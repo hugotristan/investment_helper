@@ -1,0 +1,127 @@
+import { applyLearningSignal, scoreSeries } from "../analysis/scoring.js";
+import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
+import { applyQuoteSnapshot, loadMarketContext, loadMarketSeries, loadQuoteSnapshots } from "../data/market.js";
+import { uniqueArticles } from "../data/news-helpers.js";
+import { loadNewsSources } from "../data/news.js";
+import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
+import { isBlockedAssetTicker, parseDetailTicker } from "../shared/symbols.js";
+import { escapeHtml, unique } from "../shared/text.js";
+import { persist, state } from "../storage.js";
+import { renderCategoryBars } from "../ui/components.js";
+import { els, showToast } from "../ui/dom.js";
+
+let isDetailRunning = false;
+
+export async function runStockDetail() {
+  if (isDetailRunning) {
+    showToast("Stock detail scan is already running");
+    return;
+  }
+
+  const parsed = parseDetailTicker(els.detailTickerInput.value);
+  if (!parsed.ticker) {
+    els.detailOutput.innerHTML = `<div class="empty-state">Enter a ticker, like MSFT, NVDA, VTI, or INTC.</div>`;
+    return;
+  }
+  if (isBlockedAssetTicker(parsed.ticker)) {
+    els.detailOutput.innerHTML = `<div class="empty-state">That asset type is outside this stock-and-ETF version. Use a stock or ETF ticker.</div>`;
+    return;
+  }
+
+  isDetailRunning = true;
+  state.detailTicker = parsed.ticker;
+  persist();
+  els.detailTickerInput.value = parsed.ticker;
+  els.detailButton.disabled = true;
+  els.detailOutput.innerHTML = `<div class="empty-state">Fetching live quote, one-year chart history, market context, and trusted-source evidence for ${escapeHtml(parsed.ticker)}...</div>`;
+
+  try {
+    const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
+    const [series, quotes, news, marketContext] = await Promise.all([
+      loadMarketSeries(parsed.ticker),
+      loadQuoteSnapshots([parsed.ticker]),
+      loadNewsSources(contextTickers, { allowCache: false }),
+      loadMarketContext()
+    ]);
+    const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[series.ticker] || news.byTicker[parsed.ticker] || []));
+    renderStockDetail(scored, news, marketContext, quotes);
+  } catch (error) {
+    console.error(error);
+    els.detailOutput.innerHTML = `<div class="empty-state">Could not complete the stock detail scan. Check the connection and try again.</div>`;
+  } finally {
+    isDetailRunning = false;
+    els.detailButton.disabled = false;
+  }
+}
+
+function renderStockDetail(item, news, marketContext, quoteSnapshot) {
+  const quote = item.quote || {};
+  const links = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []))
+    .filter((entry) => entry.link)
+    .slice(0, 8);
+  const sellSignal = sellSignalFor(item);
+  const holdSignal = holdSignalFor(item);
+  const currentVerdict = sellSignal?.label || holdSignal?.label || item.setup?.signal || item.label;
+  const dayRange = quote.dayLow && quote.dayHigh ? `${formatNumber(quote.dayLow)} - ${formatNumber(quote.dayHigh)}` : "-";
+  const quoteTime = quote.quoteTime ? quote.quoteTime.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "latest chart point";
+
+  els.detailOutput.innerHTML = `
+    <article class="detail-card ${item.score >= 75 ? "grade-good" : item.score >= 60 ? "grade-watch" : item.score >= 45 ? "grade-mixed" : "grade-avoid"}">
+      <div class="detail-hero">
+        <div>
+          <span>${escapeHtml(quote.name || item.ticker)}</span>
+          <h3>${escapeHtml(item.ticker)}</h3>
+          <p>${escapeHtml(currentVerdict)}. ${escapeHtml(item.reasons[0] || item.flags[0] || "No dominant signal found.")}</p>
+        </div>
+        <strong>${item.score}/100</strong>
+      </div>
+      <div class="detail-metrics">
+        ${renderMetric("Last price", formatNumber(item.latest), quote.marketState || "Yahoo intraday/chart")}
+        ${renderMetric("Today", formatPercent(item.oneDay), quote.dayChange ? formatNumber(quote.dayChange) : "daily move")}
+        ${renderMetric("1M / 6M", `${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}`, "trend")}
+        ${renderMetric("Day range", dayRange, quoteTime)}
+        ${renderMetric("Volume", compactMoney(item.latest * (quote.volume || item.averageVolume60)), "latest dollar volume")}
+        ${renderMetric("Avg liquidity", compactMoney(item.averageDollarVolume), "average dollar volume")}
+        ${renderMetric("Exchange", quote.exchange || "-", quote.currency || quote.quoteType || "metadata")}
+        ${renderMetric("52W range", `${formatNumber(item.low52Week)} - ${formatNumber(item.high52Week)}`, "quote/chart")}
+        ${renderMetric("SMA 50 / 200", `${formatNumber(item.sma50)} / ${formatNumber(item.sma200)}`, item.latest > item.sma200 ? "above 200D" : "below 200D")}
+        ${renderMetric("RSI / MACD", `${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "-"} / ${item.macd?.histogram >= 0 ? "positive" : "negative"}`, "momentum")}
+        ${renderMetric("ATR / Vol", `${formatPercent(item.atrPercent)} / ${formatPercent(item.volatility)}`, "risk")}
+        ${renderMetric("Event risk", item.eventRisk?.level || "Low", item.eventRisk?.hits?.join(", ") || "headline scan")}
+      </div>
+      ${renderCategoryBars(item.categories)}
+      <div class="detail-columns">
+        <section>
+          <span>Reasons</span>
+          <ul>${item.reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+        </section>
+        <section>
+          <span>Risk flags</span>
+          <ul>${item.flags.slice(0, 5).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
+        </section>
+      </div>
+      <div class="setup-line">
+        <span>Entry ${escapeHtml(item.setup?.entryZone || "-")}</span>
+        <span>Invalidation ${escapeHtml(item.setup ? formatNumber(item.setup.invalidation) : "-")}</span>
+        <span>Support ${escapeHtml(formatNumber(item.support))}</span>
+        <span>Resistance ${escapeHtml(formatNumber(item.resistance))}</span>
+        <span>Market ${escapeHtml(marketContext.label)}</span>
+        <span>${escapeHtml(quoteSnapshot?.label || "Quote data checked")}</span>
+      </div>
+      <div class="detail-sources">
+        <span>Source-backed evidence</span>
+        ${links.length ? links.map((entry) => `<a href="${escapeHtml(entry.link)}" target="_blank" rel="noreferrer">${escapeHtml(entry.source)}: ${escapeHtml(entry.title)}</a>`).join("") : `<p>No direct article links matched this ticker; the score leans more on price, technicals, liquidity, and broad market context.</p>`}
+      </div>
+    </article>
+  `;
+}
+
+function renderMetric(label, value, note = "") {
+  return `
+    <article class="metric-card">
+      <span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
+    </article>
+  `;
+}

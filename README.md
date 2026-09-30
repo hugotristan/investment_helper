@@ -6,7 +6,26 @@ A multi-page stock market dashboard hosted on GitHub Pages that produces ranked 
 
 Open the [live app on GitHub Pages](https://hugotristan.github.io/investment_helper/) in your browser. No installation is required.
 
-To run a local copy, open `index.html` in your browser.
+To run a local copy, serve the project directory over HTTP, then open the local URL. For example, if Python is installed, run `python -m http.server 8000 --bind 127.0.0.1` from this directory and open [http://127.0.0.1:8000](http://127.0.0.1:8000). The app uses native JavaScript modules, so opening `index.html` directly as a file is not supported. No build step or package installation is required.
+
+## Code Structure
+
+`app.js` initializes the app, connects feature controls, and manages navigation and scan timing. Feature code and data processing live in native JavaScript modules:
+
+| Location | Responsibility |
+| --- | --- |
+| `js/config/` | Scan settings, the default watchlist, trusted sources, and feeds |
+| `js/data/` | HTTP requests, ticker validation, Yahoo price/quote loading, and news scans/caching |
+| `js/analysis/` | Technical scoring, headline/outlook interpretation, market forecasts, signals, and allocation |
+| `js/features/` | Watchlist, portfolio, screener, stock detail, questions, and signal views |
+| `js/ui/` | DOM references, reusable view components, and dashboard/research/source rendering |
+| `js/shared/` | Math, formatting, text, and symbol helpers |
+| `js/storage.js` | Browser-local settings and scan history |
+| `js/scan-state.js` | Latest scan results shared by the dashboard and screener |
+
+The same GitHub Pages workflow serves these modules directly. Saved browser settings continue to use the existing storage key.
+
+Run the module regression tests with `npm test` using Node.js 18 or newer. They use Node's built-in test runner and require no installed packages.
 
 ## What It Does
 
@@ -17,6 +36,7 @@ To run a local copy, open `index.html` in your browser.
 - Pulls Yahoo Finance intraday chart data for current/latest price, day change, day range, volume, exchange metadata, and 52-week range when available.
 - Starts with a broad cross-sector opportunity universe across index ETFs, sector ETFs, mega caps, semiconductors, software, internet, financials, energy, healthcare, consumer, industrials, defense, and materials.
 - Shows the watchlist as removable ticker chips with a compact preview, an expandable full list, an add-tickers field, and a collapsible text editor for bulk changes.
+- Checks new watchlist symbols against live Yahoo Finance metadata before saving, accepting only stocks and ETFs. Bulk edits use an Apply changes button and the same validation. Unknown symbols, unsupported instruments, and temporary lookup failures leave the saved watchlist unchanged.
 - Adds a live screener page that filters the current scan by signal type, minimum score, liquidity, momentum, risk control, and volume pressure.
 - Adds a stock detail page that runs a fresh single-ticker quote, chart, technical, news, outlook, and market-context scan.
 - Pulls and analyzes a 260-source trusted stock-market universe for current headlines and macro context when available.

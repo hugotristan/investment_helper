@@ -601,6 +601,10 @@ label > span,
   font-size: 0.8rem;
 }
 
+.watchlist-bulk button {
+  margin-top: 12px;
+}
+
 .screener-controls,
 .detail-controls {
   display: grid;

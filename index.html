@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260930-watchlist-chips">
+    <link rel="stylesheet" href="styles.css?v=20260930-watchlist-validation">
   </head>
   <body>
     <header class="topbar">
@@ -43,7 +43,7 @@
               <p class="eyebrow">Settings</p>
               <h2>Scan controls</h2>
             </div>
-            <span class="disclaimer">Stocks only</span>
+            <span class="disclaimer">Stocks &amp; ETFs</span>
           </div>
           <p class="helper-text">Tune the stock universe and your tracked portfolio. The scan combines price history, trend, momentum, volatility, volume pressure, market breadth, VIX, credit risk, rate pressure, commodities, current headlines, recent trusted market outlooks, and previous scan changes stored locally.</p>
           <div class="controls-grid">
@@ -52,7 +52,7 @@
                 <h3 id="watchlistHeading">Watchlist</h3>
                 <span id="watchlistCount" class="watchlist-count"></span>
               </div>
-              <p class="watchlist-hint">Your scan universe. Remove a ticker with ×.</p>
+              <p class="watchlist-hint">Stocks and ETFs. New symbols are checked before adding. Remove a ticker with ×.</p>
               <div id="watchlistChips" class="watchlist-chips" aria-label="Watchlist tickers"></div>
               <button id="watchlistToggle" class="watchlist-toggle ghost" type="button" aria-expanded="false" aria-controls="watchlistChips" hidden>Show all</button>
               <form id="watchlistAddForm" class="watchlist-add">
@@ -66,7 +66,8 @@
               <details class="watchlist-bulk">
                 <summary>Edit as text</summary>
                 <label for="tickerInput"><span>Tickers separated by commas or spaces</span></label>
-                <textarea id="tickerInput" rows="3" spellcheck="false"></textarea>
+                <textarea id="tickerInput" rows="3" spellcheck="false" aria-describedby="watchlistMessage"></textarea>
+                <button id="watchlistApplyButton" type="button">Apply changes</button>
               </details>
             </section>
             <label>
@@ -297,6 +298,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=20260930-watchlist-chips"></script>
+    <script type="module" src="app.js?v=20260930-modules"></script>
   </body>
 </html>
