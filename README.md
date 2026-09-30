@@ -1,10 +1,12 @@
 # Investing tool
 
-A local multi-page stock market dashboard that produces ranked market signals for today's watchlist.
+A multi-page stock market dashboard hosted on GitHub Pages that produces ranked market signals for today's watchlist.
 
 ## Run It
 
-Open `index.html` in your browser.
+Open the [live app on GitHub Pages](https://hugotristan.github.io/investment_helper/) in your browser. No installation is required.
+
+To run a local copy, open `index.html` in your browser.
 
 ## What It Does
 
