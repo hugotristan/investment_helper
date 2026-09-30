@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Investing tool</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20260827-bold-type-pages">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">01</span>
+        <div>
+          <p class="eyebrow">Live market scan</p>
+          <h1 class="hero-title">Investing tool</h1>
+          <p class="hero-copy">Stock-market signals ranked through price action, market regime, source breadth, and portfolio context.</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span id="dataStatus" class="status-pill">Starting live scan</span>
+      </div>
+    </header>
+
+    <nav class="page-nav" aria-label="App pages">
+      <a href="#dashboard" data-page-link="dashboard">Dashboard</a>
+      <a href="#screener" data-page-link="screener">Screener</a>
+      <a href="#detail" data-page-link="detail">Stock detail</a>
+      <a href="#portfolio" data-page-link="portfolio">Portfolio</a>
+      <a href="#ask" data-page-link="ask">Ask</a>
+      <a href="#signals" data-page-link="signals">Signals</a>
+      <a href="#research" data-page-link="research">Research</a>
+      <a href="#sources" data-page-link="sources">Sources</a>
+    </nav>
+
+    <main class="app-shell">
+      <section class="view-page active" data-page="dashboard">
+        <section class="panel control-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h2>Scan controls</h2>
+            </div>
+            <span class="disclaimer">Stocks only</span>
+          </div>
+          <p class="helper-text">Tune the stock universe and your tracked portfolio. The scan combines price history, trend, momentum, volatility, volume pressure, market breadth, VIX, credit risk, rate pressure, commodities, current headlines, recent trusted market outlooks, and previous scan changes stored locally.</p>
+          <div class="controls-grid">
+            <label>
+              <span>Watchlist</span>
+              <textarea id="tickerInput" rows="6" spellcheck="false">SPY, QQQ, IWM, VTI, VEA, VWO, TLT, HYG, LQD, GLD, USO, UUP, XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLRE, XLB, SMH, XBI, AAPL, MSFT, NVDA, AVGO, AMD, INTC, TSM, ORCL, CRM, ADBE, NOW, PANW, GOOGL, META, AMZN, NFLX, TSLA, UBER, SHOP, PLTR, SNOW, MU, JPM, BAC, V, MA, AXP, GS, MS, BX, SCHW, XOM, CVX, COP, SLB, NEE, CEG, LLY, UNH, JNJ, MRK, ABBV, TMO, PFE, ISRG, COST, WMT, HD, MCD, NKE, SBUX, DIS, CAT, GE, DE, HON, BA, LMT, LIN, FCX, NEM, RIO</textarea>
+            </label>
+            <label>
+              <span>My portfolio</span>
+              <textarea id="myPortfolioInput" rows="6" spellcheck="false">VWRL.AS | Vanguard FTSE All-World | 9300 | up
+MSFT | Microsoft | 300 | down
+TSM | TSMC | 250 | down
+AVGO | Broadcom | 250 | down
+NVDA | Nvidia | 150 | down
+GOOGL | Google | 150 | down</textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="grid summary-grid">
+          <article class="panel">
+            <p class="eyebrow">Live pulse</p>
+            <h2 id="marketPulseTitle">Scanning market</h2>
+            <div id="marketPulse" class="pulse-grid"></div>
+          </article>
+          <article class="panel">
+            <p class="eyebrow">Refresh</p>
+            <h2 id="refreshTitle">Deep live scan</h2>
+            <div class="refresh-box">
+              <span>Last scan</span>
+              <strong id="lastScan">Not yet</strong>
+              <span>Timer</span>
+              <strong id="nextScan">Starting now</strong>
+            </div>
+          </article>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Market prediction</p>
+              <h2>Model forecast and confidence</h2>
+            </div>
+            <span class="disclaimer">Probabilistic</span>
+          </div>
+          <div id="marketForecast" class="forecast-box">
+            <div class="empty-state">Forecast will appear after the first deep scan.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="screener" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Live screener</p>
+              <h2>Find the strongest setups</h2>
+            </div>
+            <span class="disclaimer">Current scan</span>
+          </div>
+          <p class="helper-text">Filter the live watchlist by score, signal type, liquidity, momentum, and risk. The screener uses current Yahoo intraday chart data when available, one-year chart history, and the trusted-source headline/outlook scan.</p>
+          <div class="screener-controls">
+            <label>
+              <span>Signal filter</span>
+              <select id="screenerSignal">
+                <option value="actionable" selected>Actionable setups</option>
+                <option value="buy">Buy / buy-watch</option>
+                <option value="hold">Hold candidates</option>
+                <option value="avoid">Avoid new buys</option>
+                <option value="sell">Sell / reduce</option>
+                <option value="all">All scanned tickers</option>
+              </select>
+            </label>
+            <label>
+              <span>Minimum score</span>
+              <input id="screenerMinScore" type="number" min="0" max="100" step="1" value="50">
+            </label>
+            <label>
+              <span>Minimum liquidity, $M</span>
+              <input id="screenerMinLiquidity" type="number" min="0" step="1" value="5">
+            </label>
+            <label>
+              <span>Sort by</span>
+              <select id="screenerSort">
+                <option value="score" selected>Overall score</option>
+                <option value="momentum">Momentum</option>
+                <option value="risk">Risk control</option>
+                <option value="liquidity">Liquidity</option>
+                <option value="volume">Volume pressure</option>
+              </select>
+            </label>
+          </div>
+          <div id="screenerResults" class="screener-results">
+            <div class="empty-state">The screener will populate after the first live scan.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="detail" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Stock detail</p>
+              <h2>One ticker, full scan</h2>
+            </div>
+            <span class="disclaimer">Fresh fetch</span>
+          </div>
+          <p class="helper-text">Enter a ticker to pull a fresh Yahoo intraday/chart scan, technical score, sell/hold logic, source-backed evidence, and broad-market context for that single stock or ETF.</p>
+          <div class="detail-controls">
+            <input id="detailTickerInput" type="search" placeholder="Example: MSFT">
+            <button id="detailButton" type="button">Analyze ticker</button>
+          </div>
+          <div id="detailOutput" class="detail-output">
+            <div class="empty-state">Enter a ticker or open one from the screener.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="portfolio" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Personal portfolio</p>
+              <h2>Your current holdings</h2>
+            </div>
+            <span class="disclaimer">Position-aware</span>
+          </div>
+          <div id="portfolioReview" class="portfolio-review">
+            <div class="empty-state">Your portfolio review will appear after the live scan.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="ask" hidden>
+        <section class="panel ask-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Ask the model</p>
+              <h2>Ask whether to sell a stock today</h2>
+            </div>
+            <span class="disclaimer">Deep answer</span>
+          </div>
+          <div class="ask-controls">
+            <input id="askInput" type="search" placeholder="Example: Should I sell Microsoft today?">
+            <button id="askButton" type="button">Ask</button>
+          </div>
+          <div id="askAnswer" class="ask-answer">
+            <div class="empty-state">Ask about a ticker or company name and the model will run a focused live stock scan.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="signals" hidden>
+        <section class="panel primary-output">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Signal ranking</p>
+              <h2>Market signals ranked today</h2>
+            </div>
+            <span class="disclaimer">Not personal advice</span>
+          </div>
+          <div id="modelInstructions" class="model-instructions">
+            <div class="empty-state">Running live research...</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Exit model</p>
+              <h2>What the model would sell or hold</h2>
+            </div>
+            <span class="disclaimer">Watchlist only</span>
+          </div>
+          <div id="sellGuidance" class="sell-guidance">
+            <div class="empty-state">Sell and hold signals will appear after the live scan.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Full ranking</p>
+              <h2>All scanned tickers</h2>
+            </div>
+          </div>
+          <div id="analysisResults" class="analysis-results">
+            <div class="empty-state">Waiting for ranked output.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="research" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Evidence</p>
+              <h2>Why the model chose this</h2>
+            </div>
+          </div>
+          <div id="researchEvidence" class="evidence-grid">
+            <div class="empty-state">Evidence will appear after the first live scan.</div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Framework</p>
+              <h2>Market knowledge used by the model</h2>
+            </div>
+            <span class="disclaimer">Rules based</span>
+          </div>
+          <div id="marketFramework" class="framework-grid">
+            <div class="empty-state">Framework details will appear after the first scan.</div>
+          </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="sources" hidden>
+        <section class="panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Source coverage</p>
+              <h2>Live sources checked</h2>
+            </div>
+          </div>
+          <div id="sourceStatus" class="source-grid">
+            <div class="empty-state">Source status will appear after the first live scan.</div>
+          </div>
+        </section>
+
+        <section class="source-note">
+          <strong>Data sources:</strong> Yahoo Finance intraday and one-year chart data plus a 260-source trusted universe scanned through GDELT live news JSON and direct RSS feeds where available, including official SEC, Fed, BLS, BEA, FTC, EIA, and ECB feeds. The app also checks broad-market proxies including SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GLD, USO, UUP, and VIX to estimate market regime. Buy, sell, hold, and forecast outputs are probabilistic model signals only. This app does not place trades or guarantee returns.
+        </section>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js?v=20260827-bold-type-pages"></script>
+  </body>
+</html>
