@@ -16,6 +16,7 @@ To run a local copy, open `index.html` in your browser.
 - Pulls Yahoo Finance chart data for watchlist price history and broad-market proxy data.
 - Pulls Yahoo Finance intraday chart data for current/latest price, day change, day range, volume, exchange metadata, and 52-week range when available.
 - Starts with a broad cross-sector opportunity universe across index ETFs, sector ETFs, mega caps, semiconductors, software, internet, financials, energy, healthcare, consumer, industrials, defense, and materials.
+- Shows the watchlist as removable ticker chips with a compact preview, an expandable full list, an add-tickers field, and a collapsible text editor for bulk changes.
 - Adds a live screener page that filters the current scan by signal type, minimum score, liquidity, momentum, risk control, and volume pressure.
 - Adds a stock detail page that runs a fresh single-ticker quote, chart, technical, news, outlook, and market-context scan.
 - Pulls and analyzes a 260-source trusted stock-market universe for current headlines and macro context when available.

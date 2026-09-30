@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260827-bold-type-pages">
+    <link rel="stylesheet" href="styles.css?v=20260930-watchlist-chips">
   </head>
   <body>
     <header class="topbar">
@@ -47,10 +47,28 @@
           </div>
           <p class="helper-text">Tune the stock universe and your tracked portfolio. The scan combines price history, trend, momentum, volatility, volume pressure, market breadth, VIX, credit risk, rate pressure, commodities, current headlines, recent trusted market outlooks, and previous scan changes stored locally.</p>
           <div class="controls-grid">
-            <label>
-              <span>Watchlist</span>
-              <textarea id="tickerInput" rows="6" spellcheck="false">SPY, QQQ, IWM, VTI, VEA, VWO, TLT, HYG, LQD, GLD, USO, UUP, XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLRE, XLB, SMH, XBI, AAPL, MSFT, NVDA, AVGO, AMD, INTC, TSM, ORCL, CRM, ADBE, NOW, PANW, GOOGL, META, AMZN, NFLX, TSLA, UBER, SHOP, PLTR, SNOW, MU, JPM, BAC, V, MA, AXP, GS, MS, BX, SCHW, XOM, CVX, COP, SLB, NEE, CEG, LLY, UNH, JNJ, MRK, ABBV, TMO, PFE, ISRG, COST, WMT, HD, MCD, NKE, SBUX, DIS, CAT, GE, DE, HON, BA, LMT, LIN, FCX, NEM, RIO</textarea>
-            </label>
+            <section class="watchlist-editor" aria-labelledby="watchlistHeading">
+              <div class="watchlist-heading">
+                <h3 id="watchlistHeading">Watchlist</h3>
+                <span id="watchlistCount" class="watchlist-count"></span>
+              </div>
+              <p class="watchlist-hint">Your scan universe. Remove a ticker with ×.</p>
+              <div id="watchlistChips" class="watchlist-chips" aria-label="Watchlist tickers"></div>
+              <button id="watchlistToggle" class="watchlist-toggle ghost" type="button" aria-expanded="false" aria-controls="watchlistChips" hidden>Show all</button>
+              <form id="watchlistAddForm" class="watchlist-add">
+                <label for="watchlistAddInput"><span>Add tickers</span></label>
+                <div class="watchlist-add-row">
+                  <input id="watchlistAddInput" type="text" placeholder="e.g. AAPL, MSFT" autocomplete="off" spellcheck="false" aria-describedby="watchlistMessage">
+                  <button type="submit">Add +</button>
+                </div>
+              </form>
+              <p id="watchlistMessage" class="watchlist-message" role="status" aria-live="polite"></p>
+              <details class="watchlist-bulk">
+                <summary>Edit as text</summary>
+                <label for="tickerInput"><span>Tickers separated by commas or spaces</span></label>
+                <textarea id="tickerInput" rows="3" spellcheck="false"></textarea>
+              </details>
+            </section>
             <label>
               <span>My portfolio</span>
               <textarea id="myPortfolioInput" rows="6" spellcheck="false"></textarea>
@@ -279,6 +297,6 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=20260827-bold-type-pages"></script>
+    <script src="app.js?v=20260930-watchlist-chips"></script>
   </body>
 </html>

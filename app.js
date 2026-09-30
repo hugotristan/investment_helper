@@ -433,6 +433,12 @@ VanEck|vaneck.com
     viewPages: document.querySelectorAll("[data-page]"),
     pageLinks: document.querySelectorAll("[data-page-link]"),
     tickerInput: document.getElementById("tickerInput"),
+    watchlistChips: document.getElementById("watchlistChips"),
+    watchlistCount: document.getElementById("watchlistCount"),
+    watchlistToggle: document.getElementById("watchlistToggle"),
+    watchlistAddForm: document.getElementById("watchlistAddForm"),
+    watchlistAddInput: document.getElementById("watchlistAddInput"),
+    watchlistMessage: document.getElementById("watchlistMessage"),
     myPortfolioInput: document.getElementById("myPortfolioInput"),
     screenerSignal: document.getElementById("screenerSignal"),
     screenerMinScore: document.getElementById("screenerMinScore"),
@@ -462,6 +468,7 @@ VanEck|vaneck.com
   };
 
   let autoRefreshTimer = null;
+  let watchlistExpanded = false;
   let refreshTicker = null;
   let inputScanTimer = null;
   let scanStartedAt = null;
@@ -490,6 +497,7 @@ VanEck|vaneck.com
 
   function hydrateInputs() {
     els.tickerInput.value = state.tickerInput;
+    renderWatchlist();
     els.myPortfolioInput.value = state.myPortfolioInput;
     els.screenerSignal.value = state.screenerSignal;
     els.screenerMinScore.value = state.screenerMinScore;
@@ -502,9 +510,33 @@ VanEck|vaneck.com
     ["tickerInput", "myPortfolioInput"].forEach((key) => {
       els[key].addEventListener("input", () => {
         state[key] = els[key].value;
+        if (key === "tickerInput") {
+          renderWatchlist();
+          els.watchlistMessage.textContent = "Watchlist saved.";
+        }
         persist();
         scheduleConfigScan();
       });
+    });
+
+    els.watchlistAddForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      addWatchlistTickers();
+    });
+    els.watchlistToggle.addEventListener("click", () => {
+      watchlistExpanded = !watchlistExpanded;
+      renderWatchlist();
+    });
+    els.watchlistChips.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-remove-ticker]");
+      if (!button) return;
+      const ticker = button.dataset.removeTicker;
+      const buttons = Array.from(els.watchlistChips.querySelectorAll("[data-remove-ticker]"));
+      const index = buttons.indexOf(button);
+      updateWatchlist(parseTickers(state.tickerInput).filter((item) => item !== ticker));
+      els.watchlistMessage.textContent = `${ticker} removed. Watchlist saved.`;
+      const remaining = els.watchlistChips.querySelectorAll("[data-remove-ticker]");
+      (remaining[Math.min(index, remaining.length - 1)] || els.watchlistAddInput).focus();
     });
 
     ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort"].forEach((key) => {
@@ -539,6 +571,51 @@ VanEck|vaneck.com
       if (event.key === "Enter") answerQuestion();
     });
     window.addEventListener("hashchange", syncActivePage);
+  }
+
+  function renderWatchlist() {
+    const tickers = parseTickers(state.tickerInput);
+    const previewCount = 16;
+    const visible = watchlistExpanded ? tickers : tickers.slice(0, previewCount);
+    els.watchlistCount.textContent = `${tickers.length} ticker${tickers.length === 1 ? "" : "s"}`;
+    els.watchlistChips.innerHTML = visible.length
+      ? visible.map((ticker) => `<button type="button" class="ticker-chip" data-remove-ticker="${escapeHtml(ticker)}" aria-label="Remove ${escapeHtml(ticker)} from watchlist"><span>${escapeHtml(ticker)}</span><span class="ticker-chip-remove" aria-hidden="true">×</span></button>`).join("")
+      : `<p class="watchlist-empty">Add tickers to build your watchlist.</p>`;
+    els.watchlistToggle.hidden = tickers.length <= previewCount;
+    els.watchlistToggle.textContent = watchlistExpanded ? "Show less" : `Show all ${tickers.length} tickers`;
+    els.watchlistToggle.setAttribute("aria-expanded", String(watchlistExpanded));
+  }
+
+  function updateWatchlist(tickers) {
+    els.tickerInput.value = tickers.join(", ");
+    els.tickerInput.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function addWatchlistTickers() {
+    const input = els.watchlistAddInput.value.trim().toUpperCase();
+    const entries = input.split(/[\s,;]+/).filter(Boolean);
+    if (!entries.length || entries.some((ticker) => !/^[A-Z0-9.^-]+$/.test(ticker))) {
+      els.watchlistMessage.textContent = "Enter ticker symbols separated by commas or spaces.";
+      return;
+    }
+    if (entries.some(isBlockedAssetTicker)) {
+      els.watchlistMessage.textContent = "This watchlist supports stocks and ETFs. Remove cryptocurrency symbols to continue.";
+      return;
+    }
+    const current = parseTickers(state.tickerInput);
+    const additions = unique(entries).filter((ticker) => !current.includes(ticker));
+    if (!additions.length) {
+      els.watchlistMessage.textContent = "Those tickers are already on your watchlist.";
+      return;
+    }
+    if (current.length + additions.length > 90) {
+      els.watchlistMessage.textContent = "Your watchlist can hold up to 90 tickers. Remove some before adding more.";
+      return;
+    }
+    updateWatchlist(current.concat(additions));
+    els.watchlistAddInput.value = "";
+    els.watchlistMessage.textContent = `${additions.join(", ")} added. Watchlist saved.`;
+    els.watchlistAddInput.focus();
   }
 
   function syncActivePage() {

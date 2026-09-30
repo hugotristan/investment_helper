@@ -459,6 +459,146 @@ label > span,
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
+  align-items: start;
+}
+
+.watchlist-editor {
+  min-width: 0;
+  border: 1px solid var(--border);
+  padding: 20px;
+  background: var(--card);
+}
+
+.watchlist-heading,
+.watchlist-add-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.watchlist-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.watchlist-heading h3 {
+  font-size: 1.25rem;
+}
+
+.watchlist-count {
+  padding: 4px 9px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 0.7rem;
+}
+
+.watchlist-hint,
+.watchlist-empty,
+.watchlist-message {
+  margin: 10px 0 16px;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.watchlist-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ticker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.ticker-chip::after {
+  content: none;
+}
+
+.ticker-chip-remove {
+  color: var(--muted-foreground);
+  font-size: 1rem;
+}
+
+.ticker-chip:hover,
+.ticker-chip:focus-visible {
+  border-color: var(--accent);
+  background: var(--muted-strong);
+}
+
+.ticker-chip:hover .ticker-chip-remove,
+.ticker-chip:focus-visible .ticker-chip-remove {
+  color: var(--accent);
+}
+
+.watchlist-toggle {
+  margin-top: 10px;
+  min-height: 40px;
+  font-size: 0.7rem;
+}
+
+.watchlist-toggle[hidden] {
+  display: none;
+}
+
+.watchlist-add {
+  margin-top: 22px;
+}
+
+.watchlist-add-row input {
+  min-width: 0;
+  flex: 1;
+}
+
+.watchlist-add-row button {
+  flex-shrink: 0;
+}
+
+.watchlist-message {
+  margin: 10px 0;
+}
+
+.watchlist-message:empty {
+  display: none;
+}
+
+.watchlist-bulk {
+  margin-top: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.watchlist-bulk summary {
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+}
+
+.watchlist-bulk summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.watchlist-bulk label {
+  margin-top: 16px;
+}
+
+.watchlist-bulk textarea {
+  min-height: 100px;
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 0.8rem;
 }
 
 .screener-controls,
