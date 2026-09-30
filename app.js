@@ -414,14 +414,7 @@ VanEck|vaneck.com
 
   const defaults = {
     tickerInput: opportunityUniverse.join(", "),
-    myPortfolioInput: [
-      "VWRL.AS | Vanguard FTSE All-World | 9300 | up",
-      "MSFT | Microsoft | 300 | down",
-      "TSM | TSMC | 250 | down",
-      "AVGO | Broadcom | 250 | down",
-      "NVDA | Nvidia | 150 | down",
-      "GOOGL | Google | 150 | down"
-    ].join("\n"),
+    myPortfolioInput: "",
     screenerSignal: "actionable",
     screenerMinScore: 50,
     screenerMinLiquidity: 5,
