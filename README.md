@@ -59,6 +59,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Saves structured holdings with shares, average purchase price, and currency. Calculates current value and unrealized gain from qualified matching-currency prices, with separate totals for each currency.
 - Shows a "do not buy today" ticker from the weakest setup.
 - Stores recent scan history locally in the browser.
+- Tracks dated research picks against SPY after five and 21 later matching market sessions. Original evidence and observed baseline prices are preserved; pending results remain pending. The Performance page exports the browser-local journal.
 
 ## Important
 
@@ -95,5 +96,11 @@ Sources can explain and score candidates, but they cannot recommend a stock the 
 The personal portfolio starts empty. On My portfolio, enter a stock/ETF symbol, shares, average purchase price, and purchase currency, then select Save holding. New symbols are validated before saving. Qualified matching-currency quotes calculate current value, cost basis, unrealized gain, and allocation within each currency. Totals keep different currencies separate; gains exclude fees, dividends, taxes, and currency conversion. Missing or stale prices remain unavailable.
 
 Existing text entries are preserved as manual amounts until edited into structured holdings; the app does not infer share counts or purchase prices. Holdings can be edited, removed, and restored with Undo. Saved holdings stay in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
+
+## Recommendation Performance
+
+Complete fresh scans record up to three qualifying opportunities once per ticker per UTC day. Each record freezes the score, reasons, risks, evidence, observation time, and same-currency stock/SPY baseline prices. Cached or preliminary scans cannot create records. Performance tracking starts when a pick is recorded in your browser; no past recommendations or returns are invented.
+
+The Performance page compares observed price changes after five and 21 later matching market sessions. Today's incomplete daily bar is excluded. Missing prices, different currencies, and splits that require price adjustment leave the result unavailable. Mature results retain their original observations when old histories roll off. Results exclude dividends, fees, taxes, and currency conversion and describe observed research performance, not executed trades. Averages use only completed results and display their sample count. Export the local journal to keep a copy; clearing browser storage removes local records.
 
 The app also runs dedicated recent-market-outlook scans. These look for strategist forecasts, market perspectives, weekly commentary, asset-allocation views, overweight/underweight calls, stock-idea articles, and official macro outlooks from trusted research providers and institutions including BlackRock, Vanguard, J.P. Morgan, Fidelity, Morningstar, Schwab, Goldman Sachs, Morgan Stanley, UBS, PIMCO, Motley Fool, the Federal Reserve, IMF, OECD, World Bank, ECB, BEA, BLS, Census, and EIA. Outlook items are scored separately from breaking news, then used as a modest positive or negative adjustment to each ticker or ETF theme.

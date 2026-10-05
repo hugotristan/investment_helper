@@ -24,6 +24,7 @@
           <a href="#portfolio" data-page-link="portfolio"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18m-11-2h4v4h-4z"/></svg><span>My portfolio</span></a>
           <a href="#ask" data-page-link="ask"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H8l-5 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/><path d="M8 11h8m-8 4h4"/></svg><span>Ask the model</span></a>
           <a href="#signals" data-page-link="signals"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 12 4-7 4 14 4-11 3 4h3"/></svg><span>Market signals</span></a>
+          <a href="#performance" data-page-link="performance"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4m0 16h16M8 16v-5m5 5V8m5 8V5"/><path d="m7 6 5-3 6 1"/></svg><span>Performance</span></a>
           <a href="#research" data-page-link="research"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h12l4 4v14H4zM16 3v5h4M8 12h8m-8 4h5"/></svg><span>Research</span></a>
           <a href="#sources" data-page-link="sources"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><span>Data sources</span></a>
         </nav>
@@ -277,6 +278,25 @@
           <div id="analysisResults" class="analysis-results">
             <div class="empty-state">Waiting for ranked output.</div>
           </div>
+        </section>
+      </section>
+
+      <section class="view-page" data-page="performance" hidden>
+        <section class="panel performance-panel" aria-labelledby="performanceHeading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Forward tracking</p><h2 id="performanceHeading">Recommendation performance</h2></div>
+            <button id="exportRecommendations" class="ghost" type="button" disabled>Export records</button>
+          </div>
+          <p class="performance-intro">Follow dated picks saved in this browser and compare their later price returns with SPY. Tracking starts when a pick is recorded; its original signal and evidence stay frozen.</p>
+          <div id="performanceSummary" class="performance-summary" aria-label="Recommendation tracking summary">
+            <article class="performance-metric"><span>Completed outcomes</span><strong>—</strong><small>After matching trading sessions</small></article>
+            <article class="performance-metric"><span>Pending outcomes</span><strong>—</strong><small>Waiting for enough price history</small></article>
+            <article class="performance-metric"><span>Unavailable outcomes</span><strong>—</strong><small>Missing qualified comparison data</small></article>
+          </div>
+          <p id="performanceStatus" class="performance-status-line" role="status" aria-live="polite">Loading the recommendations saved in this browser.</p>
+          <div id="performanceEmpty" class="performance-empty empty-state">No tracked recommendations yet. Qualified future picks will appear here with their recorded dates; price outcomes become available as trading sessions pass.</div>
+          <div id="performanceTable" class="performance-table-container"></div>
+          <p class="performance-method">Returns are checked after 5 and 21 matching stock and SPY trading sessions. Price returns exclude fees, dividends, and currency conversion. These records track signals; the app places no trades.</p>
         </section>
       </section>
 

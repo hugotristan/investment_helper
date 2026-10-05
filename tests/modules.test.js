@@ -16,7 +16,7 @@ const { state, persist, saveLearningSnapshot, latestLearningPoint } = await impo
 const { scoreSeries, applyLearningSignal, stableRankSort } = await import("../js/analysis/scoring.js");
 const { buildModelAllocation } = await import("../js/analysis/allocation.js");
 const { buildPortfolioReview, parsePortfolioPositions } = await import("../js/features/portfolio.js");
-const { validateWatchlistTicker } = await import("../js/data/market.js");
+const { validateWatchlistTicker, loadMarketSeries } = await import("../js/data/market.js");
 
 beforeEach(() => {
   saved.clear();
@@ -105,6 +105,24 @@ test("ticker validation requires matching live stock or ETF metadata", async (t)
   assert.equal(await validateWatchlistTicker("ZZZZ"), "invalid");
   globalThis.fetch = async () => { throw new Error("Offline"); };
   assert.equal(await validateWatchlistTicker("ACME"), "unavailable");
+});
+
+test("daily market history preserves currency and dated split events for forward tracking", async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => { globalThis.fetch = originalFetch; });
+  const time = Math.floor(Date.now() / 1000) - 86400;
+  let request;
+  globalThis.fetch = async (url) => {
+    request = String(url);
+    return Response.json({ chart: { result: [{ meta: { symbol: "ACME", currency: "USD", instrumentType: "EQUITY" },
+      timestamp: [time], indicators: { quote: [{ close: [100] }] },
+      events: { splits: { [time]: { date: time, numerator: 2, denominator: 1, splitRatio: "2:1" } } }
+    }] } });
+  };
+  const result = await loadMarketSeries("ACME");
+  assert.match(request, /events=splits/);
+  assert.equal(result.currency, "USD");
+  assert.deepEqual(result.splits, [{ date: new Date(time * 1000).toISOString(), numerator: 2, denominator: 1, splitRatio: "2:1" }]);
 });
 
 test("all native module imports resolve without circular dependencies", async () => {

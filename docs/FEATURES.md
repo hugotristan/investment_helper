@@ -41,3 +41,11 @@ Each feature is delivered in its own commit. This log records the behavior, impl
 **How:** A pure holdings calculator checks quote dates and exact currency matches, falls back to qualified daily history, and keeps missing values explicit. Saved changes trigger a new scan. Gains exclude fees, dividends, taxes, and currency conversion. Migration preserves old amounts without inventing share counts or costs.
 
 **Validation:** Tests cover input normalization, dated prices, stale/sample rejection, exact currency matching, daily fallback, incomplete totals, gains, and legacy preservation. Browser checks cover save/edit/remove/Undo, invalid symbols, persistence, and mobile layout.
+
+## 6. Dated recommendation performance
+
+**What changed:** A Performance page tracks future price changes for saved research picks against SPY after five and 21 matching sessions. It shows pending/unavailable results explicitly, sample counts, and an exportable local journal. The original score, reasons, risks, sources, and baseline prices stay with each pick.
+
+**How:** Only complete fresh scans record qualified candidates, once per ticker per UTC day. Stock and benchmark baselines use the same date and currency. Outcomes require later matched dates and exclude today's incomplete bar. Known splits block unadjusted comparisons. Mature observations persist when older histories disappear; averages include only mature results. No historical picks, trade fills, dividends, fees, or currency conversion are assumed.
+
+**Validation:** Tests cover immutable recording, duplicate refreshes, fresh-scan guards, exact matching sessions, missing/currency/stale/sample data, split events, mature observation retention, storage failures, and the export payload. Browser checks cover the new page, pending results, frozen evidence, ticker links, reload persistence, and responsive layout.

@@ -162,7 +162,7 @@ export function applyQuoteSnapshot(series, quoteMap) {
 }
 
 export async function loadMarketSeries(ticker) {
-  const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d`;
+  const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d&events=splits`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
   for (const [index, url] of [directUrl, proxyUrl].entries()) {
@@ -210,6 +210,10 @@ function parseYahooChart(json, ticker) {
     historyAsOf: prices.at(-1)?.date?.toISOString() || null,
     instrumentType: result?.meta?.instrumentType || "",
     currency: result?.meta?.currency || "",
+    splits: Object.values(result?.events?.splits || {}).map((event) => ({
+      date: Number.isFinite(event.date) ? new Date(event.date * 1000).toISOString() : null,
+      numerator: event.numerator, denominator: event.denominator, splitRatio: event.splitRatio
+    })).filter((event) => event.date),
     source: "Yahoo Finance chart"
   };
 }

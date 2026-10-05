@@ -8,6 +8,7 @@ import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
+import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, renderWatchlist } from "./js/features/watchlist.js";
@@ -36,6 +37,7 @@ init();
 
 function init() {
   hydrateInputs();
+  initializePerformance();
   bindEvents();
   syncActivePage();
   restoreCachedScan();
@@ -105,7 +107,7 @@ async function runAnalysis(options = {}) {
     return;
   }
   const tickers = unique(parseTickers(state.tickerInput)
-    .concat(getPortfolioHoldings().map((holding) => holding.ticker), opportunityUniverse))
+    .concat(getPortfolioHoldings().map((holding) => holding.ticker), getRecommendationTickers(), opportunityUniverse, ["SPY"]))
     .filter((ticker) => !isBlockedAssetTicker(ticker))
     .slice(0, 180);
   if (!tickers.length) {
@@ -145,6 +147,7 @@ async function runAnalysis(options = {}) {
     const ranked = rankSeries(series, quotes, news.byTicker);
 
     renderAll(ranked, priceSource, news, marketContext, quotes);
+    recordRecommendations(ranked, marketContext);
     cachedScanAt = null;
     saveLearningSnapshot(ranked, priceSource, news.label);
     saveScanCache({ series, quotes, news, marketContext });
@@ -186,6 +189,7 @@ function restoreCachedScan() {
   const ranked = rankSeries(series, cached.quotes, cached.news.byTicker);
   cachedScanAt = cached.savedAt;
   renderAll(ranked, series[0].source, cached.news, cached.marketContext, cached.quotes, { scannedAt: cached.savedAt });
+  renderPerformance(ranked);
   setScanStage(`Showing saved scan from ${new Date(cached.savedAt).toLocaleString()}. A fresh scan is starting.`);
 }
 
