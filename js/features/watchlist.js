@@ -22,15 +22,23 @@ export function renderWatchlist() {
   els.watchlistToggle.setAttribute("aria-expanded", String(watchlistExpanded));
 }
 
-function updateWatchlist(tickers) {
+export async function addTickerToWatchlist(ticker) {
+  if (parseTickers(state.tickerInput).includes(ticker)) return { ok: true, changed: false, message: `${ticker} is already on your watchlist.` };
+  if (isWatchlistValidating) return { ok: false, changed: false, message: "Another ticker check is running. Try again shortly." };
+  await saveWatchlistInput(ticker, false, false);
+  const ok = parseTickers(state.tickerInput).includes(ticker);
+  return { ok, changed: ok, message: els.watchlistMessage.textContent };
+}
+
+function updateWatchlist(tickers, notify = true) {
   state.tickerInput = tickers.join(", ");
   els.tickerInput.value = state.tickerInput;
   renderWatchlist();
   persist();
-  onWatchlistChange();
+  if (notify) onWatchlistChange();
 }
 
-async function saveWatchlistInput(value, replace) {
+async function saveWatchlistInput(value, replace, notify = true) {
   if (isWatchlistValidating) return;
   const input = value.trim().toUpperCase();
   const entries = input.split(/[\s,;]+/).filter(Boolean);
@@ -70,7 +78,7 @@ async function saveWatchlistInput(value, replace) {
         return;
       }
     }
-    updateWatchlist(next);
+    updateWatchlist(next, notify);
     if (!replace) els.watchlistAddInput.value = "";
     els.watchlistMessage.textContent = replace ? "Watchlist saved." : `${additions.join(", ")} added. Watchlist saved.`;
   } catch {

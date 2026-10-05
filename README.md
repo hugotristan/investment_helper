@@ -48,6 +48,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Shows the rules-based market framework used for trend, momentum, risk, diversification, market regime, recent-year research, and known data gaps.
 - Shows category scores, signal strength, timeframe, entry zone, invalidation level, support/resistance, and risk level. Scores are rules-based measures, not calibrated success probabilities.
 - Requires recent real history with at least 200 distinct daily prices before generating investment signals. Sample, stale, future-dated, and incomplete histories are excluded; a quote cannot make invalid history usable.
+- Highlights up to three individual stock opportunities with recent direct company evidence, explicit reasons and risks, dates, and detail/watchlist actions. Discovery scans the configured universe independently of the saved watchlist and can return no qualifying opportunity.
 - Produces a rules-based market-regime score using qualified equity breadth, VIX, credit appetite, bond/rate pressure, dollar pressure, oil, and gold histories.
 - Outputs model allocations by ticker and percentage.
 - Answers focused natural-language questions such as "Should I sell Intel stock today?" or "Should I sell Microsoft today?"

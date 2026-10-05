@@ -54,6 +54,11 @@
 
     <main class="app-shell">
       <section class="view-page active" data-page="dashboard">
+        <section class="panel opportunities-panel" aria-labelledby="opportunityHeading">
+          <div class="panel-heading"><div><p class="eyebrow">Evidence-led discovery</p><h2 id="opportunityHeading">Today's opportunities</h2></div><a href="#screener">Explore all <span aria-hidden="true">↗</span></a></div>
+          <div id="opportunityCards" class="opportunity-cards"><div class="empty-state">Checking recent real prices and company-specific evidence. An opportunity appears only when the data and risk checks pass.</div></div>
+          <p id="opportunityMessage" role="status" aria-live="polite"></p>
+        </section>
         <div id="dashboardStats" class="dashboard-stats" aria-label="Scan summary">
           <article class="stat-card"><span class="stat-label">Tickers scanned</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
           <article class="stat-card"><span class="stat-label">Average score</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>

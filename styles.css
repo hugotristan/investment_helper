@@ -484,3 +484,72 @@ label > span, .sell-column-head span, .forecast-head span, .detail-hero span, .m
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+/* Evidence-led opportunities: a lead candidate and compact alternatives. */
+.opportunity-cards { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+.opportunity-cards:has(> .opportunity-card:only-child) { grid-template-columns: minmax(0, 1fr); }
+.opportunity-cards:has(> .opportunity-card:nth-child(2):last-child) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.opportunity-card { display: flex; flex-direction: column; min-width: 0; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: #141b27; }
+.opportunity-card.opportunity-lead { border-color: #37598a; background: linear-gradient(130deg, #192942, #141b27 75%); }
+.opportunity-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.opportunity-head > div:first-child { min-width: 0; }
+.opportunity-head h3 { margin: 0 0 5px; font-size: 1.04rem; }
+.opportunity-head h3 a { color: #e4edfc; }
+.opportunity-head h3 a:hover { color: #9dc4ff; }
+.opportunity-name { display: block; min-width: 0; color: #95a5bd; font-size: .72rem; line-height: 1.6; }
+.opportunity-price { flex-shrink: 0; color: #e0e9f9; text-align: right; font-variant-numeric: tabular-nums; }
+.opportunity-price strong { display: block; font-size: 1.13rem; font-weight: 500; letter-spacing: -.04em; }
+.opportunity-price span, .opportunity-price small { display: block; font-size: .7rem; line-height: 1.6; }
+.opportunity-lead .opportunity-head h3 { font-size: 1.2rem; }
+.opportunity-lead .opportunity-price strong { font-size: 1.4rem; }
+.opportunity-strength { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 16px 0 14px; color: #afc9f2; font-size: .7rem; line-height: 1.6; }
+.opportunity-strength > span, .opportunity-strength > strong { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #30476a; border-radius: 5px; background: #1b2b43; font-size: .7rem; font-weight: 500; }
+.opportunity-card p { color: #9aa9c0; font-size: .74rem; line-height: 1.7; }
+.opportunity-reasons, .opportunity-risks { margin: 0 0 15px; padding-left: 0; color: #b2c0d5; font-size: .74rem; line-height: 1.7; }
+.opportunity-reasons ul, .opportunity-risks ul { margin: 0; padding-left: 17px; }
+.opportunity-reasons li, .opportunity-risks li { margin: 0 0 7px; padding-left: 2px; }
+.opportunity-reasons li::marker { color: #719ad9; }
+.opportunity-risks { padding-top: 13px; border-top: 1px solid #2c3443; color: #c3b299; }
+.opportunity-risks li::marker { color: #bf985a; }
+.opportunity-reasons strong, .opportunity-risks strong { color: #d2dded; font-weight: 500; }
+.opportunity-reasons h4, .opportunity-risks h4 { margin: 0 0 9px; color: #b4c5df; font-size: .7rem; font-weight: 500; line-height: 1.5; }
+.opportunity-risks h4 { color: #d7be98; }
+.opportunity-meta { display: grid; gap: 9px 15px; margin: auto 0 15px; padding-top: 2px; color: #8d9db6; font-size: .69rem; line-height: 1.7; }
+.opportunity-lead .opportunity-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.opportunity-meta > div { min-width: 0; }
+.opportunity-meta dt { margin: 0 0 2px; color: #8d9db6; font-size: .69rem; }
+.opportunity-meta dd { margin: 0; color: #c1d0e5; font-size: .73rem; overflow-wrap: anywhere; }
+.opportunity-sources { display: block; margin-bottom: 15px; padding-top: 12px; border-top: 1px solid #283448; color: #8e9fba; font-size: .7rem; line-height: 1.65; }
+.opportunity-sources summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 25px; cursor: pointer; color: #a8c4ec; font-size: .71rem; font-weight: 500; list-style: none; }
+.opportunity-sources summary::-webkit-details-marker { display: none; }
+.opportunity-sources summary::after { content: "+"; flex-shrink: 0; color: #a8c4ec; font-size: 1rem; line-height: 1; }
+.opportunity-sources[open] summary::after { content: "−"; }
+.opportunity-source { margin-top: 12px; }
+.opportunity-sources a { display: block; min-width: 0; overflow-wrap: anywhere; color: #9bbff4; }
+.opportunity-sources a:hover { color: #c0d8fc; }
+.opportunity-sources small, .opportunity-sources span { color: #9baac1; font-size: .69rem; }
+.opportunity-source > span { display: block; margin-top: 3px; }
+.opportunity-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: auto; padding-top: 2px; }
+.opportunity-actions button, .opportunity-actions .button { min-height: 38px; padding: 9px 12px; font-size: .72rem; }
+.opportunity-actions > a:not(.button) { font-size: .72rem; }
+.opportunity-empty, .opportunity-cards > .empty-state { grid-column: 1 / -1; }
+.opportunity-empty { padding: 18px; border: 1px solid #2a3a56; border-radius: 11px; background: #152034; color: #a0b4d3; font-size: .76rem; line-height: 1.75; }
+.opportunity-empty strong { display: block; margin-bottom: 7px; color: #d2e0f5; font-size: .88rem; font-weight: 500; }
+.opportunity-empty p:last-child { margin-bottom: 0; }
+#opportunityMessage { margin: 12px 0 0; color: #a1b5d5; font-size: .74rem; line-height: 1.6; }
+#opportunityMessage:empty { display: none; }
+@media (max-width: 1100px) {
+  .opportunity-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .opportunity-cards:has(> .opportunity-card:only-child), .opportunity-cards:has(> .opportunity-card:nth-child(2):last-child) { grid-template-columns: minmax(0, 1fr); }
+  .opportunity-card.opportunity-lead { grid-column: 1 / -1; }
+  .opportunity-card { padding: 18px; }
+}
+@media (max-width: 600px) {
+  .opportunity-cards { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .opportunity-card { padding: 16px; }
+  .opportunity-card.opportunity-lead { grid-column: auto; }
+  .opportunity-lead .opportunity-head h3 { font-size: 1.13rem; }
+  .opportunity-price strong { font-size: 1.1rem; }
+  .opportunity-lead .opportunity-price strong { font-size: 1.23rem; }
+  .opportunity-actions { gap: 9px 12px; }
+}

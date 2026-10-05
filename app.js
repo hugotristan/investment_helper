@@ -1,7 +1,7 @@
 // App entry point: initializes feature controls, navigation, and the scan/refresh lifecycle.
 
 import { applyLearningSignal, scoreSeries, stableRankSort } from "./js/analysis/scoring.js";
-import { AUTO_REFRESH_DELAY_SECONDS, MIN_ACTIVE_SOURCES } from "./js/config/settings.js";
+import { AUTO_REFRESH_DELAY_SECONDS, MIN_ACTIVE_SOURCES, opportunityUniverse } from "./js/config/settings.js";
 import { applyQuoteSnapshot, loadMarketContext, loadQuoteSnapshots, loadTickerSeries } from "./js/data/market.js";
 import { loadNewsSources } from "./js/data/news.js";
 import { runStockDetail } from "./js/features/detail.js";
@@ -17,6 +17,7 @@ import { renderAll } from "./js/ui/dashboard.js";
 import { els, setStatus } from "./js/ui/dom.js";
 import { bindQuickSearch, syncActivePage } from "./js/ui/navigation.js";
 import { renderPortfolioSnapshot } from "./js/ui/overview.js";
+import { bindOpportunityEvents } from "./js/features/opportunities.js";
 
 let autoRefreshTimer = null;
 let refreshTicker = null;
@@ -57,6 +58,7 @@ function bindEvents() {
     scheduleConfigScan();
   });
   bindWatchlistEvents(scheduleConfigScan);
+  bindOpportunityEvents(scheduleConfigScan);
   bindQuickSearch(runStockDetail);
 
   ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort"].forEach((key) => {
@@ -99,9 +101,9 @@ async function runAnalysis(options = {}) {
     return;
   }
   const tickers = unique(parseTickers(state.tickerInput)
-    .concat(parsePortfolioPositions(state.myPortfolioInput).map((holding) => holding.ticker)))
+    .concat(parsePortfolioPositions(state.myPortfolioInput).map((holding) => holding.ticker), opportunityUniverse))
     .filter((ticker) => !isBlockedAssetTicker(ticker))
-    .slice(0, 96);
+    .slice(0, 180);
   if (!tickers.length) {
     setStatus("Add tickers");
     return;
