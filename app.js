@@ -132,7 +132,8 @@ async function runAnalysis(options = {}) {
 
     renderAll(ranked, priceSource, news, marketContext, quotes);
     saveLearningSnapshot(ranked, priceSource, news.label);
-    setStatus(priceSource === "sample" ? "Sample fallback" : "Live web data");
+    const qualifiedCount = ranked.filter((item) => item.dataQuality?.eligible).length;
+    setStatus(`${qualifiedCount}/${ranked.length} price histories qualified`);
   } catch (error) {
     console.error(error);
     setStatus("Scan failed");

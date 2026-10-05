@@ -40,6 +40,10 @@ export async function answerQuestion() {
       loadNewsSources(contextTickers, { allowCache: false })
     ]);
     const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[parsed.ticker] || []));
+    if (!scored.dataQuality?.eligible) {
+      els.askAnswer.innerHTML = `<div class="empty-state"><h3>${escapeHtml(scored.ticker)} · Analysis unavailable</h3><p>${escapeHtml(scored.dataQuality?.reason || "Qualified price history is unavailable.")}</p><p>No investment signal can be generated until recent real history is available.</p></div>`;
+      return;
+    }
     const answer = buildQuestionAnswer(scored, news, parsed);
     renderQuestionAnswer(answer);
   } catch (error) {
@@ -81,7 +85,7 @@ function buildQuestionAnswer(item, news, parsed) {
     score: item.score,
     stats: [
       ["Signal", item.setup?.signal || item.label],
-      ["Confidence", `${item.setup?.confidence || item.score}/100`],
+      ["Signal strength", `${item.score}/100`],
       ["Timeframe", item.setup?.timeframe || "1-4 weeks"],
       ["Price", formatNumber(item.latest)],
       ["1M", formatPercent(item.oneMonth)],

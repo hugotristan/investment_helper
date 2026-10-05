@@ -1,4 +1,5 @@
 import { formatPercent } from "../shared/format.js";
+import { hasQualifiedSignal } from "./data-quality.js";
 
 export function buildSellGuidance(results) {
   const sell = [];
@@ -18,6 +19,7 @@ export function buildSellGuidance(results) {
 }
 
 export function sellSignalFor(item) {
+  if (!hasQualifiedSignal(item)) return null;
   const triggers = [];
   if (item.score <= 44) triggers.push(`Low total model score: ${item.score}/100.`);
   if (item.latest < item.sma200 && item.sixMonth < 0) triggers.push(`Below 200-day average with ${formatPercent(item.sixMonth)} six-month momentum.`);
@@ -29,7 +31,6 @@ export function sellSignalFor(item) {
   if (!item.isFund && item.volatility > 0.5) triggers.push(`Single-stock volatility is high at ${formatPercent(item.volatility)} annualized.`);
   if (item.outlookSourceCount >= 1 && item.outlookScore < -0.15) triggers.push(`Trusted outlook tone is negative across ${item.outlookSourceCount} source${item.outlookSourceCount === 1 ? "" : "s"}.`);
   if (item.headlineSourceCount >= 2 && item.headlineScore < -0.2) triggers.push(`Recent headline tone is negative across ${item.headlineSourceCount} sources.`);
-  if (item.scoreDelta <= -8) triggers.push(`Model score dropped ${Math.abs(item.scoreDelta)} points since the previous scan.`);
 
   const urgent = item.score <= 40 || triggers.length >= 3;
   if (!urgent && triggers.length < 2) return null;
@@ -46,6 +47,7 @@ export function sellSignalFor(item) {
 }
 
 export function holdSignalFor(item) {
+  if (!hasQualifiedSignal(item)) return null;
   const reasons = [];
   if (item.score >= 65) reasons.push(`Strong model score: ${item.score}/100.`);
   if (item.latest > item.sma50 && item.latest > item.sma200) reasons.push("Price is above both 50-day and 200-day averages.");
@@ -54,7 +56,6 @@ export function holdSignalFor(item) {
   if (item.eventRisk?.level === "Low") reasons.push("No major event-risk blocker was detected.");
   if (item.outlookSourceCount >= 1 && item.outlookScore >= 0.05) reasons.push(`Trusted outlook tone is constructive across ${item.outlookSourceCount} source${item.outlookSourceCount === 1 ? "" : "s"}.`);
   if (item.isFund && item.score >= 58) reasons.push("Broad ETF exposure reduces single-company risk.");
-  if (item.scoreDelta >= 5) reasons.push(`Model score improved ${item.scoreDelta} points since the previous scan.`);
 
   if (item.score < 58 || reasons.length < 2) return null;
 

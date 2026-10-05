@@ -48,11 +48,11 @@ export function buildPortfolioReview(results, marketContext) {
 
 function portfolioHoldingReview(holding, marketContext) {
   const item = holding.analysis;
-  if (!item) {
+  if (!item || !item.dataQuality?.eligible) {
     return {
-      label: "Needs ticker check",
+      label: "Analysis unavailable",
       className: "holding-watch",
-      reason: "This holding was not returned by the live price scan. Check that the ticker matches your broker symbol.",
+      reason: item?.dataQuality?.reason || "This holding was not returned by the live price scan. Check the ticker.",
       detail: "The app can still count the position size, but it cannot score trend or risk until price data loads."
     };
   }
@@ -156,9 +156,7 @@ function renderHoldingCard(holding) {
       <div class="stock-stats">
         <span>${escapeHtml(holding.ticker)}</span>
         <span>${money(holding.amount)}</span>
-        ${item ? `<span>Score ${item.score}/100</span>` : ""}
-        ${item ? `<span>1M ${formatPercent(item.oneMonth)}</span>` : ""}
-        ${item ? `<span>Risk ${escapeHtml(item.setup?.riskLevel || "-")}</span>` : ""}
+        ${item?.dataQuality?.eligible ? `<span>Signal strength ${item.score}/100</span><span>1M ${formatPercent(item.oneMonth)}</span><span>Risk ${escapeHtml(item.setup?.riskLevel || "-")}</span>` : ""}
       </div>
       <b class="holding-label">${escapeHtml(holding.review.label)}</b>
       <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>

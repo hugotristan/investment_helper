@@ -31,14 +31,14 @@ function series(ticker, direction) {
     prices: Array.from({ length: 253 }, (_, index) => {
       const close = 100 * Math.exp(direction * index / 500) + Math.sin(index / 7);
       return {
-        date: new Date(Date.UTC(2025, 0, index + 1)),
+        date: new Date(Date.now() - (252 - index) * 86400000),
         close, high: close + 1, low: close - 1, volume: 1000000 + index * 100,
       };
     }),
   };
 }
 
-test("scoring, local learning, and allocation retain the pre-refactor results", () => {
+test("qualified scoring is independent of local history and allocations retain limits", () => {
   state.learningHistory = [{ scores: [{ ticker: "ACME", score: 48 }, { ticker: "FALL", score: 55 }] }];
   const headlines = [
     { title: "Strong growth beats estimates", sentiment: 0.5, sourceId: "fixture-one", source: "Example", kind: "news" },
@@ -47,15 +47,15 @@ test("scoring, local learning, and allocation retain the pre-refactor results", 
   const results = [series("SPY", 1), series("ACME", 1), series("FALL", -1)]
     .map((data) => applyLearningSignal(scoreSeries(data, headlines)))
     .sort(stableRankSort);
-  // Captured from the original monolithic app using the same fixed data.
+  // Raw technical scores are preserved; previous browser scores no longer alter signals.
   assert.deepEqual(results.map(({ ticker, score, rawScore }) => ({ ticker, score, rawScore })), [
     { ticker: "SPY", score: 83, rawScore: 83 },
-    { ticker: "ACME", score: 54, rawScore: 77 },
-    { ticker: "FALL", score: 49, rawScore: 26 },
+    { ticker: "ACME", score: 77, rawScore: 77 },
+    { ticker: "FALL", score: 26, rawScore: 26 },
   ]);
-  const actions = buildModelAllocation(results, { score: 0 }).actions;
+  const actions = buildModelAllocation(results, { score: 0, available: true }).actions;
   assert.deepEqual(actions.map(({ ticker, percent }) => ({ ticker, percent })), [
-    { ticker: "SPY", percent: 37.2 }, { ticker: "Cash", percent: 62.8 },
+    { ticker: "SPY", percent: 37.2 }, { ticker: "ACME", percent: 16 }, { ticker: "Cash", percent: 46.8 },
   ]);
 });
 
@@ -79,7 +79,7 @@ test("storage preserves the existing key and bounded scan history", () => {
   persist();
   assert.equal(JSON.parse(saved.get("today-invest-model-state")).myPortfolioInput, state.myPortfolioInput);
   for (let score = 0; score < 100; score += 1) {
-    saveLearningSnapshot([{ ticker: "ACME", score, latest: 100 }], "fixture", "fixture");
+    saveLearningSnapshot([{ ticker: "ACME", score, latest: 100, dataQuality: { eligible: true } }], "fixture", "fixture");
   }
   assert.equal(state.learningHistory.length, 96);
   assert.equal(latestLearningPoint("ACME").score, 99);

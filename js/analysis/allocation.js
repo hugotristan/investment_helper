@@ -1,6 +1,8 @@
 import { average, clamp, roundPercent } from "../shared/math.js";
+import { hasQualifiedSignal } from "./data-quality.js";
 
 export function buildModelAllocation(results, marketContext) {
+  results = results.filter(hasQualifiedSignal);
   const candidates = results.filter((item) => item.score >= 58);
   const funds = candidates.filter((item) => item.isFund).slice(0, 2);
   const stocks = candidates.filter((item) => !item.isFund).slice(0, 4);
@@ -35,8 +37,9 @@ export function buildModelAllocation(results, marketContext) {
     ticker: "Cash",
     percent: roundPercent(clamp(100 - allocated, 0, 100)),
     label: "Hold back",
-    reason: marketContext
-      ? `Reserve adjusted for market forecast: ${marketContext.label} (${marketContext.confidence}% confidence).`
+    reason: Number.isFinite(marketContext?.score)
+      ? `Reserve adjusted for market regime: ${marketContext.label}.`
+      : !results.length ? "No instruments have qualified recent price history; no allocation signal is available."
       : "Reserve for volatility, bad fills, and better entries if the deep scans weaken."
   });
 

@@ -29,7 +29,7 @@ export function saveLearningSnapshot(results, priceSource, newsSource) {
       at: new Date().toISOString(),
       priceSource,
       newsSource,
-      scores: results.map((item) => ({ ticker: item.ticker, score: item.score, latest: item.latest }))
+      scores: results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score)).map((item) => ({ ticker: item.ticker, score: item.score, latest: item.latest }))
     }
   ].slice(-96);
   persist();

@@ -1,4 +1,4 @@
-import { headlineSentiment, inferMarketContextTargets, inferNewsTargets, inferOutlookTargets, outlookSentiment, outlookTermsMentioned, symbolMentioned } from "../analysis/news.js";
+import { cleanArticleText, headlineSentiment, inferArticleEvidence, outlookSentiment, outlookTermsMentioned } from "../analysis/news.js";
 import { GDELT_DIRECT_TIMEOUT_MS, GDELT_RELAY_TIMEOUT_MS, MAX_SOURCE_SCAN_MS, MIN_ACTIVE_SOURCES, RSS_DIRECT_TIMEOUT_MS, RSS_RELAY_TIMEOUT_MS, SOURCE_CACHE_MIN_RATIO, outlookDomains } from "../config/settings.js";
 import { sourceFeeds, trustedSourceUniverse } from "../config/sources.js";
 import { fetchWithRetry, mapLimit } from "./http.js";
@@ -92,26 +92,27 @@ async function loadGdeltScan(scan, tickers) {
   return { id: scan.id, name: scan.name, ok: false, via: "none", count: 0, items: [], error: "GDELT unavailable after retry" };
 }
 
-function parseGdeltArticle(article, tickers, scan = {}) {
+export function parseGdeltArticle(article, tickers, scan = {}) {
   const title = cleanText(article?.title || "");
+  const description = cleanText(article?.description || article?.summary || "");
   const link = article?.url || "";
   const domain = normalizeDomain(article?.domain || safeDomainFromUrl(link));
   const trusted = sourceForDomain(domain);
   if (!title || !trusted) return null;
 
-  const text = `${title} ${trusted.name}`.toUpperCase();
+  // Publisher identity is attribution, never evidence about a listed company.
+  const text = `${cleanArticleText(title, trusted.name)} ${cleanArticleText(description, trusted.name)}`.trim();
   const isOutlook = scan.kind === "outlook" || outlookDomains.has(trusted.domain) || outlookTermsMentioned(text);
-  const targets = unique(tickers.filter((ticker) => symbolMentioned(text, ticker))
-    .concat(inferNewsTargets(text, tickers), inferMarketContextTargets(text, tickers), isOutlook ? inferOutlookTargets(text, tickers) : []));
-  if (!targets.length) return null;
+  const evidence = inferArticleEvidence(text, tickers, { isOutlook });
+  if (!evidence.tickers.length) return null;
 
   return {
     title,
-    description: "",
+    description,
     link,
     pubDate: article?.seendate || "",
-    sentiment: isOutlook ? outlookSentiment(title) : headlineSentiment(title),
-    tickers: targets,
+    sentiment: isOutlook ? outlookSentiment(text) : headlineSentiment(text),
+    ...evidence,
     source: trusted.name,
     sourceId: trusted.id,
     domain: trusted.domain,
@@ -193,7 +194,7 @@ async function collectSourceBatch(items, limit, worker, scanSources, startedAt) 
   });
 }
 
-function parseNewsFeed(xmlText, tickers, feed) {
+export function parseNewsFeed(xmlText, tickers, feed) {
   const doc = new DOMParser().parseFromString(xmlText, "application/xml");
   const nodes = Array.from(doc.querySelectorAll("item, entry"));
   const parsed = [];
@@ -208,12 +209,14 @@ function parseNewsFeed(xmlText, tickers, feed) {
     const linkNode = item.querySelector("link");
     const link = linkNode?.getAttribute("href") || linkNode?.textContent?.trim() || "";
     const pubDate = item.querySelector("pubDate, updated, published")?.textContent?.trim() || "";
-    const text = `${title} ${description}`.toUpperCase();
-    const targets = unique(tickers.filter((ticker) => symbolMentioned(text, ticker))
-      .concat(inferNewsTargets(text, tickers), inferMarketContextTargets(text, tickers)));
-    const sentiment = headlineSentiment(`${title} ${description}`);
-    if (!title || !targets.length) return;
-    parsed.push({ title, description, link, pubDate, sentiment, tickers: targets, source: sourceName, sourceId, domain: sourceDomain });
+    const text = `${cleanArticleText(title, sourceName)} ${cleanArticleText(description, sourceName)}`.trim();
+    const isOutlook = outlookDomains.has(sourceDomain) || outlookTermsMentioned(text);
+    const evidence = inferArticleEvidence(text, tickers, { isOutlook });
+    const sentiment = isOutlook ? outlookSentiment(text) : headlineSentiment(text);
+    if (!title || !evidence.tickers.length) return;
+    parsed.push({ title, description, link, pubDate, sentiment, ...evidence,
+      source: sourceName, sourceId, domain: sourceDomain,
+      kind: isOutlook ? "outlook" : "news", horizon: isOutlook ? "recent" : "current" });
   });
 
   return parsed;

@@ -27,6 +27,8 @@ The same GitHub Pages workflow serves these modules directly. Saved browser sett
 
 Run the module regression tests with `npm test` using Node.js 18 or newer. They use Node's built-in test runner and require no installed packages.
 
+See [the feature change log](docs/FEATURES.md) for the behavior, implementation, and validation of each feature commit.
+
 ## What It Does
 
 - Runs immediately when the page opens.
@@ -44,8 +46,9 @@ Run the module regression tests with `npm test` using Node.js 18 or newer. They 
 - Scores trend, momentum, RSI, MACD, Bollinger position, ATR, volatility, drawdown, volume pressure, liquidity, event risk, cross-source headline tone, trusted market outlook tone, source breadth, diversification, and local score changes.
 - Adds recent-year stock, sector, institutional, and macro-regime outlook scans to avoid relying only on today's headlines.
 - Shows the rules-based market framework used for trend, momentum, risk, diversification, market regime, recent-year research, and known data gaps.
-- Shows category scores, signal type, confidence, timeframe, entry zone, invalidation level, support/resistance, and risk level.
-- Produces a probabilistic market-regime forecast using equity breadth, VIX, credit appetite, bond/rate pressure, dollar pressure, oil, gold, headlines, and trusted outlooks.
+- Shows category scores, signal strength, timeframe, entry zone, invalidation level, support/resistance, and risk level. Scores are rules-based measures, not calibrated success probabilities.
+- Requires recent real history with at least 200 distinct daily prices before generating investment signals. Sample, stale, future-dated, and incomplete histories are excluded; a quote cannot make invalid history usable.
+- Produces a rules-based market-regime score using qualified equity breadth, VIX, credit appetite, bond/rate pressure, dollar pressure, oil, and gold histories.
 - Outputs model allocations by ticker and percentage.
 - Answers focused natural-language questions such as "Should I sell Intel stock today?" or "Should I sell Microsoft today?"
 - Shows sell/reduce and do-not-sell/hold signals for the current watchlist.
@@ -63,7 +66,7 @@ The app checks a 260-source trusted stock-market universe through GDELT live new
 
 Slow web sources now get extended retries before being marked unavailable. GDELT scans try direct JSON first, then a relay fallback, with longer timeouts and repeated attempts. RSS feeds try direct RSS first, then the relay, also with repeated attempts. If a scan gets no usable headlines after retries, the app labels the fallback and reuses the last successful headline set while continuing to refresh price data.
 
-Repeated scans are stabilized. If a refresh gets a much thinner source batch than the previous successful scan, the app merges the current and previous headline set instead of letting one weak web response rewrite the ranking. Individual asset scores are also capped to a limited per-scan move, so rankings should change gradually unless the signal persists.
+If a refresh gets a much thinner source batch than the previous successful scan, the app merges the current and previous headline set. Local scan history records score changes without smoothing the current score, so identical current inputs produce the same score in every browser. Company-specific article matches are distinguished from sector and market commentary.
 
 Each news scan now targets at least 60 active trusted sources, which is still above the original 30-source reliability goal without forcing the browser to wait through every slow RSS endpoint. If the first live pass is too thin, the app widens to broader 48-hour and 7-day GDELT scans for markets, earnings, macro, sectors, ETFs, rates, credit, official macro releases, regulators, energy data, technology, healthcare, financials, industrials, defense, consumer, materials, and event risk. The deep-source scan has a hard time budget of about five minutes because it prioritizes one solid review without turning one refresh into a 20-minute wait.
 
@@ -75,7 +78,7 @@ The app now labels data gaps instead of pretending they are solved. Bid-ask spre
 
 ## Market Forecast
 
-The forecast is probabilistic, not provable. It combines SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GLD, USO, UUP, and VIX with active trusted-source coverage and outlook counts. The output includes a market-regime label, confidence percentage, evidence bullets, and contradiction/risk notes. The allocation engine uses this forecast to adjust the cash reserve.
+The market-regime score combines qualified SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GLD, USO, UUP, and VIX histories. It is unavailable without sufficient real equity and credit coverage. The output includes a regime label, proxy coverage, evidence, and risk notes. It is not a calibrated forecast probability. The allocation engine uses an available regime to adjust the cash reserve.
 
 ## Candidate Universe
 

@@ -1,4 +1,5 @@
 import { analyzeMarketContext } from "../analysis/market-context.js";
+import { evaluateDataQuality } from "../analysis/data-quality.js";
 import { PRICE_TIMEOUT_MS, broadFunds, marketProxyTickers } from "../config/settings.js";
 import { fetchWithRetry, fetchWithTimeout, mapLimit } from "./http.js";
 import { finiteNumber } from "../shared/math.js";
@@ -31,8 +32,7 @@ export async function validateWatchlistTicker(ticker) {
 export async function loadTickerSeries(tickers) {
   const settled = await mapLimit(tickers, 12, (ticker) => loadMarketSeries(ticker));
   return settled
-    .map((result, index) => result.status === "fulfilled" ? result.value : sampleSeries(tickers[index]))
-    .filter((series) => series.prices.length >= 60);
+    .map((result, index) => result.status === "fulfilled" ? result.value : sampleSeries(tickers[index]));
 }
 
 export async function loadQuoteSnapshots(tickers) {
@@ -86,7 +86,7 @@ function parseIntradayQuote(json, ticker) {
   const meta = result?.meta || {};
   const symbol = String(meta.symbol || ticker || "").toUpperCase();
   const price = finiteNumber(meta.regularMarketPrice);
-  if (!symbol || !price) return null;
+  if (!symbol || symbol !== String(ticker).toUpperCase() || !price) return null;
   const previousClose = finiteNumber(meta.previousClose || meta.chartPreviousClose);
   return {
     ticker: symbol,
@@ -96,8 +96,8 @@ function parseIntradayQuote(json, ticker) {
     currency: meta.currency || "",
     price,
     previousClose,
-    dayChange: previousClose ? price - previousClose : 0,
-    dayChangePercent: previousClose ? price / previousClose - 1 : 0,
+    dayChange: previousClose ? price - previousClose : null,
+    dayChangePercent: previousClose ? price / previousClose - 1 : null,
     volume: finiteNumber(meta.regularMarketVolume),
     averageVolume: 0,
     marketCap: 0,
@@ -128,7 +128,17 @@ function marketStateFromMeta(meta) {
 
 export function applyQuoteSnapshot(series, quoteMap) {
   const quote = quoteMap?.get(series.ticker);
-  if (!quote) return series;
+  const quality = evaluateDataQuality(series);
+  const quoteTime = quote?.quoteTime ? new Date(quote.quoteTime).getTime() : NaN;
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  // Keep generated/stale history intact. Only a dated current quote may update
+  // qualified history; historyAsOf remains the date of the actual daily series.
+  if (!quote || !quality.eligible || !Number.isFinite(quoteTime)
+    || (quote.ticker && String(quote.ticker).toUpperCase() !== series.ticker)
+    || quoteTime > now || now - quoteTime > 7 * dayMs
+    || quoteTime < new Date(quality.asOf).getTime()
+    || !Number.isFinite(quote.price) || quote.price <= 0) return series;
   const prices = series.prices.slice();
   const latest = prices.at(-1);
   if (latest && Number.isFinite(quote.price) && quote.price > 0) {
@@ -144,7 +154,8 @@ export function applyQuoteSnapshot(series, quoteMap) {
     ...series,
     prices,
     quote,
-    source: series.source === "sample" ? series.source : `${series.source} + ${quote.price ? "Yahoo intraday" : "quote metadata"}`
+    historyAsOf: series.historyAsOf ?? quality.asOf,
+    source: `${series.source} + Yahoo intraday`
   };
 }
 
@@ -163,7 +174,7 @@ export async function loadMarketSeries(ticker) {
       if (!response.ok) continue;
       const json = await response.json();
       const parsed = parseYahooChart(json, ticker);
-      if (parsed.prices.length >= 60) {
+      if (parsed.prices.length) {
         parsed.source = url === directUrl ? "Yahoo Finance chart" : "Yahoo Finance via CORS relay";
         return parsed;
       }
@@ -194,6 +205,8 @@ function parseYahooChart(json, ticker) {
   return {
     ticker: String(result?.meta?.symbol || ticker).toUpperCase(),
     prices,
+    historyAsOf: prices.at(-1)?.date?.toISOString() || null,
+    instrumentType: result?.meta?.instrumentType || "",
     source: "Yahoo Finance chart"
   };
 }

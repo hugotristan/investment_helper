@@ -18,14 +18,18 @@ export function renderScreener() {
   const sort = els.screenerSort.value || defaults.screenerSort;
   const appliesScoreFloor = !["sell", "avoid"].includes(signal);
   const filtered = scanState.latestRankedResults
+    .filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score))
     .filter((item) => !appliesScoreFloor || item.score >= minScore)
     .filter((item) => item.averageDollarVolume >= minLiquidity || item.isFund)
     .filter((item) => screenerSignalMatches(item, signal))
     .sort((a, b) => sortScreenerResults(a, b, sort))
     .slice(0, 40);
   const top = filtered[0];
+  const unavailable = scanState.latestRankedResults.filter((item) => !item.dataQuality?.eligible);
 
   els.screenerResults.innerHTML = `
+    <p class="data-note">${scanState.latestRankedResults.filter((item) => item.dataQuality?.eligible).length}/${scanState.latestRankedResults.length} instruments have qualified recent price history. Sample, stale, and incomplete history is excluded from signals.</p>
+    ${unavailable.length ? `<details class="data-gaps"><summary>Unavailable instruments (${unavailable.length})</summary><ul>${unavailable.map((item) => `<li><strong>${escapeHtml(item.ticker)}</strong> — ${escapeHtml(item.dataQuality?.reason || "Price history unavailable")}</li>`).join("")}</ul></details>` : ""}
     <div class="screener-summary">
       <article><span>Matched</span><strong>${filtered.length}/${scanState.latestRankedResults.length}</strong></article>
       <article><span>Top ticker</span><strong>${escapeHtml(top?.ticker || "-")}</strong></article>

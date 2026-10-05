@@ -9,10 +9,12 @@ export function money(value) {
 }
 
 export function formatPercent(value) {
+  if (!Number.isFinite(value)) return "—";
   return `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1)}%`;
 }
 
 export function formatNumber(value) {
+  if (!Number.isFinite(value)) return "—";
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: value >= 100 ? 0 : 2 }).format(value);
 }
 

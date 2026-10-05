@@ -10,7 +10,8 @@ const colors = ["#7189ff", "#36c8b1", "#f3bd66", "#c38af5", "#607085"];
 let latestOverview = null;
 
 export function renderDashboardOverview(results, priceSource, news, marketContext, quotes) {
-  latestOverview = { results, priceSource, quotes };
+  const qualified = results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score));
+  latestOverview = { results: qualified, priceSource, quotes };
   const trusted = (news?.sources || []).filter((source) => source.ok && source.id !== "live-source-index").length;
   const scores = results.map((item) => item.score).filter(Number.isFinite);
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
@@ -27,17 +28,17 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
       <strong class="stat-value">${escapeHtml(value)}</strong>
       <span class="stat-note">${escapeHtml(note)}</span>
     </article>`).join(""));
-  setHtml("featuredStocks", results.slice(0, 4).map((item, index) => featuredStock(item, quotes, priceSource, index)).join("")
-    || '<p class="empty-state">Add instruments to your watchlist to discover market signals.</p>');
+  setHtml("featuredStocks", qualified.slice(0, 4).map((item, index) => featuredStock(item, quotes, priceSource, index)).join("")
+    || '<p class="empty-state">No qualified price history yet. Sample, stale, and incomplete data cannot generate market signals.</p>');
   renderTrends();
   renderPortfolioSnapshot();
-  const top = results[0];
-  const sampleCount = results.filter((item) => isSample(item, priceSource)).length;
+  const top = qualified[0];
+  const excludedCount = results.length - qualified.length;
   const activity = [
-    ["Market regime", marketContext?.label || "Not available", Number.isFinite(marketContext?.confidence) ? `${marketContext.confidence}% model confidence` : "Market proxy data pending"],
+    ["Market regime", marketContext?.label || "Not available", `${marketContext?.liveCount || 0}/${marketContext?.total || 11} qualified market proxies`],
     ["Research coverage", `${news?.items?.length || 0} relevant headlines`, `${trusted} trusted sources active in this scan`],
     ["Leading instrument", top ? `${top.ticker} · ${top.score}/100` : "No result yet", top?.setup?.signal || top?.label || "Scan your watchlist to find a leader"],
-    ["Price data", sampleCount ? `${sampleCount} instrument${sampleCount === 1 ? "" : "s"} using sample history` : results.length ? "Market price history loaded" : "Price history pending", sampleCount ? "Generated fallback prices are included. Do not act on sample signals." : quotes?.label || String(priceSource || "No data")]
+    ["Price data", `${qualified.length}/${results.length} instruments qualified`, excludedCount ? `${excludedCount} excluded: sample, stale, or incomplete history. See the screener for coverage.` : "Recent real daily history. Signal strength is a rules-based score, not a measured success probability."]
   ];
   setHtml("scanActivity", activity.map(([label, title, note], index) => `
     <div class="activity-row"><span class="activity-dot" style="--activity-color:${colors[index]}" aria-hidden="true"></span>
@@ -58,7 +59,7 @@ function featuredStock(item, quotes, priceSource, index) {
     <div class="featured-stock-price"><strong>${priceLabel(item, quote)}</strong>
       <span class="${changeClass(change)}">${percentLabel(change)} <small>1D</small></span></div>
     <div class="mini-chart">${priceChart(item, chartPoints(item).slice(-40), true, `featured-${index}`)}</div>
-    <span class="stock-meta">${sample ? "Sample price history" : "Daily price history"} · ${escapeHtml(item.setup?.signal || item.label || "Model signal")}</span>
+    <span class="stock-meta">${escapeHtml(item.setup?.signal || item.label || "Model signal")} · as of ${escapeHtml(dateLabel(item.dataQuality?.asOf))}</span>
   </article>`;
 }
 

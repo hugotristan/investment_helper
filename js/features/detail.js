@@ -56,6 +56,10 @@ export async function runStockDetail() {
 
 function renderStockDetail(item, news, marketContext, quoteSnapshot) {
   const quote = item.quote || {};
+  if (!item.dataQuality?.eligible) {
+    els.detailOutput.innerHTML = `<div class="empty-state"><h3>${escapeHtml(item.ticker)} · Analysis unavailable</h3><p>${escapeHtml(item.dataQuality?.reason || "Qualified price history is unavailable.")}</p>${Number.isFinite(quote.price) ? `<p>Latest quote ${formatNumber(quote.price)} ${escapeHtml(quote.currency || "")} · ${escapeHtml(quote.quoteTime?.toLocaleString() || "Timestamp unavailable")}</p>` : ""}<p>No buy, hold, or sell recommendation is generated from this data.</p></div>`;
+    return;
+  }
   const links = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []))
     .filter((entry) => entry.link)
     .slice(0, 8);

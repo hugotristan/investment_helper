@@ -6,9 +6,16 @@ export function groupNewsByTicker(items) {
   items.forEach((item) => {
     item.tickers.forEach((ticker) => {
       if (!byTicker[ticker]) byTicker[ticker] = [];
-      if (byTicker[ticker].length < 16) byTicker[ticker].push(item);
+      byTicker[ticker].push(item);
     });
   });
+  for (const ticker of Object.keys(byTicker)) {
+    // Broad sector stories must not crowd direct company coverage out of scoring.
+    // Older cached articles without metadata are retained as context only.
+    byTicker[ticker] = byTicker[ticker]
+      .sort((a, b) => Number(Boolean(b.directTickers?.includes(ticker))) - Number(Boolean(a.directTickers?.includes(ticker))))
+      .slice(0, 16);
+  }
   return byTicker;
 }
 

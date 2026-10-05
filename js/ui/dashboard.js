@@ -18,11 +18,10 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
   scanState.latestQuoteSnapshot = quoteSnapshot;
   const allocation = buildModelAllocation(results, marketContext);
   const portfolio = buildPortfolioReview(results, marketContext);
-  const top = results[0];
+  const qualified = results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score));
+  const top = qualified[0];
   const now = new Date();
-  const sourceLine = priceSource === "sample"
-    ? "Price data fell back to sample data. Do not act on this scan."
-    : `Price data: ${priceSource}. ${quoteSnapshot?.label || "Quote data checked"}. Headlines: ${news.label}.`;
+  const sourceLine = `${qualified.length}/${results.length} instruments have qualified recent real history. Unavailable instruments are excluded from recommendations. Headlines: ${news.label}.`;
   const activeTrustedSources = Math.max(0, news.sources.filter((source) => source.ok).length - 1);
 
   renderDashboardOverview(results, priceSource, news, marketContext, quoteSnapshot);
@@ -31,13 +30,13 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
   els.marketPulseTitle.textContent = top ? `${top.ticker} leads today's scan` : "No leader";
   els.marketPulse.innerHTML = [
     ["Scanned", results.length],
-    ["Average", Math.round(average(results.map((item) => item.score)))],
+    ["Average signal", qualified.length ? Math.round(average(qualified.map((item) => item.score))) : "—"],
     ["Top score", top ? `${top.score}/100` : "-"],
     ["Active sources", `${activeTrustedSources}/${news.configured}`],
     ["Quotes", quoteSnapshot?.count ? `${quoteSnapshot.count}/${quoteSnapshot.total}` : "Chart only"],
     ["Universe", `${news.configured}+`],
     ["Forecast", marketContext.label],
-    ["Confidence", `${marketContext.confidence}%`],
+    ["Proxy coverage", `${marketContext.liveCount}/${marketContext.total}`],
     ["Headlines", news.items.length],
     ["Outlooks", news.outlookCount || 0],
     ["Source", priceSource === "sample" ? "Sample" : "Live"]
@@ -49,9 +48,9 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
   renderPortfolioReview(portfolio, priceSource);
   renderSellGuidance(results, priceSource);
   renderEvidence(results, allocation);
-  renderMarketFramework(results, marketContext, news);
+  renderMarketFramework(qualified, marketContext, news);
   renderSourceStatus(news.sources, news.configured);
-  renderRanking(results);
+  renderRanking(qualified);
 }
 
 function renderModelInstructions(allocation, sourceLine) {
@@ -69,6 +68,10 @@ function renderModelInstructions(allocation, sourceLine) {
 }
 
 function renderMarketForecast(forecast, news) {
+  if (!forecast.available) {
+    els.marketForecast.innerHTML = `<div class="empty-state"><h3>Market outlook unavailable</h3><p>Recent real equity and credit proxy data is required.</p><p>${escapeHtml((forecast.risks || []).join(" "))}</p></div>`;
+    return;
+  }
   const activeTrustedSources = Math.max(0, news.sources.filter((source) => source.ok).length - 1);
   els.marketForecast.innerHTML = `
     <article class="forecast-card ${forecast.score >= 56 ? "forecast-positive" : forecast.score < 45 ? "forecast-negative" : "forecast-neutral"}">
@@ -77,7 +80,7 @@ function renderMarketForecast(forecast, news) {
           <span>${escapeHtml(forecast.horizon)}</span>
           <h3>${escapeHtml(forecast.label)}</h3>
         </div>
-        <strong>${forecast.confidence}% confidence</strong>
+        <strong>${forecast.liveCount}/${forecast.total} proxy coverage</strong>
       </div>
       <div class="forecast-meter" aria-hidden="true"><span style="width: ${forecast.score}%"></span></div>
       <div class="stock-stats">
@@ -144,7 +147,7 @@ function renderEvidence(results, allocation) {
 }
 
 function renderMarketFramework(results, marketContext, news) {
-  const averageScore = Math.round(average(results.map((item) => item.score)));
+  const averageScore = results.length ? Math.round(average(results.map((item) => item.score))) : "—";
   const yearOutlookItems = news.items.filter((item) => item.horizon === "recent-year");
   const yearSourceCount = unique(yearOutlookItems.map((item) => item.sourceId)).length;
   const yearTone = yearOutlookItems.length ? average(yearOutlookItems.map((item) => item.sentiment)) : 0;
@@ -233,5 +236,5 @@ function renderRanking(results) {
       </div>
       <p>${escapeHtml(item.flags[0] || item.reasons[0] || "No major note.")}</p>
     </article>
-  `).join("");
+  `).join("") || '<div class="empty-state">No qualified instruments to rank. Price data must be recent, real, and sufficiently complete.</div>';
 }

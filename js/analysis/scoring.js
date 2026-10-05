@@ -1,13 +1,17 @@
-import { SCORE_MOVE_LIMIT, broadFunds } from "../config/settings.js";
+import { broadFunds } from "../config/settings.js";
+import { evaluateDataQuality, hasQualifiedSignal, isEtfSeries, validHistoryPoints } from "./data-quality.js";
 import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
 import { average, averageTrueRange, bollingerBands, clamp, dailyReturns, macdSignal, relativeStrengthIndex, returnOver, stdev } from "../shared/math.js";
 import { unique } from "../shared/text.js";
 import { latestLearningPoint } from "../storage.js";
 
 export function scoreSeries(series, headlines) {
+  const dataQuality = evaluateDataQuality(series);
+  const isFund = broadFunds.has(series.ticker) || isEtfSeries(series);
+  if (!dataQuality.eligible) return unavailableSignal(series, headlines, dataQuality, isFund);
   const outlooks = headlines.filter((headline) => headline.kind === "outlook");
   const newsHeadlines = headlines.filter((headline) => headline.kind !== "outlook");
-  const prices = series.prices;
+  const prices = validHistoryPoints(series);
   const closes = prices.map((point) => point.close);
   const highs = prices.map((point) => Number.isFinite(point.high) ? point.high : point.close);
   const lows = prices.map((point) => Number.isFinite(point.low) ? point.low : point.close);
@@ -17,7 +21,7 @@ export function scoreSeries(series, headlines) {
   const sma200 = average(closes.slice(-200));
   const previousSma50 = average(closes.slice(-100, -50));
   const oneWeek = returnOver(closes, 5);
-  const oneDay = series.quote?.dayChangePercent || returnOver(closes, 1);
+  const oneDay = Number.isFinite(series.quote?.dayChangePercent) ? series.quote.dayChangePercent : returnOver(closes, 1);
   const oneMonth = returnOver(closes, 21);
   const threeMonth = returnOver(closes, 63);
   const sixMonth = returnOver(closes, 126);
@@ -37,7 +41,6 @@ export function scoreSeries(series, headlines) {
   const yearOutlooks = outlooks.filter((outlook) => outlook.horizon === "recent-year");
   const yearOutlookScore = yearOutlooks.length ? average(yearOutlooks.map((outlook) => outlook.sentiment)) : 0;
   const yearOutlookSourceCount = unique(yearOutlooks.map((outlook) => outlook.sourceId)).length;
-  const isFund = broadFunds.has(series.ticker);
   const rsi14 = relativeStrengthIndex(closes, 14);
   const macd = macdSignal(closes);
   const bands = bollingerBands(closes, 20);
@@ -108,6 +111,8 @@ export function scoreSeries(series, headlines) {
 
   return {
     ...series,
+    prices,
+    dataQuality,
     score,
     latest,
     oneDay,
@@ -216,42 +221,55 @@ function detectEventRisk(headlines) {
 }
 
 export function applyLearningSignal(item) {
+  if (!hasQualifiedSignal(item)) return { ...item, rawScore: null, scoreDelta: 0 };
   const previous = latestLearningPoint(item.ticker);
-  if (!previous) return { ...item, rawScore: item.score };
+  if (!previous || !Number.isFinite(previous.score)) return { ...item, rawScore: item.score, scoreDelta: 0 };
   const rawScore = item.score;
-  const rawDelta = rawScore - previous.score;
-  const limitedScore = previous.score + clamp(rawDelta, -SCORE_MOVE_LIMIT, SCORE_MOVE_LIMIT);
-  const adjusted = Math.round(clamp(limitedScore, 0, 100));
-  const scoreDelta = adjusted - previous.score;
+  const scoreDelta = rawScore - previous.score;
 
   return {
     ...item,
     rawScore,
-    score: adjusted,
     scoreDelta,
-    label: scoreLabel(adjusted),
-    setup: item.setup ? { ...item.setup, signal: signalForScore(adjusted, item.eventRisk?.level || "Low"), confidence: Math.round(clamp(adjusted - (item.eventRisk?.level === "High" ? 10 : item.eventRisk?.level === "Medium" ? 5 : 0), 0, 100)) } : item.setup,
     reasons: [
       ...item.reasons,
       scoreDelta >= 5
         ? `Score improved ${scoreDelta} points since the previous local scan.`
         : scoreDelta <= -5
           ? `Score weakened ${Math.abs(scoreDelta)} points since the previous local scan.`
-          : rawDelta !== scoreDelta
-            ? `Raw score moved ${rawDelta >= 0 ? "+" : ""}${rawDelta} points, capped to ${scoreDelta >= 0 ? "+" : ""}${scoreDelta} for scan stability.`
-            : "Score change from the previous local scan is small."
-    ].slice(0, 4)
+          : "Score change from the previous local scan is small."
+    ]
   };
 }
 
 export function stableRankSort(a, b) {
-  const scoreDiff = b.score - a.score;
-  if (Math.abs(scoreDiff) >= 3) return scoreDiff;
-  const previousA = latestLearningPoint(a.ticker)?.score ?? a.score;
-  const previousB = latestLearningPoint(b.ticker)?.score ?? b.score;
-  const previousDiff = previousB - previousA;
-  if (Math.abs(previousDiff) >= 3) return previousDiff;
+  const qualifiedA = hasQualifiedSignal(a);
+  const qualifiedB = hasQualifiedSignal(b);
+  if (qualifiedA !== qualifiedB) return qualifiedA ? -1 : 1;
+  if (qualifiedA && a.score !== b.score) return b.score - a.score;
   return a.ticker.localeCompare(b.ticker);
+}
+
+function unavailableSignal(series, headlines, dataQuality, isFund) {
+  const unavailable = Object.fromEntries([
+    "latest", "oneDay", "sma20", "sma50", "sma200", "sma50Slope", "oneWeek", "oneMonth",
+    "threeMonth", "sixMonth", "volatility", "drawdown", "high52Week", "low52Week", "support",
+    "resistance", "rsi14", "atrValue", "atrPercent", "averageVolume60", "averageDollarVolume",
+    "volumePressure", "headlineScore", "outlookScore", "yearOutlookScore"
+  ].map((key) => [key, null]));
+  const outlooks = headlines.filter((headline) => headline.kind === "outlook");
+  return {
+    ...series, ...unavailable, dataQuality, isFund, score: null, rawScore: null, scoreDelta: 0,
+    headlines, outlooks, yearOutlooks: outlooks.filter((item) => item.horizon === "recent-year"),
+    headlineSourceCount: unique(headlines.filter((item) => item.kind !== "outlook").map((item) => item.sourceId)).length,
+    outlookSourceCount: unique(outlooks.map((item) => item.sourceId)).length,
+    yearOutlookSourceCount: unique(outlooks.filter((item) => item.horizon === "recent-year").map((item) => item.sourceId)).length,
+    categories: {}, macd: { macd: null, signal: null, histogram: null }, bollinger: { position: null },
+    eventRisk: { score: null, level: "Unknown", hits: [] },
+    label: "Data unavailable", reasons: [dataQuality.reason], flags: [dataQuality.reason],
+    setup: { signal: "Data unavailable", confidence: null, timeframe: "Unavailable", entryZone: "Unavailable",
+      invalidation: null, riskLevel: "Unavailable", support: null, resistance: null, note: dataQuality.reason }
+  };
 }
 
 function buildReasons(data) {
