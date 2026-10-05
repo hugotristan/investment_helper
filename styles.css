@@ -553,3 +553,53 @@ label > span, .sell-column-head span, .forecast-head span, .detail-hero span, .m
   .opportunity-lead .opportunity-price strong { font-size: 1.23rem; }
   .opportunity-actions { gap: 9px 12px; }
 }
+
+/* Filing-based fundamentals keep reported values and market estimates distinct. */
+.fundamentals-panel { min-width: 0; margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: #141b27; }
+.fundamentals-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 16px; }
+.fundamentals-head h3, .fundamentals-head h4 { margin: 0; color: var(--foreground); font-size: 1rem; font-weight: 500; line-height: 1.5; }
+.fundamentals-head p { margin: 0; color: #96a6bd; font-size: .73rem; line-height: 1.65; }
+.fundamentals-status { display: inline-flex; align-items: center; gap: 6px; min-height: 26px; padding: 4px 9px; border: 1px solid #294d44; border-radius: 6px; background: #152820; color: #87d7b6; font-size: .69rem; line-height: 1.5; }
+.fundamentals-status.is-stale { border-color: #53472e; background: #292316; color: #dfc38e; }
+.fundamentals-status.is-unavailable { border-color: #37445b; background: #1c2534; color: #a0b1cc; }
+.fundamentals-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 11px; }
+.fundamentals-note + .fundamentals-grid { margin-top: 0; }
+.fundamental-metric { min-width: 0; padding: 15px; border: 1px solid #29354a; border-radius: 10px; background: #182130; }
+.fundamental-metric > span { display: block; margin-bottom: 6px; color: #9eafc9; font-size: .71rem; line-height: 1.5; }
+.fundamental-metric strong { display: block; margin-bottom: 5px; color: #e2eaf8; font-size: 1.1rem; font-weight: 500; line-height: 1.45; letter-spacing: -.025em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fundamental-metric small { display: block; color: #92a2ba; font-size: .69rem; line-height: 1.65; }
+.fundamentals-valuation { display: grid; grid-template-columns: minmax(150px, .6fr) minmax(0, 1fr); align-items: start; gap: 13px 20px; margin-top: 15px; padding: 14px 0; border-bottom: 1px solid var(--border); color: #a5b6d0; font-size: .73rem; line-height: 1.7; }
+.fundamentals-valuation > div { min-width: 0; }
+.fundamentals-valuation strong { display: block; margin: 4px 0; color: #d4e2f8; font-size: .92rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.fundamentals-valuation small { color: #92a2ba; font-size: .69rem; }
+.fundamentals-valuation p { width: 100%; margin: 0; color: #92a2ba; font-size: .71rem; }
+.earnings-status { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 5px 14px; margin-top: 16px; padding: 0 0 15px; border-bottom: 1px solid var(--border); color: #b7c7e0; font-size: .73rem; line-height: 1.7; }
+.earnings-status > span { color: #a0b2cd; }
+.earnings-status strong { color: #d6e4f8; font-size: .8rem; font-weight: 500; font-variant-numeric: tabular-nums; }
+.earnings-status p, .earnings-status small { grid-column: 1 / -1; margin: 0; color: #92a2ba; font-size: .71rem; line-height: 1.7; }
+.earnings-status a { font-size: .71rem; }
+.earnings-status > a { grid-column: 1 / -1; overflow-wrap: anywhere; }
+.fundamentals-provenance { margin-top: 14px; }
+.fundamentals-provenance summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 29px; cursor: pointer; color: #9ebdeb; font-size: .72rem; font-weight: 500; list-style: none; }
+.fundamentals-provenance summary::-webkit-details-marker { display: none; }
+.fundamentals-provenance summary::after { content: "+"; flex-shrink: 0; color: #9ebdeb; font-size: 1rem; line-height: 1; }
+.fundamentals-provenance[open] summary::after { content: "−"; }
+.fundamentals-source { min-width: 0; margin-top: 11px; padding-top: 11px; border-top: 1px solid #293448; color: #a4b5d0; font-size: .71rem; line-height: 1.75; overflow-wrap: anywhere; }
+.fundamentals-source > span, .fundamentals-source > small { display: block; margin-top: 3px; color: #91a2bd; font-size: .69rem; }
+.fundamentals-source a { color: #a9c9f8; }
+.fundamentals-source a:hover { color: #d2e4ff; }
+.fundamentals-note { margin: 12px 0 14px; color: #91a2bd; font-size: .71rem; line-height: 1.75; }
+.fundamentals-panel > .fundamentals-note:last-child { margin-bottom: 0; }
+@media (max-width: 800px) {
+  .fundamentals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fundamental-metric { padding: 13px; }
+}
+@media (max-width: 600px) {
+  .fundamentals-panel { margin-top: 16px; padding: 16px; }
+}
+@media (max-width: 440px) {
+  .fundamentals-grid { grid-template-columns: minmax(0, 1fr); gap: 9px; }
+  .fundamental-metric { padding: 13px 14px; }
+  .fundamentals-valuation { grid-template-columns: minmax(0, 1fr); }
+  .earnings-status { grid-template-columns: minmax(0, 1fr); }
+}

@@ -3,6 +3,8 @@ import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
 import { applyQuoteSnapshot, loadMarketContext, loadMarketSeries, loadQuoteSnapshots } from "../data/market.js";
 import { uniqueArticles } from "../data/news-helpers.js";
 import { loadNewsSources } from "../data/news.js";
+import { loadFundamentalsSnapshot } from "../data/fundamentals.js";
+import { renderFundamentals } from "./fundamentals.js";
 import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
 import { isBlockedAssetTicker, parseDetailTicker } from "../shared/symbols.js";
 import { escapeHtml, unique } from "../shared/text.js";
@@ -37,14 +39,15 @@ export async function runStockDetail() {
 
   try {
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
-    const [series, quotes, news, marketContext] = await Promise.all([
+    const [series, quotes, news, marketContext, fundamentals] = await Promise.all([
       loadMarketSeries(parsed.ticker),
       loadQuoteSnapshots([parsed.ticker]),
       loadNewsSources(contextTickers, { allowCache: false }),
-      loadMarketContext()
+      loadMarketContext(),
+      loadFundamentalsSnapshot()
     ]);
     const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[series.ticker] || news.byTicker[parsed.ticker] || []));
-    renderStockDetail(scored, news, marketContext, quotes);
+    await renderStockDetail(scored, news, marketContext, quotes, fundamentals);
   } catch (error) {
     console.error(error);
     els.detailOutput.innerHTML = `<div class="empty-state">Could not complete the stock detail scan. Check the connection and try again.</div>`;
@@ -54,10 +57,12 @@ export async function runStockDetail() {
   }
 }
 
-function renderStockDetail(item, news, marketContext, quoteSnapshot) {
+async function renderStockDetail(item, news, marketContext, quoteSnapshot, snapshot) {
   const quote = item.quote || {};
+  const fundamentals = await renderFundamentals(item, snapshot);
   if (!item.dataQuality?.eligible) {
     els.detailOutput.innerHTML = `<div class="empty-state"><h3>${escapeHtml(item.ticker)} · Analysis unavailable</h3><p>${escapeHtml(item.dataQuality?.reason || "Qualified price history is unavailable.")}</p>${Number.isFinite(quote.price) ? `<p>Latest quote ${formatNumber(quote.price)} ${escapeHtml(quote.currency || "")} · ${escapeHtml(quote.quoteTime?.toLocaleString() || "Timestamp unavailable")}</p>` : ""}<p>No buy, hold, or sell recommendation is generated from this data.</p></div>`;
+    els.detailOutput.insertAdjacentHTML("beforeend", fundamentals);
     return;
   }
   const links = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []))
@@ -117,6 +122,7 @@ function renderStockDetail(item, news, marketContext, quoteSnapshot) {
         ${links.length ? links.map((entry) => `<a href="${escapeHtml(entry.link)}" target="_blank" rel="noreferrer">${escapeHtml(entry.source)}: ${escapeHtml(entry.title)}</a>`).join("") : `<p>No direct article links matched this ticker; the score leans more on price, technicals, liquidity, and broad market context.</p>`}
       </div>
     </article>
+    ${fundamentals}
   `;
 }
 

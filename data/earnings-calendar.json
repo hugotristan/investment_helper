@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "description": "Curated issuer announcements; dates expire after the event and are never rolled forward automatically.",
+  "byTicker": {
+    "JNJ": {
+      "date": "2026-10-13",
+      "status": "confirmed",
+      "source": "Johnson & Johnson investor announcement",
+      "sourceUrl": "https://www.jnj.com/media-center/press-releases/johnson-johnson-to-host-investor-conference-call-on-second-quarter-results-2026",
+      "verifiedAt": "2026-10-05"
+    },
+    "MRK": {
+      "date": "2026-10-29",
+      "status": "confirmed",
+      "source": "Merck investor relations",
+      "sourceUrl": "https://www.msd.com/investor-relations/",
+      "verifiedAt": "2026-10-05"
+    }
+  }
+}

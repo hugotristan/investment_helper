@@ -5,6 +5,8 @@ on:
     branches:
       - main
   workflow_dispatch:
+  schedule:
+    - cron: '30 6 * * *'
 
 permissions:
   contents: read
@@ -24,6 +26,35 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test app modules
+        run: npm test
+
+      - name: Restore latest fundamentals snapshot
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: data/fundamentals.json
+          key: fundamentals-${{ github.run_id }}
+          restore-keys: |
+            fundamentals-
+
+      - name: Refresh SEC fundamentals snapshot
+        run: node scripts/update-fundamentals.mjs
+        env:
+          SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+
+      - name: Preserve fundamentals snapshot
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: data/fundamentals.json
+          key: fundamentals-${{ github.run_id }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

@@ -49,6 +49,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Shows category scores, signal strength, timeframe, entry zone, invalidation level, support/resistance, and risk level. Scores are rules-based measures, not calibrated success probabilities.
 - Requires recent real history with at least 200 distinct daily prices before generating investment signals. Sample, stale, future-dated, and incomplete histories are excluded; a quote cannot make invalid history usable.
 - Highlights up to three individual stock opportunities with recent direct company evidence, explicit reasons and risks, dates, and detail/watchlist actions. Discovery scans the configured universe independently of the saved watchlist and can return no qualifying opportunity.
+- Shows annual company fundamentals from SEC XBRL snapshots: revenue, net income, operating/free cash flow, supported debt, growth, and annual diluted EPS valuation, with filing links and reporting periods. Missing facts stay unavailable. Snapshots refresh on deployment and daily.
 - Produces a rules-based market-regime score using qualified equity breadth, VIX, credit appetite, bond/rate pressure, dollar pressure, oil, and gold histories.
 - Outputs model allocations by ticker and percentage.
 - Answers focused natural-language questions such as "Should I sell Intel stock today?" or "Should I sell Microsoft today?"
@@ -75,7 +76,11 @@ The app also searches recent-year outlook material from trusted institutions and
 
 ## Current Gaps
 
-The app now labels data gaps instead of pretending they are solved. Bid-ask spreads, stock fundamentals, earnings calendars, analyst revisions, options flow, and social hype need dedicated reliable APIs before they should affect scoring. Yahoo's public fundamentals endpoint returned unauthorized in testing, so fundamentals were not wired in as a fake source.
+The app labels missing data explicitly. Fundamentals cover the configured equity universe when SEC companyfacts is reachable; unsupported/custom XBRL tags and unregistered issuers may have missing metrics. Annual P/E uses the last reported annual diluted EPS, not trailing twelve months. Fundamentals are displayed for research and do not alter technical signal strength. Bid-ask spreads, analyst revisions, options flow, and social hype still need reliable data feeds.
+
+Upcoming earnings dates are a small curated set of sourced issuer announcements in `data/earnings-calendar.json`, not a complete automated calendar. Confirmed dates expire after the event; other companies link to a calendar for verification and show unavailable instead of an invented date. Extend the file with a future date, confirmation status, and the issuer announcement URL.
+
+`node scripts/update-fundamentals.mjs` refreshes `data/fundamentals.json`. The GitHub Pages workflow runs it daily and before deployment, restoring the last successful snapshot from the Actions cache. Set the optional repository variable `SEC_USER_AGENT` to a descriptive user agent with contact information. Failed refreshes retain each original retrieval timestamp; they never make old facts appear newly fetched. A provider outage can leave the initial snapshot unavailable.
 
 ## Market Forecast
 
