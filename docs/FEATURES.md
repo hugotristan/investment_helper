@@ -33,3 +33,11 @@ Each feature is delivered in its own commit. This log records the behavior, impl
 **How:** Qualified raw histories and research are cached locally, preserving original timestamps and rejecting stale or invalid caches. Prices and portfolio values render before the longer news scan finishes, clearly labeled preliminary; only the complete scan generates new opportunity selections. No chart library or build step is needed.
 
 **Validation:** Cache tests cover date/Map revival, malformed/stale/future data, sample filtering, market timestamps, and quota failures. Browser checks cover chart controls, detail disclosures, navigation, mobile overflow, and cache reload behavior. The deployment test's folder-name assumption was corrected separately for Linux portability.
+
+## 5. Structured holdings and calculated gains
+
+**What changed:** My portfolio now saves symbols, shares, average purchase prices, and currencies through a validated form. Holdings support editing, removal, and Undo. Current value, unrealized gain, and allocation update from qualified prices; totals remain separate for each currency. Existing text holdings stay visible as manual amounts until converted.
+
+**How:** A pure holdings calculator checks quote dates and exact currency matches, falls back to qualified daily history, and keeps missing values explicit. Saved changes trigger a new scan. Gains exclude fees, dividends, taxes, and currency conversion. Migration preserves old amounts without inventing share counts or costs.
+
+**Validation:** Tests cover input normalization, dated prices, stale/sample rejection, exact currency matching, daily fallback, incomplete totals, gains, and legacy preservation. Browser checks cover save/edit/remove/Undo, invalid symbols, persistence, and mobile layout.

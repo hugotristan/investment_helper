@@ -620,3 +620,59 @@ label > span, .sell-column-head span, .forecast-head span, .detail-hero span, .m
 .analysis-disclosure[open] summary::after { content: "−"; }
 .analysis-disclosure[open] > summary { margin-bottom: 15px; }
 .analysis-disclosure .detail-sources { padding-top: 0; border-top: 0; }
+
+/* Structured holdings and currency-separated portfolio values. */
+.holding-form { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 15px 13px; align-items: end; }
+.holding-form label { display: block; min-width: 0; }
+.holding-form label > span { color: #a4b5cf; font-size: .72rem; line-height: 1.55; }
+.holding-form label small { color: #879bb9; font-size: .69rem; }
+.holding-form input, .holding-form select { min-height: 43px; font-size: .77rem; }
+.holding-form-actions { display: flex; flex-wrap: wrap; gap: 10px; grid-column: 1 / -1; }
+.holding-form-actions button { min-height: 39px; font-size: .74rem; }
+.holding-editor-message { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 12px; margin-top: 14px; color: #a7c1e5; font-size: .75rem; line-height: 1.7; }
+.holding-editor-message:empty { display: none; }
+.holding-editor-message button { min-height: 31px; padding: 6px 10px; border-color: #304d79; background: #1a2e4c; color: #b3d0fb; font-size: .71rem; }
+.holding-editor-message button:hover { border-color: #5785c8; background: #24416a; }
+.holding-editor-rows { display: grid; gap: 0; margin-top: 19px; border-top: 1px solid var(--border); }
+.holding-editor-rows:empty { display: none; }
+.holding-editor-row { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.6fr) auto; gap: 17px; align-items: center; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.holding-editor-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.holding-editor-name { min-width: 0; }
+.holding-editor-name strong { display: block; color: #d1dff3; font-size: .82rem; font-weight: 500; }
+.holding-editor-name span { display: block; margin-top: 3px; color: #8da1be; font-size: .72rem; line-height: 1.65; overflow-wrap: anywhere; }
+.holding-editor-values { min-width: 0; }
+.holding-editor-values > span { display: block; color: #bdcce3; font-size: .75rem; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.holding-editor-values > small { display: block; margin-top: 3px; color: #8da1be; font-size: .7rem; line-height: 1.65; }
+.holding-editor-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.holding-editor-actions button { min-height: 33px; padding: 7px 10px; border-color: #354763; background: #1c2c44; color: #a9c9f8; font-size: .71rem; }
+.holding-editor-actions button:hover { border-color: #5685cd; background: #263e61; }
+.holding-editor-actions button[data-remove-holding] { border-color: #4e3643; background: #281e29; color: #e4a5b1; }
+.holding-editor-actions button[data-remove-holding]:hover { border-color: #915361; background: #3a2531; }
+.portfolio-currency-group { min-width: 0; margin-top: 23px; }
+.portfolio-currency-group > h3 { margin-bottom: 7px; color: #b8cef1; font-size: 1rem; font-weight: 500; }
+.portfolio-currency-group > p { color: #92a5c1; font-size: .73rem; line-height: 1.7; }
+.holding-card [data-edit-holding] { min-height: 33px; margin-top: 13px; padding: 7px 10px; font-size: .71rem; }
+.snapshot-currency-group { min-width: 0; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border); }
+.snapshot-currency-group .snapshot-total { margin-top: 5px; font-size: 1.45rem; overflow-wrap: anywhere; }
+.snapshot-currency-group .snapshot-caption { margin-bottom: 8px; }
+.snapshot-currency-group .allocation-bar { margin: 15px 0 8px; }
+.snapshot-currency-group .snapshot-row { gap: 9px; }
+.snapshot-currency-group .snapshot-row > div:last-child { max-width: 63%; }
+.snapshot-gain { margin: 3px 0 10px; color: #a6bce0; font-size: .71rem; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.snapshot-unavailable { margin: 10px 0 0; color: #cfb891; font-size: .69rem; line-height: 1.75; }
+@media (max-width: 1100px) {
+  .holding-form { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .holding-editor-row { grid-template-columns: minmax(0, .8fr) minmax(0, 1.3fr) auto; gap: 12px; }
+}
+@media (max-width: 650px) {
+  .holding-form { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px 11px; }
+  .holding-editor-row { grid-template-columns: minmax(0, 1fr) auto; gap: 9px 12px; }
+  .holding-editor-values { grid-column: 1 / -1; grid-row: 2; }
+  .holding-editor-actions { align-self: start; }
+}
+@media (max-width: 390px) {
+  .holding-form { grid-template-columns: minmax(0, 1fr); }
+  .holding-editor-row { grid-template-columns: minmax(0, 1fr); }
+  .holding-editor-values { grid-column: auto; grid-row: auto; }
+  .holding-editor-actions { justify-content: flex-start; }
+}

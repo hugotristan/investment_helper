@@ -81,7 +81,7 @@ function exclusionFor(item, evidence, holdingWeight, now) {
     return { code: "trend", reason: "A positive 200-day trend and six-month momentum are both required." };
   }
   if (sellSignalFor(item)) return { code: "sell_signal", reason: "The current model identifies sell or trim triggers." };
-  if (holdingWeight > 10) return { code: "concentration", reason: `This stock already represents ${holdingWeight.toFixed(1)}% of the entered portfolio; it is excluded from new research candidates.` };
+  if (holdingWeight > 10) return { code: "concentration", reason: `This stock already represents ${holdingWeight.toFixed(1)}% of a tracked currency group; it is excluded from new research candidates.` };
   if (!evidence.length) return { code: "evidence", reason: "No dated direct company article with a usable link was found within the last 14 days." };
   return null;
 }
@@ -115,7 +115,7 @@ function candidateReasons(item, evidence) {
 function candidateRisks(item, evidence, holdingWeight) {
   const risks = (item.flags || []).filter((risk) => !/^No major risk flag/.test(risk));
   if (item.eventRisk?.level === "Medium") risks.unshift("Matched headlines indicate medium event risk; verify the event before acting.");
-  if (holdingWeight > 0) risks.unshift(`Already ${holdingWeight.toFixed(1)}% of your entered portfolio; further exposure increases concentration.`);
+  if (holdingWeight > 0) risks.unshift(`Already ${holdingWeight.toFixed(1)}% of a tracked currency group; further exposure increases concentration.`);
   if (evidence.some((article) => Number.isFinite(article.sentiment) && article.sentiment < 0)) risks.unshift("Recent direct company coverage includes negative or cautious language.");
   return [...new Set(risks.concat([
     "Single-stock exposure can lose value even when the technical setup is strong.",
@@ -133,8 +133,19 @@ function holdingWeights(holdings) {
   }
   const total = [...amounts.values()].reduce((sum, amount) => sum + amount, 0);
   if (total) return new Map([...amounts].map(([ticker, amount]) => [ticker, amount / total * 100]));
-  return new Map((holdings || []).filter((holding) => Number.isFinite(holding.weight) && holding.weight > 0)
-    .map((holding) => [String(holding.ticker || "").toUpperCase(), holding.weight]));
+  const grouped = new Map();
+  for (const holding of holdings || []) {
+    if (!Number.isFinite(holding.weight) || holding.weight <= 0) continue;
+    const ticker = String(holding.ticker || "").toUpperCase();
+    const key = `${ticker}|${holding.currency || ""}`;
+    grouped.set(key, (grouped.get(key) || 0) + holding.weight);
+  }
+  const weights = new Map();
+  for (const [key, weight] of grouped) {
+    const ticker = key.split("|")[0];
+    weights.set(ticker, Math.max(weights.get(ticker) || 0, weight));
+  }
+  return weights;
 }
 
 function articleTime(value) {

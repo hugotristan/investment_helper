@@ -3,7 +3,8 @@ import { scanState } from "../scan-state.js";
 import { parseTickers } from "../shared/symbols.js";
 import { dateValue, escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
-import { parsePortfolioPositions } from "./portfolio.js";
+import { getPortfolioHoldings } from "./portfolio.js";
+import { calculateHoldings } from "../analysis/holdings.js";
 import { addTickerToWatchlist } from "./watchlist.js";
 
 const boundContainers = new WeakSet();
@@ -15,7 +16,11 @@ export function renderOpportunities(results, marketContext) {
   const container = document.getElementById("opportunityCards");
   if (!container) return;
   latestInput = { results, marketContext };
-  const model = buildOpportunities(results, marketContext, { holdings: parsePortfolioPositions(state.myPortfolioInput) });
+  const portfolio = calculateHoldings(getPortfolioHoldings(), results);
+  const model = buildOpportunities(results, marketContext, { holdings: portfolio.holdings.map((holding) => ({
+    ticker: holding.ticker, currency: holding.currency,
+    weight: portfolio.groups.find((group) => group.currency === holding.currency)?.complete ? holding.weight : null
+  })) });
   if (!model.candidates.length) {
     container.innerHTML = `<div class="opportunity-empty"><span class="eyebrow">Research opportunities</span>
       <h3>No qualified opportunity right now</h3><p>${escapeHtml(model.reason)}</p>

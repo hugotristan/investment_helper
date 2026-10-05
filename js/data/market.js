@@ -136,6 +136,7 @@ export function applyQuoteSnapshot(series, quoteMap) {
   // qualified history; historyAsOf remains the date of the actual daily series.
   if (!quote || !quality.eligible || !Number.isFinite(quoteTime)
     || (quote.ticker && String(quote.ticker).toUpperCase() !== series.ticker)
+    || (series.currency && quote.currency !== series.currency)
     || quoteTime > now || now - quoteTime > 7 * dayMs
     || quoteTime < new Date(quality.asOf).getTime()
     || !Number.isFinite(quote.price) || quote.price <= 0) return series;
@@ -154,6 +155,7 @@ export function applyQuoteSnapshot(series, quoteMap) {
     ...series,
     prices,
     quote,
+    dailyClose: series.dailyClose || { price: latest?.close, currency: series.currency, asOf: quality.asOf },
     historyAsOf: series.historyAsOf ?? quality.asOf,
     source: `${series.source} + Yahoo intraday`
   };
@@ -207,6 +209,7 @@ function parseYahooChart(json, ticker) {
     prices,
     historyAsOf: prices.at(-1)?.date?.toISOString() || null,
     instrumentType: result?.meta?.instrumentType || "",
+    currency: result?.meta?.currency || "",
     source: "Yahoo Finance chart"
   };
 }

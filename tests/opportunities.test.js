@@ -110,6 +110,13 @@ test("portfolio concentration excludes holdings over ten percent and cautions ab
     holdings: [{ ticker: "ACME", amount: 10 }, { ticker: "ACME", amount: 10 }, { ticker: "OTHER", amount: 180 }] });
   assert.equal(smaller.candidates[0].holdingWeight, 10);
   assert.match(smaller.candidates[0].risks[0], /Already 10.0%/);
+  const lots = buildOpportunities([stock("ACME")], market, { now: NOW,
+    holdings: [{ ticker: "ACME", weight: 6 }, { ticker: "ACME", weight: 6 }] });
+  assert.equal(lots.candidates.length, 0);
+  assert.equal(lots.exclusions[0].code, "concentration");
+  const currencies = buildOpportunities([stock("ACME")], market, { now: NOW,
+    holdings: [{ ticker: "ACME", weight: 6, currency: "USD" }, { ticker: "ACME", weight: 6, currency: "EUR" }] });
+  assert.equal(currencies.candidates[0].holdingWeight, 6);
 });
 
 test("empty scans and all unavailable histories return clear explanations without a substitute stock", () => {

@@ -21,6 +21,7 @@ const { validateWatchlistTicker } = await import("../js/data/market.js");
 beforeEach(() => {
   saved.clear();
   state.myPortfolioInput = "";
+  state.holdings = null;
   state.learningHistory = [];
 });
 

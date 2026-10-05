@@ -6,7 +6,8 @@ import { applyQuoteSnapshot, loadMarketContext, loadQuoteSnapshots, loadTickerSe
 import { loadNewsSources } from "./js/data/news.js";
 import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { runStockDetail } from "./js/features/detail.js";
-import { buildPortfolioReview, parsePortfolioPositions, renderPortfolioReview } from "./js/features/portfolio.js";
+import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
+import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, renderWatchlist } from "./js/features/watchlist.js";
@@ -45,7 +46,7 @@ function init() {
 function hydrateInputs() {
   els.tickerInput.value = state.tickerInput;
   renderWatchlist();
-  els.myPortfolioInput.value = state.myPortfolioInput;
+  initializePortfolio();
   renderPortfolioSnapshot();
   els.screenerSignal.value = state.screenerSignal;
   els.screenerMinScore.value = state.screenerMinScore;
@@ -55,10 +56,9 @@ function hydrateInputs() {
 }
 
 function bindEvents() {
-  els.myPortfolioInput.addEventListener("input", () => {
-    state.myPortfolioInput = els.myPortfolioInput.value;
-    persist();
+  bindPortfolioEvents(() => {
     renderPortfolioSnapshot();
+    renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
     scheduleConfigScan();
   });
   bindWatchlistEvents(scheduleConfigScan);
@@ -105,7 +105,7 @@ async function runAnalysis(options = {}) {
     return;
   }
   const tickers = unique(parseTickers(state.tickerInput)
-    .concat(parsePortfolioPositions(state.myPortfolioInput).map((holding) => holding.ticker), opportunityUniverse))
+    .concat(getPortfolioHoldings().map((holding) => holding.ticker), opportunityUniverse))
     .filter((ticker) => !isBlockedAssetTicker(ticker))
     .slice(0, 180);
   if (!tickers.length) {
@@ -180,7 +180,7 @@ function restoreCachedScan() {
   const cached = loadScanCache();
   if (!cached) return;
   const requested = new Set(parseTickers(state.tickerInput).concat(opportunityUniverse,
-    parsePortfolioPositions(state.myPortfolioInput).map((holding) => holding.ticker)));
+    getPortfolioHoldings().map((holding) => holding.ticker)));
   const series = cached.series.filter((item) => requested.has(item.ticker));
   if (!series.length) return;
   const ranked = rankSeries(series, cached.quotes, cached.news.byTicker);

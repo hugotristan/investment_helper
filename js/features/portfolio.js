@@ -1,46 +1,51 @@
 import { broadFunds } from "../config/settings.js";
-import { formatNumber, formatPercent, money } from "../shared/format.js";
+import { calculateHoldings } from "../analysis/holdings.js";
+import { formatNumber, formatPercent } from "../shared/format.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
 import { els } from "../ui/dom.js";
 
 export function buildPortfolioReview(results, marketContext) {
-  const holdings = parsePortfolioPositions(state.myPortfolioInput);
+  const calculated = calculateHoldings(getPortfolioHoldings(), results);
   const byTicker = new Map(results.map((item) => [item.ticker, item]));
-  const enriched = holdings.map((holding) => {
+  const byCurrency = new Map(calculated.groups.map((group) => [group.currency, group]));
+  const enriched = calculated.holdings.map((holding) => {
     const item = byTicker.get(holding.ticker);
+    const group = byCurrency.get(holding.currency);
     return {
       ...holding,
+      weight: group?.complete ? holding.weight : null,
       analysis: item || null,
-      isCore: broadFunds.has(holding.ticker) || /vanguard|ftse|all-world|index|etf/i.test(holding.label)
+      isCore: Boolean(item?.isFund) || broadFunds.has(holding.ticker) || /vanguard|ftse|all-world|index|etf/i.test(holding.label)
     };
   });
-  const total = enriched.reduce((sum, holding) => sum + holding.amount, 0);
-  enriched.forEach((holding) => {
-    holding.weight = total ? (holding.amount / total) * 100 : 0;
-    holding.review = portfolioHoldingReview(holding, marketContext);
+  enriched.forEach((holding) => { holding.review = portfolioHoldingReview(holding, marketContext); });
+  const groups = calculated.groups.map((group) => {
+    const holdings = enriched.filter((holding) => holding.currency === group.currency);
+    const coreValue = holdings.filter((holding) => holding.isCore).reduce((sum, holding) => sum + (holding.currentValue || 0), 0);
+    return { ...group, holdings, coreValue, stockValue: group.total === null ? null : group.total - coreValue };
   });
-
-  const coreValue = enriched.filter((holding) => holding.isCore).reduce((sum, holding) => sum + holding.amount, 0);
-  const stockValue = total - coreValue;
-  const largest = enriched.reduce((best, holding) => !best || holding.amount > best.amount ? holding : best, null);
+  const onlyGroup = groups.length === 1 ? groups[0] : null;
   const downCount = enriched.filter((holding) => holding.status === "down").length;
-  const ownedTech = enriched
-    .filter((holding) => ["MSFT", "TSM", "AVGO", "NVDA", "GOOGL"].includes(holding.ticker))
-    .reduce((sum, holding) => sum + holding.amount, 0);
   const concentrationNotes = [];
-  if (total && coreValue / total >= 0.8) concentrationNotes.push("Most of the portfolio is in one broad Vanguard/FTSE core holding. That is diversified by companies, but still concentrated in one fund wrapper.");
-  if (total && ownedTech / total >= 0.1) concentrationNotes.push("The satellite positions are mostly mega-cap tech and semiconductors, so they can fall together even if each individual amount is small.");
-  if (downCount >= 3) concentrationNotes.push("Several satellite holdings are down. The model separates normal drawdown from actual trend damage before suggesting any reduction.");
+  groups.forEach((group) => {
+    if (!group.complete) { concentrationNotes.push(`${group.currency}: some prices are unavailable. Totals show known values; weights remain unavailable.`); return; }
+    const ownedTech = group.holdings.filter((holding) => ["MSFT", "TSM", "AVGO", "NVDA", "GOOGL"].includes(holding.ticker))
+      .reduce((sum, holding) => sum + (holding.currentValue || 0), 0);
+    if (group.total && group.coreValue / group.total >= 0.8) concentrationNotes.push(`${group.currency}: core fund exposure represents ${((group.coreValue / group.total) * 100).toFixed(1)}% of tracked value.`);
+    if (group.total && ownedTech / group.total >= 0.1) concentrationNotes.push(`${group.currency}: technology and semiconductor holdings can fall together.`);
+  });
   if (marketContext?.score < 45) concentrationNotes.push(`Market regime is weak (${marketContext.label}), so new buys need a stricter setup.`);
-  if (!concentrationNotes.length) concentrationNotes.push("Position sizes look controlled. The main task is patience and avoiding impulsive averaging down.");
+  if (!concentrationNotes.length) concentrationNotes.push("Values and weights are grouped by currency. No currency conversion is assumed.");
 
   return {
     holdings: enriched,
-    total,
-    coreValue,
-    stockValue,
-    largest,
+    groups,
+    total: onlyGroup?.total ?? null,
+    coreValue: onlyGroup?.coreValue ?? null,
+    stockValue: onlyGroup?.stockValue ?? null,
+    largest: onlyGroup ? onlyGroup.holdings.reduce((best, holding) => !best || holding.currentValue > best.currentValue ? holding : best, null) : null,
+    missingCount: calculated.missingCount,
     downCount,
     concentrationNotes
   };
@@ -48,12 +53,12 @@ export function buildPortfolioReview(results, marketContext) {
 
 function portfolioHoldingReview(holding, marketContext) {
   const item = holding.analysis;
-  if (!item || !item.dataQuality?.eligible) {
+  if (!item || !item.dataQuality?.eligible || marketContext?.available === false) {
     return {
       label: "Analysis unavailable",
       className: "holding-watch",
-      reason: item?.dataQuality?.reason || "This holding was not returned by the live price scan. Check the ticker.",
-      detail: "The app can still count the position size, but it cannot score trend or risk until price data loads."
+      reason: marketContext?.available === false ? "Market context is unavailable; the model cannot issue a position signal." : item?.dataQuality?.reason || "This holding was not returned by the live price scan. Check the ticker.",
+      detail: "Saved holdings and available prices remain visible while analysis is unavailable."
     };
   }
 
@@ -123,45 +128,86 @@ export function renderPortfolioReview(portfolio, priceSource) {
     return;
   }
   const sourceWarning = priceSource === "sample"
-    ? `<p class="data-note">Price data fell back to sample data, so this is only a position-size review.</p>`
-    : `<p class="data-note">This is a portfolio-aware market signal, not personal financial advice. It uses your stated position sizes, current model scores, trend checks, and risk filters.</p>`;
+    ? '<p class="data-note">Sample prices cannot value holdings or support position signals. Legacy amounts remain as entered.</p>'
+    : '<p class="data-note">Share positions use qualified prices in their purchase currency. Legacy amounts stay manual; currency totals remain separate.</p>';
   els.portfolioReview.innerHTML = `
     ${sourceWarning}
-    <div class="portfolio-summary">
-      <article><span>Total tracked</span><strong>${money(portfolio.total)}</strong></article>
-      <article><span>Core ETF weight</span><strong>${portfolio.total ? `${((portfolio.coreValue / portfolio.total) * 100).toFixed(1)}%` : "-"}</strong></article>
-      <article><span>Satellite stock weight</span><strong>${portfolio.total ? `${((portfolio.stockValue / portfolio.total) * 100).toFixed(1)}%` : "-"}</strong></article>
-      <article><span>Down positions</span><strong>${portfolio.downCount}/${portfolio.holdings.length}</strong></article>
-    </div>
     <div class="portfolio-notes">
       ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
     </div>
-    <div class="holding-grid">
-      ${portfolio.holdings.map(renderHoldingCard).join("")}
-    </div>
+    ${portfolio.groups.map((group) => `<section class="portfolio-currency-group"><h3>${escapeHtml(group.currency)} holdings</h3>
+      <div class="portfolio-summary">
+        <article><span>${group.complete ? "Tracked value" : "Known tracked value"}</span><strong>${escapeHtml(currencyMoney(group.total, group.currency))}</strong></article>
+        <article><span>Cost basis</span><strong>${escapeHtml(currencyMoney(group.costBasis, group.currency))}</strong></article>
+        <article><span>Unrealized gain / loss</span><strong>${escapeHtml(gainMoney(group.gain, group.currency))}</strong></article>
+        <article><span>Core fund weight</span><strong>${group.complete && group.total > 0 ? `${((group.coreValue / group.total) * 100).toFixed(1)}%` : "Unavailable"}</strong></article>
+      </div>
+      ${group.legacyCount ? `<p class="data-note">${group.legacyCount} legacy amount${group.legacyCount === 1 ? " is" : "s are"} included as entered. Group cost basis and gain / loss need share quantities and purchase prices for every holding.</p>` : ""}
+      <div class="holding-grid">${group.holdings.map(renderHoldingCard).join("")}</div>
+    </section>`).join("")}
   `;
 }
 
 function renderHoldingCard(holding) {
   const item = holding.analysis;
+  const manual = holding.kind === "manual";
+  const status = holding.status === "down" ? "In loss" : holding.status === "up" ? "In profit" : holding.status === "flat" ? "At cost" : "Gain / loss unavailable";
+  const values = manual
+    ? `<div><span>Entered amount</span><strong>${escapeHtml(currencyMoney(holding.amount, holding.currency))}</strong></div>`
+    : `<div><span>Shares</span><strong>${escapeHtml(quantity(holding.shares))}</strong></div>
+      <div><span>Average purchase</span><strong>${escapeHtml(currencyMoney(holding.averageCost, holding.currency))}</strong></div>
+      <div><span>Cost basis</span><strong>${escapeHtml(currencyMoney(holding.costBasis, holding.currency))}</strong></div>
+      <div><span>Current value</span><strong>${escapeHtml(currencyMoney(holding.currentValue, holding.currency))}</strong></div>
+      <div><span>Unrealized gain / loss</span><strong>${escapeHtml(gainMoney(holding.gain, holding.currency))}${Number.isFinite(holding.gainPercent) ? ` <small>${escapeHtml(formatPercent(holding.gainPercent))}</small>` : ""}</strong></div>`;
   return `
     <article class="holding-card ${holding.review.className}">
       <div class="holding-head">
         <div>
-          <span>${escapeHtml(holding.status === "down" ? "Currently down" : holding.status === "up" ? "Currently up" : "Status unknown")}</span>
+          <span>${escapeHtml(manual ? `Manual status: ${holding.status}` : status)}</span>
           <h3>${escapeHtml(holding.label || holding.ticker)}</h3>
         </div>
-        <strong>${holding.weight.toFixed(1)}%</strong>
+        <strong>${Number.isFinite(holding.weight) ? `${holding.weight.toFixed(1)}%` : "Weight unavailable"}</strong>
       </div>
       <div class="stock-stats">
         <span>${escapeHtml(holding.ticker)}</span>
-        <span>${money(holding.amount)}</span>
+        <span>${escapeHtml(holding.currency)}</span>
         ${item?.dataQuality?.eligible ? `<span>Signal strength ${item.score}/100</span><span>1M ${formatPercent(item.oneMonth)}</span><span>Risk ${escapeHtml(item.setup?.riskLevel || "-")}</span>` : ""}
       </div>
+      <div class="holding-values">${values}</div>
+      <p class="data-note">${manual ? "Legacy amount stays as entered. Edit to add shares and average purchase price." : Number.isFinite(holding.price)
+        ? `Price ${escapeHtml(currencyMoney(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
+        : escapeHtml(holding.valuationError || "A qualified price in the purchase currency is unavailable.")}</p>
       <b class="holding-label">${escapeHtml(holding.review.label)}</b>
       <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
+      <button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>
     </article>
   `;
+}
+
+export function getPortfolioHoldings() {
+  if (Array.isArray(state.holdings)) return state.holdings;
+  return parsePortfolioPositions(state.myPortfolioInput).map((holding, index) => ({
+    ...holding, id: `legacy-${index}`, kind: "manual", currency: state.currency || "EUR"
+  }));
+}
+
+function currencyMoney(value, currency) {
+  if (!Number.isFinite(value)) return "Unavailable";
+  try { return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value); }
+  catch { return `${value.toFixed(2)} ${currency || ""}`.trim(); }
+}
+
+function gainMoney(value, currency) {
+  return Number.isFinite(value) ? `${value > 0 ? "+" : ""}${currencyMoney(value, currency)}` : "Unavailable";
+}
+
+function quantity(value) {
+  return Number.isFinite(value) ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(value) : "Unavailable";
+}
+
+function holdingDate(value) {
+  const date = new Date(value);
+  return value && Number.isFinite(date.getTime()) ? date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Date unavailable";
 }
 
 export function parsePortfolioPositions(value) {

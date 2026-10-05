@@ -56,7 +56,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Outputs model allocations by ticker and percentage.
 - Answers focused natural-language questions such as "Should I sell Intel stock today?" or "Should I sell Microsoft today?"
 - Shows sell/reduce and do-not-sell/hold signals for the current watchlist.
-- Adds a personal portfolio review using the user's current holdings, position sizes, up/down status, concentration, and live score checks.
+- Saves structured holdings with shares, average purchase price, and currency. Calculates current value and unrealized gain from qualified matching-currency prices, with separate totals for each currency.
 - Shows a "do not buy today" ticker from the weakest setup.
 - Stores recent scan history locally in the browser.
 
@@ -92,6 +92,8 @@ The market-regime score combines qualified SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GL
 
 Sources can explain and score candidates, but they cannot recommend a stock the app never scans. The default watchlist now includes a much wider opportunity universe instead of only SPY, QQQ, AAPL, MSFT, NVDA, TSLA, JPM, XOM, and UNH. Changing the watchlist or portfolio holdings automatically schedules a fresh scan.
 
-The personal portfolio starts empty. On the My portfolio page, add one holding per line in the format `TICKER | Label | Amount | up/down`. The overview shows an allocation summary based on those manually entered amounts. Changes are saved automatically in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals do not sell purely because a position is down; they look for trend damage, event risk, concentration, volatility, and weak model score before escalating from hold/watch to review/trim.
+The personal portfolio starts empty. On My portfolio, enter a stock/ETF symbol, shares, average purchase price, and purchase currency, then select Save holding. New symbols are validated before saving. Qualified matching-currency quotes calculate current value, cost basis, unrealized gain, and allocation within each currency. Totals keep different currencies separate; gains exclude fees, dividends, taxes, and currency conversion. Missing or stale prices remain unavailable.
+
+Existing text entries are preserved as manual amounts until edited into structured holdings; the app does not infer share counts or purchase prices. Holdings can be edited, removed, and restored with Undo. Saved holdings stay in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
 
 The app also runs dedicated recent-market-outlook scans. These look for strategist forecasts, market perspectives, weekly commentary, asset-allocation views, overweight/underweight calls, stock-idea articles, and official macro outlooks from trusted research providers and institutions including BlackRock, Vanguard, J.P. Morgan, Fidelity, Morningstar, Schwab, Goldman Sachs, Morgan Stanley, UBS, PIMCO, Motley Fool, the Federal Reserve, IMF, OECD, World Bank, ECB, BEA, BLS, Census, and EIA. Outlook items are scored separately from breaking news, then used as a modest positive or negative adjustment to each ticker or ETF theme.

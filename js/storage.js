@@ -7,6 +7,7 @@ const STORAGE_KEY = "today-invest-model-state";
 export const defaults = {
   tickerInput: opportunityUniverse.join(", "),
   myPortfolioInput: "",
+  holdings: null,
   screenerSignal: "actionable",
   screenerMinScore: 50,
   screenerMinLiquidity: 5,

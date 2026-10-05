@@ -190,11 +190,21 @@
 
       <section class="view-page" data-page="portfolio" hidden>
         <details class="panel portfolio-editor" open>
-          <summary class="control-summary"><span><strong>Your holdings</strong><span>Edit your portfolio, saved in this browser</span></span></summary>
+          <summary class="control-summary"><span><strong>Your holdings</strong><span>Track shares, purchase cost, and current value</span></span></summary>
           <div class="control-content">
-            <label for="myPortfolioInput"><span>One holding per line</span></label>
-            <textarea id="myPortfolioInput" rows="4" spellcheck="false" placeholder="TICKER | Label | Amount | up/down" aria-describedby="portfolioInputHelp"></textarea>
-            <p id="portfolioInputHelp" class="data-note">Enter the amount and whether the position is up or down for you. These values stay as entered; market analysis refreshes automatically.</p>
+            <form id="holdingForm" class="holding-form" aria-describedby="portfolioInputHelp">
+              <input id="holdingId" type="hidden">
+              <label for="holdingTicker"><span>Ticker</span><input id="holdingTicker" type="text" placeholder="e.g. AAPL" autocomplete="off" spellcheck="false" required></label>
+              <label for="holdingLabel"><span>Label <small>optional</small></span><input id="holdingLabel" type="text" placeholder="e.g. Apple" maxlength="120" autocomplete="off"></label>
+              <label for="holdingShares"><span>Number of shares</span><input id="holdingShares" type="number" min="0.00000001" step="any" inputmode="decimal" placeholder="e.g. 5" required></label>
+              <label for="holdingCost"><span>Average purchase price</span><input id="holdingCost" type="number" min="0" step="any" inputmode="decimal" placeholder="Per share" required></label>
+              <label for="holdingCurrency"><span>Purchase currency</span><select id="holdingCurrency"><option value="USD">USD · US dollar</option><option value="EUR">EUR · Euro</option><option value="GBP">GBP · Pound sterling</option><option value="JPY">JPY · Japanese yen</option><option value="CHF">CHF · Swiss franc</option><option value="CAD">CAD · Canadian dollar</option><option value="AUD">AUD · Australian dollar</option></select></label>
+              <div class="holding-form-actions"><button id="holdingSave" type="submit">Save holding</button><button id="holdingCancel" class="ghost" type="button" hidden>Cancel edit</button></div>
+            </form>
+            <p id="portfolioInputHelp" class="data-note">Gains update from qualified prices in the same currency as your purchase cost. Currency totals stay separate. Your holdings are saved in this browser.</p>
+            <div id="holdingEditorMessage" class="holding-editor-message" role="status" aria-live="polite"></div>
+            <div id="holdingEditorRows" class="holding-editor-rows"></div>
+            <textarea id="myPortfolioInput" hidden aria-hidden="true" tabindex="-1"></textarea>
           </div>
         </details>
         <section class="panel">

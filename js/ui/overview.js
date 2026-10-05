@@ -1,5 +1,6 @@
-import { parsePortfolioPositions } from "../features/portfolio.js";
-import { formatNumber, formatPercent, money } from "../shared/format.js";
+import { calculateHoldings } from "../analysis/holdings.js";
+import { getPortfolioHoldings } from "../features/portfolio.js";
+import { formatNumber, formatPercent } from "../shared/format.js";
 import { parseTickers } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
@@ -185,27 +186,56 @@ function chartReadout(point, currency) {
 }
 
 export function renderPortfolioSnapshot() {
-  const holdings = parsePortfolioPositions(state.myPortfolioInput).sort((a, b) => b.amount - a.amount);
-  const total = holdings.reduce((sum, holding) => sum + holding.amount, 0);
-  if (!total) {
+  const portfolio = calculateHoldings(getPortfolioHoldings(), latestOverview?.results || []);
+  if (!portfolio.holdings.length) {
     setHtml("portfolioSnapshot", `<div class="portfolio-empty"><span class="portfolio-empty-icon" aria-hidden="true">${statIcon("quote")}</span>
       <strong>Your portfolio starts here</strong><p>Add your holdings to see how your allocation is spread.</p>
       <a class="button secondary" href="#portfolio">Add holdings <span aria-hidden="true">↗</span></a></div>`);
     return;
   }
-  const rows = holdings.slice(0, 4).map((holding) => ({ ...holding, weight: holding.amount / total * 100 }));
-  if (holdings.length > 4) {
-    const others = holdings.slice(4).reduce((sum, holding) => sum + holding.amount, 0);
-    rows.push({ ticker: "Others", label: `${holdings.length - 4} other holdings`, amount: others, weight: others / total * 100 });
-  }
-  setHtml("portfolioSnapshot", `<span class="snapshot-caption">Manually entered portfolio value</span>
-    <strong class="snapshot-total">${escapeHtml(money(total))}</strong>
-    <p class="snapshot-caption">${holdings.length} holding${holdings.length === 1 ? "" : "s"} · amounts saved in this browser</p>
-    <div class="allocation-bar" aria-label="Portfolio allocation">${rows.map((holding, index) => `<span style="width:${holding.weight.toFixed(3)}%;background:${colors[index]}" title="${escapeHtml(holding.ticker)} ${holding.weight.toFixed(1)}%"></span>`).join("")}</div>
-    <div class="allocation-legend">${rows.map((holding, index) => `<div class="snapshot-row"><span class="allocation-dot" style="background:${colors[index]}" aria-hidden="true"></span>
-      <div><strong>${escapeHtml(holding.ticker)}</strong><span>${escapeHtml(holding.label)}</span></div>
-      <div><strong>${escapeHtml(money(holding.amount))}</strong><span>${holding.weight.toFixed(1)}%</span></div></div>`).join("")}</div>
+  setHtml("portfolioSnapshot", `<p class="snapshot-caption">${portfolio.holdings.length} holding${portfolio.holdings.length === 1 ? "" : "s"} · currency totals shown separately</p>
+    ${portfolio.groups.map((group) => snapshotCurrencyGroup(group, portfolio.holdings)).join("")}
     <a class="snapshot-link" href="#portfolio">Manage portfolio <span aria-hidden="true">↗</span></a>`);
+}
+
+function snapshotCurrencyGroup(group, allHoldings) {
+  const holdings = allHoldings.filter((holding) => holding.currency === group.currency)
+    .sort((a, b) => (b.currentValue ?? -1) - (a.currentValue ?? -1));
+  const missing = holdings.filter((holding) => !Number.isFinite(holding.currentValue));
+  const rows = holdings.slice(0, 4).map((holding) => ({ ...holding }));
+  const remaining = holdings.slice(4).filter((holding) => Number.isFinite(holding.currentValue));
+  if (remaining.length) {
+    const currentValue = remaining.reduce((sum, holding) => sum + holding.currentValue, 0);
+    rows.push({ ticker: "Others", label: `${remaining.length} other valued holdings`, currentValue,
+      weight: group.total > 0 ? currentValue / group.total * 100 : null, source: "combined", currency: group.currency });
+  }
+  const valued = rows.filter((holding) => Number.isFinite(holding.currentValue));
+  const label = !group.complete ? "Partial known value" : group.legacyCount ? "Tracked value" : "Current value";
+  const gain = Number.isFinite(group.gain)
+    ? `<p class="snapshot-gain ${changeClass(group.gain)}">Unrealized ${group.gain > 0 ? "+" : ""}${escapeHtml(snapshotMoney(group.gain, group.currency))}${group.costBasis > 0 ? ` · ${escapeHtml(formatPercent(group.gain / group.costBasis))}` : ""}</p>`
+    : `<p class="snapshot-caption">${group.legacyCount ? "Gain/loss needs shares and purchase cost for amount-only holdings." : "Gain/loss unavailable until all prices match the purchase currency."}</p>`;
+  return `<section class="snapshot-currency-group"><span class="snapshot-caption">${escapeHtml(label)} · ${escapeHtml(group.currency)}</span>
+    <strong class="snapshot-total">${Number.isFinite(group.total) ? escapeHtml(snapshotMoney(group.total, group.currency)) : "Unavailable"}</strong>
+    ${gain}
+    ${group.legacyCount ? `<p class="snapshot-caption">Includes ${group.legacyCount} manually entered amount${group.legacyCount === 1 ? "" : "s"}.</p>` : ""}
+    ${valued.length && group.total > 0 ? `<div class="allocation-bar" aria-label="Allocation of known ${escapeHtml(group.currency)} values">${valued.map((holding) => {
+      const index = rows.indexOf(holding);
+      const weight = holding.currentValue / group.total * 100;
+      return `<span style="width:${weight.toFixed(3)}%;background:${colors[index]}" title="${escapeHtml(holding.ticker)} ${weight.toFixed(1)}%"></span>`;
+    }).join("")}</div>` : ""}
+    <div class="allocation-legend">${rows.map((holding, index) => {
+      const known = Number.isFinite(holding.currentValue);
+      const source = holding.source === "manual" ? "Entered amount" : holding.source === "daily" ? "Daily close" : holding.source === "quote" ? "Live quote" : holding.source === "combined" ? holding.label : "Price unavailable";
+      return `<div class="snapshot-row"><span class="allocation-dot" style="background:${colors[index]}" aria-hidden="true"></span>
+      <div><strong>${escapeHtml(holding.ticker)}</strong><span title="${escapeHtml(holding.label || holding.ticker)}">${escapeHtml(source)}</span></div>
+      <div><strong>${known ? escapeHtml(snapshotMoney(holding.currentValue, group.currency)) : "Unavailable"}</strong><span>${known && group.total > 0 ? `${(holding.currentValue / group.total * 100).toFixed(1)}% of known value` : "Quote needed"}</span></div></div>`;
+    }).join("")}</div>
+    ${missing.length ? `<p class="snapshot-unavailable">${missing.length} unpriced holding${missing.length === 1 ? "" : "s"}: ${escapeHtml(missing.slice(0, 3).map((holding) => holding.ticker).join(", "))}${missing.length > 3 ? ` +${missing.length - 3} more` : ""}. Partial values exclude unavailable prices.</p>` : ""}
+  </section>`;
+}
+
+function snapshotMoney(value, currency) {
+  return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} ${currency}`;
 }
 
 function priceChart(item, points, mini, id) {
