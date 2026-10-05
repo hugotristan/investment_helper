@@ -11,7 +11,7 @@ import { els } from "./dom.js";
 import { renderDashboardOverview } from "./overview.js";
 import { renderOpportunities } from "../features/opportunities.js";
 
-export function renderAll(results, priceSource, news, marketContext, quoteSnapshot = null) {
+export function renderAll(results, priceSource, news, marketContext, quoteSnapshot = null, { scannedAt = Date.now() } = {}) {
   scanState.latestRankedResults = results;
   scanState.latestPriceSource = priceSource;
   scanState.latestNews = news;
@@ -21,7 +21,7 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
   const portfolio = buildPortfolioReview(results, marketContext);
   const qualified = results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score));
   const top = qualified[0];
-  const now = new Date();
+  const now = new Date(scannedAt);
   const sourceLine = `${qualified.length}/${results.length} instruments have qualified recent real history. Unavailable instruments are excluded from recommendations. Headlines: ${news.label}.`;
   const activeTrustedSources = Math.max(0, news.sources.filter((source) => source.ok).length - 1);
 

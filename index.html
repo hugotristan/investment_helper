@@ -42,6 +42,7 @@
             <p class="eyebrow">Your investment workspace</p>
             <h1 id="pageTitle" class="hero-title">Overview</h1>
             <p id="pageDescription" class="hero-copy">Your market, at a glance.</p>
+            <p id="scanStage" class="scan-stage" role="status" aria-live="polite">Refreshing market data…</p>
           </div>
           <div class="top-actions">
             <form id="quickSearchForm" class="quick-search" role="search" aria-label="Find a stock">
@@ -69,7 +70,7 @@
         <div class="dashboard-overview">
           <div class="dashboard-main">
             <section class="panel overview-panel">
-              <div class="panel-heading"><div><p class="eyebrow">On your radar</p><h2>Leading market signals</h2></div><a href="#screener">View all <span aria-hidden="true">↗</span></a></div>
+              <div class="panel-heading"><div><p class="eyebrow">On your radar</p><h2>Your watchlist</h2></div><a href="#screener">View all <span aria-hidden="true">↗</span></a></div>
               <div id="featuredStocks" class="featured-stocks"><div class="empty-state">Your strongest setups will appear after the scan.</div></div>
             </section>
             <section class="panel overview-panel">
@@ -176,7 +177,7 @@
             </div>
             <span class="disclaimer">Fresh fetch</span>
           </div>
-          <p class="helper-text">Enter a ticker to pull a fresh Yahoo intraday/chart scan, technical score, sell/hold logic, source-backed evidence, and broad-market context for that single stock or ETF.</p>
+          <p class="helper-text">Explore a stock's current price, financial results, risks, and company evidence.</p>
           <div class="detail-controls">
             <input id="detailTickerInput" type="search" placeholder="Example: MSFT">
             <button id="detailButton" type="button">Analyze ticker</button>
@@ -282,18 +283,12 @@
           </div>
         </section>
 
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Framework</p>
-              <h2>Market knowledge used by the model</h2>
-            </div>
-            <span class="disclaimer">Rules based</span>
-          </div>
+        <details class="panel analysis-disclosure">
+          <summary>How the model scores the market</summary>
           <div id="marketFramework" class="framework-grid">
             <div class="empty-state">Framework details will appear after the first scan.</div>
           </div>
-        </section>
+        </details>
       </section>
 
       <section class="view-page" data-page="sources" hidden>

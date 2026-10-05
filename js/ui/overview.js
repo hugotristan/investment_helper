@@ -1,25 +1,27 @@
 import { parsePortfolioPositions } from "../features/portfolio.js";
 import { formatNumber, formatPercent, money } from "../shared/format.js";
+import { parseTickers } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
 
 const periods = { "1M": 1, "3M": 3, "1Y": 12 };
 const selectedPeriods = new Map();
 const boundCharts = new WeakSet();
+const chartInteractions = new WeakMap();
 const colors = ["#7189ff", "#36c8b1", "#f3bd66", "#c38af5", "#607085"];
 let latestOverview = null;
 
-export function renderDashboardOverview(results, priceSource, news, marketContext, quotes) {
+export function renderDashboardOverview(results, priceSource, news, marketContext, quotes, { researchPending = false } = {}) {
   const qualified = results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score));
   latestOverview = { results: qualified, priceSource, quotes };
   const trusted = (news?.sources || []).filter((source) => source.ok && source.id !== "live-source-index").length;
   const scores = results.map((item) => item.score).filter(Number.isFinite);
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
   const stats = [
-    ["Instruments scanned", results.length, "Stocks & ETFs in your watchlist", "scan"],
-    ["Average model score", average === null ? "—" : `${average}/100`, "Trend, momentum & risk combined", "score"],
+    ["Instruments scanned", results.length, "Watchlist + discovery universe", "scan"],
+    ["Average model score", average === null ? "—" : `${average}/100`, researchPending ? "Price signals · research pending" : "Trend, momentum & risk combined", "score"],
     ["Live quote snapshots", quotes?.count || 0, quotes?.count ? `Of ${quotes.total} requested symbols` : "Daily chart prices used instead", "quote"],
-    ["Trusted sources", trusted, `Of ${news?.configured || 0} research sources`, "source"]
+    ["Trusted sources", researchPending ? "Pending" : trusted, researchPending ? "Research scan is still running" : `Of ${news?.configured || 0} research sources`, "source"]
   ];
   setHtml("dashboardStats", stats.map(([label, value, note, icon]) => `
     <article class="stat-card">
@@ -28,15 +30,16 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
       <strong class="stat-value">${escapeHtml(value)}</strong>
       <span class="stat-note">${escapeHtml(note)}</span>
     </article>`).join(""));
-  setHtml("featuredStocks", qualified.slice(0, 4).map((item, index) => featuredStock(item, quotes, priceSource, index)).join("")
-    || '<p class="empty-state">No qualified price history yet. Sample, stale, and incomplete data cannot generate market signals.</p>');
+  const watched = new Set(parseTickers(state.tickerInput));
+  setHtml("featuredStocks", qualified.filter((item) => watched.has(item.ticker)).slice(0, 4).map((item, index) => featuredStock(item, quotes, priceSource, index)).join("")
+    || '<p class="empty-state">No qualified price history for your watchlist yet. Add stocks or ETFs below; sample, stale, and incomplete data cannot generate signals.</p>');
   renderTrends();
   renderPortfolioSnapshot();
   const top = qualified[0];
   const excludedCount = results.length - qualified.length;
   const activity = [
     ["Market regime", marketContext?.label || "Not available", `${marketContext?.liveCount || 0}/${marketContext?.total || 11} qualified market proxies`],
-    ["Research coverage", `${news?.items?.length || 0} relevant headlines`, `${trusted} trusted sources active in this scan`],
+    ["Research coverage", researchPending ? "Research scan running" : `${news?.items?.length || 0} relevant headlines`, researchPending ? "Price charts are ready. Headlines and source checks will follow." : `${trusted} trusted sources active in this scan`],
     ["Leading instrument", top ? `${top.ticker} · ${top.score}/100` : "No result yet", top?.setup?.signal || top?.label || "Scan your watchlist to find a leader"],
     ["Price data", `${qualified.length}/${results.length} instruments qualified`, excludedCount ? `${excludedCount} excluded: sample, stale, or incomplete history. See the screener for coverage.` : "Recent real daily history. Signal strength is a rules-based score, not a measured success probability."]
   ];
@@ -67,13 +70,16 @@ function renderTrends() {
   const container = document.getElementById("marketTrends");
   if (!container || !latestOverview) return;
   const { results, priceSource, quotes } = latestOverview;
-  const selected = results.slice(0, 2);
+  const marketProxies = ["SPY", "QQQ"].map((ticker) => results.find((item) => item.ticker === ticker)).filter(Boolean);
+  const selected = marketProxies.length === 2 ? marketProxies : results.slice(0, 2);
+  const interactive = [];
   container.innerHTML = selected.map((item, index) => {
     const period = selectedPeriods.get(item.ticker) || "3M";
     const { points, partial } = periodHistory(item, periods[period]);
     const change = points.length > 1 ? points.at(-1).close / points[0].close - 1 : null;
     const quote = quotes?.byTicker?.get(item.ticker) || item.quote;
     const sample = isSample(item, priceSource);
+    interactive.push({ points, currency: quote?.currency || item.currency || "", ticker: item.ticker });
     const range = points.length ? `${dateLabel(points[0].date)} – ${dateLabel(points.at(-1).date)}` : "Price history unavailable";
     return `<article class="trend-card" style="--stock-accent:${colors[index]}">
       <div class="trend-head"><div><span class="eyebrow">${sample ? "Sample price history" : "Price history"}</span>
@@ -83,10 +89,29 @@ function renderTrends() {
         </div></div>
       <div class="trend-price"><strong>${priceLabel(item, quote)}</strong><span class="${changeClass(change)}">${percentLabel(change)} <small>in displayed period</small></span></div>
       <div class="trend-chart">${priceChart(item, points, false, `trend-${index}`)}</div>
+      <output class="chart-readout" id="chart-readout-${index}" role="status" aria-live="polite" aria-atomic="true">${escapeHtml(chartReadout(points.at(-1), quote?.currency || item.currency || ""))}</output>
       <div class="chart-axis"><span>${escapeHtml(dateLabel(points[0]?.date))}</span><span>${escapeHtml(dateLabel(points.at(-1)?.date))}</span></div>
-      <p class="chart-caption">${escapeHtml(range)} · ${sample ? "Generated fallback data" : "Daily closing prices"}${partial ? " · available history only" : ""}${quote && !sample ? " · latest point updated from quote" : ""}</p>
+      <p class="chart-caption">${escapeHtml(range)} · ${sample ? "Generated fallback data" : "Daily closing prices"}${partial ? " · available history only" : ""}${quote && !sample ? " · latest point updated from quote" : ""}<span class="chart-instructions">Hover or touch to inspect. Keyboard: ← →, Home, End.</span></p>
     </article>`;
   }).join("") || '<p class="empty-state">Price charts will appear after your first scan.</p>';
+  container.querySelectorAll("svg[data-chart-inspect]").forEach((svg) => {
+    const data = interactive[Number(svg.dataset.chartInspect)];
+    if (!data || data.points.length < 2) return;
+    const cursor = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    cursor.setAttribute("class", "chart-cursor");
+    cursor.setAttribute("y1", "10");
+    cursor.setAttribute("y2", "170");
+    cursor.setAttribute("aria-hidden", "true");
+    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    dot.setAttribute("class", "chart-cursor-dot");
+    dot.setAttribute("r", "4");
+    dot.setAttribute("aria-hidden", "true");
+    svg.append(cursor, dot);
+    const interaction = { ...data, coordinates: chartGeometry(data.points, false).coordinates, cursor, dot,
+      readout: svg.closest(".trend-card").querySelector(".chart-readout"), index: data.points.length - 1 };
+    chartInteractions.set(svg, interaction);
+    inspectChartPoint(svg, interaction.index);
+  });
   if (!boundCharts.has(container)) {
     container.addEventListener("click", (event) => {
       const button = event.target.closest?.("[data-chart-period]");
@@ -97,8 +122,66 @@ function renderTrends() {
         if (replacement.dataset.chartTicker === button.dataset.chartTicker && replacement.dataset.chartPeriod === button.dataset.chartPeriod) replacement.focus();
       });
     });
+    container.addEventListener("pointermove", (event) => inspectPointer(event, container));
+    container.addEventListener("pointerdown", (event) => {
+      const svg = inspectionTarget(event, container);
+      if (!svg) return;
+      svg.focus({ preventScroll: true });
+      inspectPointer(event, container);
+      if (event.pointerType === "touch") svg.setPointerCapture?.(event.pointerId);
+    });
+    container.addEventListener("focusin", (event) => {
+      const svg = inspectionTarget(event, container);
+      const interaction = svg && chartInteractions.get(svg);
+      if (interaction) inspectChartPoint(svg, interaction.index);
+    });
+    container.addEventListener("keydown", (event) => {
+      const svg = inspectionTarget(event, container);
+      const interaction = svg && chartInteractions.get(svg);
+      if (!interaction || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const index = event.key === "Home" ? 0 : event.key === "End" ? interaction.points.length - 1
+        : interaction.index + (event.key === "ArrowLeft" ? -1 : 1);
+      inspectChartPoint(svg, index);
+    });
     boundCharts.add(container);
   }
+}
+
+function inspectionTarget(event, container) {
+  const svg = event.target?.closest?.("svg[data-chart-inspect]");
+  return svg && container.contains(svg) ? svg : null;
+}
+
+function inspectPointer(event, container) {
+  const svg = inspectionTarget(event, container);
+  const interaction = svg && chartInteractions.get(svg);
+  if (!interaction) return;
+  const rect = svg.getBoundingClientRect();
+  if (!rect.width || !Number.isFinite(event.clientX)) return;
+  const x = (event.clientX - rect.left) / rect.width * 600;
+  const index = Math.round((x - 10) / 580 * (interaction.points.length - 1));
+  inspectChartPoint(svg, index);
+}
+
+function inspectChartPoint(svg, requested) {
+  const interaction = chartInteractions.get(svg);
+  if (!interaction) return;
+  const index = Math.min(interaction.points.length - 1, Math.max(0, requested));
+  const [x, y] = interaction.coordinates[index];
+  interaction.index = index;
+  interaction.cursor.setAttribute("x1", String(x));
+  interaction.cursor.setAttribute("x2", String(x));
+  interaction.dot.setAttribute("cx", String(x));
+  interaction.dot.setAttribute("cy", String(y));
+  const readout = chartReadout(interaction.points[index], interaction.currency);
+  if (interaction.readout && interaction.readout.textContent !== readout) interaction.readout.textContent = readout;
+}
+
+function chartReadout(point, currency) {
+  if (!point || !Number.isFinite(point.close)) return "Price history unavailable";
+  const price = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(point.close);
+  return `${dateLabel(point.date)} · ${price}${currency ? ` ${currency}` : ""}`;
 }
 
 export function renderPortfolioSnapshot() {
@@ -127,6 +210,20 @@ export function renderPortfolioSnapshot() {
 
 function priceChart(item, points, mini, id) {
   if (points.length < 2) return '<span class="chart-empty">Price history unavailable</span>';
+  const { width, height, pad, coordinates } = chartGeometry(points, mini);
+  const path = coordinates.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
+  const area = `${path} L${width - pad},${height} L${pad},${height} Z`;
+  const grid = mini ? "" : [0.2, 0.5, 0.8].map((fraction) => `<line class="chart-grid" x1="0" y1="${height * fraction}" x2="${width}" y2="${height * fraction}"/>`).join("");
+  const label = `${item.ticker} price history, ${dateLabel(points[0].date)} to ${dateLabel(points.at(-1).date)}: ${formatNumber(points[0].close)} to ${formatNumber(points.at(-1).close)}. Use left and right arrows, Home, or End to inspect prices.`;
+  const chartIndex = id.replace("trend-", "");
+  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" ${mini ? 'aria-hidden="true"' : `tabindex="0" role="img" data-chart-inspect="${escapeHtml(chartIndex)}" aria-keyshortcuts="ArrowLeft ArrowRight Home End" aria-describedby="chart-readout-${escapeHtml(chartIndex)}" aria-label="${escapeHtml(label)}"`}>
+    <defs><linearGradient id="overview-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<path class="chart-area" d="${area}" fill="url(#overview-${id})"/>
+    <path class="chart-line" d="${path}" fill="none" stroke="currentColor" stroke-width="${mini ? 1.8 : 2.4}" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+function chartGeometry(points, mini) {
   const width = mini ? 300 : 600;
   const height = mini ? 54 : 180;
   const pad = mini ? 2 : 10;
@@ -137,15 +234,7 @@ function priceChart(item, points, mini, id) {
     pad + index / (points.length - 1) * (width - pad * 2),
     height - pad - ((point.close - min) / spread) * (height - pad * 2)
   ]);
-  const path = coordinates.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ");
-  const area = `${path} L${width - pad},${height} L${pad},${height} Z`;
-  const grid = mini ? "" : [0.2, 0.5, 0.8].map((fraction) => `<line class="chart-grid" x1="0" y1="${height * fraction}" x2="${width}" y2="${height * fraction}"/>`).join("");
-  const label = `${item.ticker} price history, ${dateLabel(points[0].date)} to ${dateLabel(points.at(-1).date)}: ${formatNumber(points[0].close)} to ${formatNumber(points.at(-1).close)}`;
-  return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" ${mini ? 'aria-hidden="true"' : `role="img" aria-label="${escapeHtml(label)}"`}>
-    <defs><linearGradient id="overview-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
-    ${grid}<path class="chart-area" d="${area}" fill="url(#overview-${id})"/>
-    <path class="chart-line" d="${path}" fill="none" stroke="currentColor" stroke-width="${mini ? 1.8 : 2.4}" vector-effect="non-scaling-stroke"/>
-  </svg>`;
+  return { width, height, pad, coordinates };
 }
 
 function chartPoints(item) {
@@ -185,7 +274,7 @@ function changeClass(value) {
 function dateLabel(value) {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "—";
 }
 
 function isSample(item, source) {

@@ -7,7 +7,7 @@ import { loadFundamentalsSnapshot } from "../data/fundamentals.js";
 import { renderFundamentals } from "./fundamentals.js";
 import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
 import { isBlockedAssetTicker, parseDetailTicker } from "../shared/symbols.js";
-import { escapeHtml, unique } from "../shared/text.js";
+import { dateValue, escapeHtml, unique } from "../shared/text.js";
 import { persist, state } from "../storage.js";
 import { renderCategoryBars } from "../ui/components.js";
 import { els, showToast } from "../ui/dom.js";
@@ -66,7 +66,9 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
     return;
   }
   const links = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []))
-    .filter((entry) => entry.link)
+    .map((entry) => ({ ...entry, safeUrl: safeArticleUrl(entry.link) }))
+    .filter((entry) => entry.safeUrl)
+    .sort((a, b) => Number(Boolean(b.directTickers?.includes(item.ticker))) - Number(Boolean(a.directTickers?.includes(item.ticker))))
     .slice(0, 8);
   const sellSignal = sellSignalFor(item);
   const holdSignal = holdSignalFor(item);
@@ -80,50 +82,74 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
         <div>
           <span>${escapeHtml(quote.name || item.ticker)}</span>
           <h3>${escapeHtml(item.ticker)}</h3>
-          <p>${escapeHtml(currentVerdict)}. ${escapeHtml(item.reasons[0] || item.flags[0] || "No dominant signal found.")}</p>
+          <p>${escapeHtml(currentVerdict)}</p>
         </div>
         <strong>${item.score}/100</strong>
       </div>
       <div class="detail-metrics">
-        ${renderMetric("Last price", formatNumber(item.latest), quote.marketState || "Yahoo intraday/chart")}
+        ${renderMetric("Last price", `${formatNumber(item.latest)} ${quote.currency || ""}`.trim(), quote.marketState || "Yahoo intraday/chart")}
         ${renderMetric("Today", formatPercent(item.oneDay), quote.dayChange ? formatNumber(quote.dayChange) : "daily move")}
         ${renderMetric("1M / 6M", `${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}`, "trend")}
-        ${renderMetric("Day range", dayRange, quoteTime)}
-        ${renderMetric("Volume", compactMoney(item.latest * (quote.volume || item.averageVolume60)), "latest dollar volume")}
-        ${renderMetric("Avg liquidity", compactMoney(item.averageDollarVolume), "average dollar volume")}
-        ${renderMetric("Exchange", quote.exchange || "-", quote.currency || quote.quoteType || "metadata")}
-        ${renderMetric("52W range", `${formatNumber(item.low52Week)} - ${formatNumber(item.high52Week)}`, "quote/chart")}
-        ${renderMetric("SMA 50 / 200", `${formatNumber(item.sma50)} / ${formatNumber(item.sma200)}`, item.latest > item.sma200 ? "above 200D" : "below 200D")}
-        ${renderMetric("RSI / MACD", `${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "-"} / ${item.macd?.histogram >= 0 ? "positive" : "negative"}`, "momentum")}
-        ${renderMetric("ATR / Vol", `${formatPercent(item.atrPercent)} / ${formatPercent(item.volatility)}`, "risk")}
         ${renderMetric("Event risk", item.eventRisk?.level || "Low", item.eventRisk?.hits?.join(", ") || "headline scan")}
       </div>
-      ${renderCategoryBars(item.categories)}
+      ${fundamentals}
       <div class="detail-columns">
         <section>
           <span>Reasons</span>
-          <ul>${item.reasons.slice(0, 5).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+          <ul>${item.reasons.slice(0, 3).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
         </section>
         <section>
           <span>Risk flags</span>
-          <ul>${item.flags.slice(0, 5).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
+          <ul>${item.flags.slice(0, 3).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
         </section>
       </div>
-      <div class="setup-line">
-        <span>Entry ${escapeHtml(item.setup?.entryZone || "-")}</span>
-        <span>Invalidation ${escapeHtml(item.setup ? formatNumber(item.setup.invalidation) : "-")}</span>
-        <span>Support ${escapeHtml(formatNumber(item.support))}</span>
-        <span>Resistance ${escapeHtml(formatNumber(item.resistance))}</span>
-        <span>Market ${escapeHtml(marketContext.label)}</span>
-        <span>${escapeHtml(quoteSnapshot?.label || "Quote data checked")}</span>
-      </div>
-      <div class="detail-sources">
-        <span>Source-backed evidence</span>
-        ${links.length ? links.map((entry) => `<a href="${escapeHtml(entry.link)}" target="_blank" rel="noreferrer">${escapeHtml(entry.source)}: ${escapeHtml(entry.title)}</a>`).join("") : `<p>No direct article links matched this ticker; the score leans more on price, technicals, liquidity, and broad market context.</p>`}
-      </div>
+      <details class="analysis-disclosure"><summary>Technical metrics &amp; scoring</summary>
+        <div class="detail-metrics">
+          ${renderMetric("Day range", dayRange, quoteTime)}
+          ${renderMetric("Volume", compactMoney(item.latest * (quote.volume || item.averageVolume60)), "latest dollar volume")}
+          ${renderMetric("Avg liquidity", compactMoney(item.averageDollarVolume), "average dollar volume")}
+          ${renderMetric("Exchange", quote.exchange || "-", quote.currency || quote.quoteType || "metadata")}
+          ${renderMetric("52W range", `${formatNumber(item.low52Week)} - ${formatNumber(item.high52Week)}`, "quote/chart")}
+          ${renderMetric("SMA 50 / 200", `${formatNumber(item.sma50)} / ${formatNumber(item.sma200)}`, item.latest > item.sma200 ? "above 200D" : "below 200D")}
+          ${renderMetric("RSI / MACD", `${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "-"} / ${item.macd?.histogram >= 0 ? "positive" : "negative"}`, "momentum")}
+          ${renderMetric("ATR / Vol", `${formatPercent(item.atrPercent)} / ${formatPercent(item.volatility)}`, "risk")}
+        </div>
+        ${renderCategoryBars(item.categories)}
+        <div class="setup-line">
+          <span>Entry ${escapeHtml(item.setup?.entryZone || "-")}</span>
+          <span>Invalidation ${escapeHtml(item.setup ? formatNumber(item.setup.invalidation) : "-")}</span>
+          <span>Support ${escapeHtml(formatNumber(item.support))}</span>
+          <span>Resistance ${escapeHtml(formatNumber(item.resistance))}</span>
+        </div>
+      </details>
+      <details class="analysis-disclosure"><summary>Company evidence &amp; market context (${links.length})</summary>
+        <div class="setup-line"><span>Market ${escapeHtml(marketContext.label)}</span><span>${escapeHtml(quoteSnapshot?.label || "Quote data checked")}</span></div>
+        <div class="detail-sources">
+          ${links.length ? links.map((entry) => `<div class="detail-source-entry"><a href="${escapeHtml(entry.safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.source)}: ${escapeHtml(entry.title)}</a>
+            <small>${escapeHtml(evidenceScope(entry, item.ticker))} · Published ${escapeHtml(articleDateLabel(entry.pubDate))}</small></div>`).join("") : '<p>No usable company or market source links matched this ticker in this scan.</p>'}
+        </div>
+      </details>
     </article>
-    ${fundamentals}
   `;
+}
+
+function evidenceScope(entry, ticker) {
+  if (entry.directTickers?.includes(ticker)) return "Direct company evidence";
+  if (entry.sectorTickers?.includes(ticker)) return "Sector context";
+  return "Market context";
+}
+
+function articleDateLabel(value) {
+  const normalized = String(value || "").replace(/^(\d{8})T(\d{6})Z?$/, "$1$2");
+  const time = dateValue(normalized);
+  return time ? new Date(time).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Date unavailable";
+}
+
+function safeArticleUrl(value) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch { return ""; }
 }
 
 function renderMetric(label, value, note = "") {

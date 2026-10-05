@@ -554,6 +554,8 @@ label > span, .sell-column-head span, .forecast-head span, .detail-hero span, .m
   .opportunity-actions { gap: 9px 12px; }
 }
 
+.scan-stage { max-width: 620px; margin: 9px 0 0; color: #9cb4d8; font-size: .68rem; line-height: 1.6; }
+
 /* Filing-based fundamentals keep reported values and market estimates distinct. */
 .fundamentals-panel { min-width: 0; margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 12px; background: #141b27; }
 .fundamentals-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 16px; }
@@ -603,3 +605,18 @@ label > span, .sell-column-head span, .forecast-head span, .detail-hero span, .m
   .fundamentals-valuation { grid-template-columns: minmax(0, 1fr); }
   .earnings-status { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Price inspection is available to mouse, touch, and keyboard users. */
+.trend-chart svg[data-chart-inspect] { cursor: crosshair; touch-action: pan-y; border-radius: 5px; }
+.trend-chart svg[data-chart-inspect]:focus-visible { outline: 2px solid #82b3ff; outline-offset: 5px; }
+.chart-readout { display: block; min-height: 24px; margin-top: 12px; color: #c6d9f5; font-family: "JetBrains Mono", Consolas, monospace; font-size: .7rem; font-variant-numeric: tabular-nums; line-height: 1.65; }
+.chart-cursor { stroke: #a7bad8; stroke-width: 1; stroke-dasharray: 3 3; opacity: .6; vector-effect: non-scaling-stroke; pointer-events: none; }
+.chart-cursor-dot { fill: currentColor; stroke: #121822; stroke-width: 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+.chart-instructions { display: block; margin-top: 5px; color: #93a7c5; font-size: .69rem; line-height: 1.65; }
+.analysis-disclosure { min-width: 0; padding-top: 14px; border-top: 1px solid var(--border); }
+.analysis-disclosure summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 31px; cursor: pointer; color: #a8c4ec; font-size: .76rem; font-weight: 500; line-height: 1.6; list-style: none; }
+.analysis-disclosure summary::-webkit-details-marker { display: none; }
+.analysis-disclosure summary::after { content: "+"; flex-shrink: 0; color: #a8c4ec; font-size: 1.05rem; line-height: 1; }
+.analysis-disclosure[open] summary::after { content: "−"; }
+.analysis-disclosure[open] > summary { margin-bottom: 15px; }
+.analysis-disclosure .detail-sources { padding-top: 0; border-top: 0; }

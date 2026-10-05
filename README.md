@@ -34,6 +34,8 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Runs immediately when the page opens.
 - Uses a dark fintech dashboard with blue accents, sidebar navigation, compact stock cards, price-history charts, a portfolio allocation summary, responsive layouts, and reduced-motion fallbacks.
 - Provides one-month, three-month, and one-year chart views, with labels when only shorter history is available. The header ticker search opens a fresh stock detail scan.
+- Chart hover, touch, and keyboard controls reveal exact dates and closing prices. The overview separates your watchlist from stock discovery; technical scoring and longer evidence are expandable on detail pages.
+- Reopens the last qualified browser-local scan immediately with its original timestamp. Fresh prices render before the longer background news scan completes, with a clear preliminary status. Invalid, stale, oversized, and sample caches are rejected.
 - Refreshes automatically on a slower cadence, and lets slow source scans run longer when needed so each output is a fuller consolidated review.
 - Pulls Yahoo Finance chart data for watchlist price history and broad-market proxy data.
 - Pulls Yahoo Finance intraday chart data for current/latest price, day change, day range, volume, exchange metadata, and 52-week range when available.
