@@ -1,6 +1,10 @@
 // DOM references and small app-wide status helpers.
 
 export const els = {
+  pageTitle: document.getElementById("pageTitle"),
+  pageDescription: document.getElementById("pageDescription"),
+  quickSearchForm: document.getElementById("quickSearchForm"),
+  quickSearchInput: document.getElementById("quickSearchInput"),
   dataStatus: document.getElementById("dataStatus"),
   viewPages: document.querySelectorAll("[data-page]"),
   pageLinks: document.querySelectorAll("[data-page-link]"),

@@ -15,6 +15,8 @@ import { unique } from "./js/shared/text.js";
 import { persist, saveLearningSnapshot, state } from "./js/storage.js";
 import { renderAll } from "./js/ui/dashboard.js";
 import { els, setStatus } from "./js/ui/dom.js";
+import { bindQuickSearch, syncActivePage } from "./js/ui/navigation.js";
+import { renderPortfolioSnapshot } from "./js/ui/overview.js";
 
 let autoRefreshTimer = null;
 let refreshTicker = null;
@@ -39,6 +41,7 @@ function hydrateInputs() {
   els.tickerInput.value = state.tickerInput;
   renderWatchlist();
   els.myPortfolioInput.value = state.myPortfolioInput;
+  renderPortfolioSnapshot();
   els.screenerSignal.value = state.screenerSignal;
   els.screenerMinScore.value = state.screenerMinScore;
   els.screenerMinLiquidity.value = state.screenerMinLiquidity;
@@ -50,9 +53,11 @@ function bindEvents() {
   els.myPortfolioInput.addEventListener("input", () => {
     state.myPortfolioInput = els.myPortfolioInput.value;
     persist();
+    renderPortfolioSnapshot();
     scheduleConfigScan();
   });
   bindWatchlistEvents(scheduleConfigScan);
+  bindQuickSearch(runStockDetail);
 
   ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort"].forEach((key) => {
     els[key].addEventListener("input", () => {
@@ -86,29 +91,6 @@ function bindEvents() {
     if (event.key === "Enter") answerQuestion();
   });
   window.addEventListener("hashchange", syncActivePage);
-}
-
-function syncActivePage() {
-  const pageNames = ["dashboard", "screener", "detail", "portfolio", "ask", "signals", "research", "sources"];
-  const requested = String(window.location.hash || "").replace(/^#/, "") || "dashboard";
-  const activePage = pageNames.includes(requested) ? requested : "dashboard";
-
-  els.viewPages.forEach((page) => {
-    const isActive = page.dataset.page === activePage;
-    page.hidden = !isActive;
-    page.classList.toggle("active", isActive);
-  });
-
-  els.pageLinks.forEach((link) => {
-    const isActive = link.dataset.pageLink === activePage;
-    link.classList.toggle("active", isActive);
-    if (isActive) link.setAttribute("aria-current", "page");
-    else link.removeAttribute("aria-current");
-  });
-
-  if (requested !== activePage) {
-    window.history.replaceState(null, "", `#${activePage}`);
-  }
 }
 
 async function runAnalysis(options = {}) {

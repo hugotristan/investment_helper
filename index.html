@@ -6,47 +6,86 @@
     <title>Investing tool</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20260930-watchlist-validation">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20261005-fintech">
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">
-        <span class="mark" aria-hidden="true">01</span>
-        <div>
-          <p class="eyebrow">Live market scan</p>
-          <h1 class="hero-title">Investing tool</h1>
-          <p class="hero-copy">Stock-market signals ranked through price action, market regime, source breadth, and portfolio context.</p>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <a class="sidebar-brand" href="#dashboard" aria-label="Investing tool home">
+          <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 17V12m7 5V8m7 9V4"/></svg></span>
+          <span class="brand-text">Investing<span>Market intelligence</span></span>
+        </a>
+        <p class="nav-label">Workspace</p>
+        <nav class="page-nav" aria-label="App pages">
+          <a href="#dashboard" data-page-link="dashboard"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></a>
+          <a href="#screener" data-page-link="screener"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/></svg><span>Stock screener</span></a>
+          <a href="#detail" data-page-link="detail"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18V6m0 12h16M7 14l4-4 4 2 5-7"/></svg><span>Stock detail</span></a>
+          <a href="#portfolio" data-page-link="portfolio"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18m-11-2h4v4h-4z"/></svg><span>My portfolio</span></a>
+          <a href="#ask" data-page-link="ask"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H8l-5 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/><path d="M8 11h8m-8 4h4"/></svg><span>Ask the model</span></a>
+          <a href="#signals" data-page-link="signals"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 12 4-7 4 14 4-11 3 4h3"/></svg><span>Market signals</span></a>
+          <a href="#research" data-page-link="research"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h12l4 4v14H4zM16 3v5h4M8 12h8m-8 4h5"/></svg><span>Research</span></a>
+          <a href="#sources" data-page-link="sources"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><span>Data sources</span></a>
+        </nav>
+        <div class="sidebar-note">
+          <span class="sidebar-note-icon" aria-hidden="true">✦</span>
+          <strong>A clearer market view</strong>
+          <p>Explore the evidence behind every signal.</p>
+          <a href="#research">Explore research <span aria-hidden="true">↗</span></a>
         </div>
-      </div>
-      <div class="top-actions">
-        <span id="dataStatus" class="status-pill">Starting live scan</span>
-      </div>
-    </header>
+        <div class="workspace-badge"><span class="local-dot" aria-hidden="true"></span> Saved in your browser</div>
+      </aside>
 
-    <nav class="page-nav" aria-label="App pages">
-      <a href="#dashboard" data-page-link="dashboard">Dashboard</a>
-      <a href="#screener" data-page-link="screener">Screener</a>
-      <a href="#detail" data-page-link="detail">Stock detail</a>
-      <a href="#portfolio" data-page-link="portfolio">Portfolio</a>
-      <a href="#ask" data-page-link="ask">Ask</a>
-      <a href="#signals" data-page-link="signals">Signals</a>
-      <a href="#research" data-page-link="research">Research</a>
-      <a href="#sources" data-page-link="sources">Sources</a>
-    </nav>
+      <div class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Your investment workspace</p>
+            <h1 id="pageTitle" class="hero-title">Overview</h1>
+            <p id="pageDescription" class="hero-copy">Your market, at a glance.</p>
+          </div>
+          <div class="top-actions">
+            <form id="quickSearchForm" class="quick-search" role="search" aria-label="Find a stock">
+              <input id="quickSearchInput" type="search" aria-label="Stock or ETF ticker" placeholder="Search ticker…" autocomplete="off" spellcheck="false">
+              <button type="submit" aria-label="Analyze ticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+            </form>
+            <span id="dataStatus" class="status-pill" role="status">Starting live scan</span>
+          </div>
+        </header>
 
     <main class="app-shell">
       <section class="view-page active" data-page="dashboard">
-        <section class="panel control-panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Settings</p>
-              <h2>Scan controls</h2>
-            </div>
-            <span class="disclaimer">Stocks &amp; ETFs</span>
+        <div id="dashboardStats" class="dashboard-stats" aria-label="Scan summary">
+          <article class="stat-card"><span class="stat-label">Tickers scanned</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
+          <article class="stat-card"><span class="stat-label">Average score</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
+          <article class="stat-card"><span class="stat-label">Live quotes</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
+          <article class="stat-card"><span class="stat-label">Trusted sources</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
+        </div>
+
+        <div class="dashboard-overview">
+          <div class="dashboard-main">
+            <section class="panel overview-panel">
+              <div class="panel-heading"><div><p class="eyebrow">On your radar</p><h2>Leading market signals</h2></div><a href="#screener">View all <span aria-hidden="true">↗</span></a></div>
+              <div id="featuredStocks" class="featured-stocks"><div class="empty-state">Your strongest setups will appear after the scan.</div></div>
+            </section>
+            <section class="panel overview-panel">
+              <div class="panel-heading"><div><p class="eyebrow">Price action</p><h2>Market trends</h2></div><span class="disclaimer">Price history</span></div>
+              <div id="marketTrends" class="market-trends"><div class="empty-state">Charts will appear when price history is available.</div></div>
+            </section>
+            <section class="panel overview-panel">
+              <div class="panel-heading"><div><p class="eyebrow">The bigger picture</p><h2>Market outlook</h2></div><a href="#research">See evidence <span aria-hidden="true">↗</span></a></div>
+              <div id="marketForecast" class="forecast-box"><div class="empty-state">Market outlook will appear after the first scan.</div></div>
+            </section>
           </div>
-          <p class="helper-text">Tune the stock universe and your tracked portfolio. The scan combines price history, trend, momentum, volatility, volume pressure, market breadth, VIX, credit risk, rate pressure, commodities, current headlines, recent trusted market outlooks, and previous scan changes stored locally.</p>
-          <div class="controls-grid">
+          <aside class="dashboard-rail" aria-label="Portfolio and scan activity">
+            <section class="panel overview-panel"><div class="panel-heading"><h2>My portfolio</h2><a href="#portfolio" aria-label="Open my portfolio">↗</a></div><div id="portfolioSnapshot" class="portfolio-snapshot"><div class="empty-state">Add holdings on the Portfolio page to see your allocation.</div></div></section>
+            <section class="panel overview-panel"><div class="panel-heading"><h2>Scan highlights</h2><span class="disclaimer">Latest scan</span></div><div id="scanActivity" class="scan-activity"><div class="empty-state">Following market trends, headlines, and research.</div></div></section>
+            <section class="panel refresh-panel"><div class="panel-heading"><h2 id="refreshTitle">Deep live scan</h2><span class="refresh-dot" aria-hidden="true"></span></div><div class="refresh-box"><span>Last updated</span><strong id="lastScan">Not yet</strong><span>Next update</span><strong id="nextScan">Starting now</strong></div><p class="data-note">Market signals refresh automatically.</p></section>
+          </aside>
+        </div>
+
+        <details class="panel control-panel">
+          <summary class="control-summary"><span><strong>Manage watchlist</strong><span>Customize the stocks and ETFs in your scan</span></span><span class="disclaimer">Stocks &amp; ETFs</span></summary>
+          <div class="control-content"><div class="controls-grid">
             <section class="watchlist-editor" aria-labelledby="watchlistHeading">
               <div class="watchlist-heading">
                 <h3 id="watchlistHeading">Watchlist</h3>
@@ -70,43 +109,10 @@
                 <button id="watchlistApplyButton" type="button">Apply changes</button>
               </details>
             </section>
-            <label>
-              <span>My portfolio</span>
-              <textarea id="myPortfolioInput" rows="6" spellcheck="false"></textarea>
-            </label>
-          </div>
-        </section>
-
-        <section class="grid summary-grid">
-          <article class="panel">
-            <p class="eyebrow">Live pulse</p>
-            <h2 id="marketPulseTitle">Scanning market</h2>
-            <div id="marketPulse" class="pulse-grid"></div>
-          </article>
-          <article class="panel">
-            <p class="eyebrow">Refresh</p>
-            <h2 id="refreshTitle">Deep live scan</h2>
-            <div class="refresh-box">
-              <span>Last scan</span>
-              <strong id="lastScan">Not yet</strong>
-              <span>Timer</span>
-              <strong id="nextScan">Starting now</strong>
-            </div>
-          </article>
-        </section>
-
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Market prediction</p>
-              <h2>Model forecast and confidence</h2>
-            </div>
-            <span class="disclaimer">Probabilistic</span>
-          </div>
-          <div id="marketForecast" class="forecast-box">
-            <div class="empty-state">Forecast will appear after the first deep scan.</div>
-          </div>
-        </section>
+            <div class="scan-explainer"><p class="eyebrow">A broader perspective</p><h3>More than a price check</h3><p>Each scan brings together price trends, market conditions, trusted headlines, and research. Your watchlist and portfolio holdings shape the review.</p><a href="#sources">Explore data sources <span aria-hidden="true">↗</span></a><p class="data-note">Changes are saved in this browser. Holdings can be edited on the <a href="#portfolio">Portfolio page</a>.</p></div>
+          </div></div>
+        </details>
+        <details class="panel scan-details"><summary class="control-summary"><span><strong>Scan details</strong><span>Coverage, confidence, and market context</span></span></summary><div class="control-content"><h2 id="marketPulseTitle">Scanning market</h2><div id="marketPulse" class="pulse-grid"></div></div></details>
       </section>
 
       <section class="view-page" data-page="screener" hidden>
@@ -177,6 +183,14 @@
       </section>
 
       <section class="view-page" data-page="portfolio" hidden>
+        <details class="panel portfolio-editor" open>
+          <summary class="control-summary"><span><strong>Your holdings</strong><span>Edit your portfolio, saved in this browser</span></span></summary>
+          <div class="control-content">
+            <label for="myPortfolioInput"><span>One holding per line</span></label>
+            <textarea id="myPortfolioInput" rows="4" spellcheck="false" placeholder="TICKER | Label | Amount | up/down" aria-describedby="portfolioInputHelp"></textarea>
+            <p id="portfolioInputHelp" class="data-note">Enter the amount and whether the position is up or down for you. These values stay as entered; market analysis refreshes automatically.</p>
+          </div>
+        </details>
         <section class="panel">
           <div class="section-heading">
             <div>
@@ -295,9 +309,11 @@
         </section>
       </section>
     </main>
+      </div>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script type="module" src="app.js?v=20260930-modules"></script>
+    <script type="module" src="app.js?v=20261005-fintech"></script>
   </body>
 </html>

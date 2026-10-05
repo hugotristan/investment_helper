@@ -30,7 +30,8 @@ Run the module regression tests with `npm test` using Node.js 18 or newer. They 
 ## What It Does
 
 - Runs immediately when the page opens.
-- Uses a bold typography visual system with centralized dark-mode tokens, sharp borders, oversized editorial headings, restrained vermillion accents, underline-first navigation, and reduced-motion fallbacks.
+- Uses a dark fintech dashboard with blue accents, sidebar navigation, compact stock cards, price-history charts, a portfolio allocation summary, responsive layouts, and reduced-motion fallbacks.
+- Provides one-month, three-month, and one-year chart views, with labels when only shorter history is available. The header ticker search opens a fresh stock detail scan.
 - Refreshes automatically on a slower cadence, and lets slow source scans run longer when needed so each output is a fuller consolidated review.
 - Pulls Yahoo Finance chart data for watchlist price history and broad-market proxy data.
 - Pulls Yahoo Finance intraday chart data for current/latest price, day change, day range, volume, exchange metadata, and 52-week range when available.
@@ -80,6 +81,6 @@ The forecast is probabilistic, not provable. It combines SPY, QQQ, IWM, VTI, TLT
 
 Sources can explain and score candidates, but they cannot recommend a stock the app never scans. The default watchlist now includes a much wider opportunity universe instead of only SPY, QQQ, AAPL, MSFT, NVDA, TSLA, JPM, XOM, and UNH. Changing the watchlist or portfolio holdings automatically schedules a fresh scan.
 
-The personal portfolio box starts empty. Add one holding per line in the format `TICKER | Label | Amount | up/down`. Changes are saved automatically in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals do not sell purely because a position is down; they look for trend damage, event risk, concentration, volatility, and weak model score before escalating from hold/watch to review/trim.
+The personal portfolio starts empty. On the My portfolio page, add one holding per line in the format `TICKER | Label | Amount | up/down`. The overview shows an allocation summary based on those manually entered amounts. Changes are saved automatically in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals do not sell purely because a position is down; they look for trend damage, event risk, concentration, volatility, and weak model score before escalating from hold/watch to review/trim.
 
 The app also runs dedicated recent-market-outlook scans. These look for strategist forecasts, market perspectives, weekly commentary, asset-allocation views, overweight/underweight calls, stock-idea articles, and official macro outlooks from trusted research providers and institutions including BlackRock, Vanguard, J.P. Morgan, Fidelity, Morningstar, Schwab, Goldman Sachs, Morgan Stanley, UBS, PIMCO, Motley Fool, the Federal Reserve, IMF, OECD, World Bank, ECB, BEA, BLS, Census, and EIA. Outlook items are scored separately from breaking news, then used as a modest positive or negative adjustment to each ticker or ETF theme.

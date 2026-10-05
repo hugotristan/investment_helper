@@ -8,6 +8,7 @@ import { average } from "../shared/math.js";
 import { escapeHtml, unique } from "../shared/text.js";
 import { renderCategoryBars } from "./components.js";
 import { els } from "./dom.js";
+import { renderDashboardOverview } from "./overview.js";
 
 export function renderAll(results, priceSource, news, marketContext, quoteSnapshot = null) {
   scanState.latestRankedResults = results;
@@ -23,6 +24,8 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
     ? "Price data fell back to sample data. Do not act on this scan."
     : `Price data: ${priceSource}. ${quoteSnapshot?.label || "Quote data checked"}. Headlines: ${news.label}.`;
   const activeTrustedSources = Math.max(0, news.sources.filter((source) => source.ok).length - 1);
+
+  renderDashboardOverview(results, priceSource, news, marketContext, quoteSnapshot);
 
   els.lastScan.textContent = now.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   els.marketPulseTitle.textContent = top ? `${top.ticker} leads today's scan` : "No leader";
