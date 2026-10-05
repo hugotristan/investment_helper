@@ -116,7 +116,7 @@ test("snapshot client requests the site-relative asset once and returns honest f
   let count = 0;
   globalThis.fetch = async (url) => {
     count += 1;
-    assert.equal(new URL(url).pathname.endsWith("/investing_page_clean/data/fundamentals.json"), true);
+    assert.equal(new URL(url).href, new URL("../data/fundamentals.json", import.meta.url).href);
     return new Response(JSON.stringify(snapshot()));
   };
   const success = await import("../js/data/fundamentals.js?ui-success");
