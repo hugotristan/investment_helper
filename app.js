@@ -19,7 +19,7 @@ import { persist, saveLearningSnapshot, state } from "./js/storage.js";
 import { renderAll } from "./js/ui/dashboard.js";
 import { els, setStatus } from "./js/ui/dom.js";
 import { bindQuickSearch, syncActivePage } from "./js/ui/navigation.js";
-import { renderDashboardOverview, renderPortfolioSnapshot } from "./js/ui/overview.js";
+import { renderDashboardOverview } from "./js/ui/overview.js";
 import { bindOpportunityEvents } from "./js/features/opportunities.js";
 import { scanState } from "./js/scan-state.js";
 
@@ -49,7 +49,6 @@ function hydrateInputs() {
   els.tickerInput.value = state.tickerInput;
   renderWatchlist();
   initializePortfolio();
-  renderPortfolioSnapshot();
   els.screenerSignal.value = state.screenerSignal;
   els.screenerMinScore.value = state.screenerMinScore;
   els.screenerMinLiquidity.value = state.screenerMinLiquidity;
@@ -59,13 +58,17 @@ function hydrateInputs() {
 
 function bindEvents() {
   bindPortfolioEvents(() => {
-    renderPortfolioSnapshot();
     renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
     scheduleConfigScan();
   });
   bindWatchlistEvents(scheduleConfigScan);
   bindOpportunityEvents(scheduleConfigScan);
   bindQuickSearch(runStockDetail);
+
+  document.getElementById("openHoldingEditor").addEventListener("click", () => {
+    document.getElementById("portfolioEditor").open = true;
+    document.getElementById("holdingTicker").focus();
+  });
 
   ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort"].forEach((key) => {
     els[key].addEventListener("input", () => {
@@ -121,9 +124,9 @@ async function runAnalysis(options = {}) {
   nextRunAt = null;
   pendingInputScan = false;
   updateRefreshTimer();
-  setStatus(options.reason === "config" ? "Settings changed; rescanning" : "Deep source scan running");
+  setStatus("Updating…");
   setScanStage(`${cachedScanAt ? `Showing saved scan from ${new Date(cachedScanAt).toLocaleString()}. ` : ""}Refreshing prices and market context. Company research runs in the background.`);
-  if (!scanState.latestRankedResults.length) els.modelInstructions.innerHTML = `<div class="empty-state">Checking prices and market context, then gathering company evidence from trusted sources.</div>`;
+  if (!scanState.latestRankedResults.length) els.modelInstructions.innerHTML = `<div class="empty-state">Checking prices and company news.</div>`;
 
   try {
     const newsRequest = loadNewsSources(tickers).then((news) => ({ news }), (error) => ({ error }));
@@ -139,7 +142,7 @@ async function runAnalysis(options = {}) {
     scanState.latestMarketContext = marketContext;
     renderDashboardOverview(preliminary, priceSource, { sources: [], items: [] }, marketContext, quotes, { researchPending: true });
     renderPortfolioReview(buildPortfolioReview(preliminary, marketContext), priceSource);
-    setStatus("Prices ready; research scanning");
+    setStatus("Prices ready");
     setScanStage("Prices are ready. Technical scores are preliminary while company evidence is gathered.");
     const response = await newsRequest;
     if (response.error) throw response.error;
@@ -152,11 +155,11 @@ async function runAnalysis(options = {}) {
     saveLearningSnapshot(ranked, priceSource, news.label);
     saveScanCache({ series, quotes, news, marketContext });
     const qualifiedCount = ranked.filter((item) => item.dataQuality?.eligible).length;
-    setStatus(`${qualifiedCount}/${ranked.length} price histories qualified`);
+    setStatus("Updated");
     setScanStage(`Scan complete · ${qualifiedCount} qualified histories · research and market checks updated.`);
   } catch (error) {
     console.error(error);
-    setStatus("Scan failed");
+    setStatus("Update failed");
     setScanStage("The complete scan could not finish. Available prices remain visible; research will retry on the next scan.");
     els.modelInstructions.innerHTML = `<div class="empty-state">Could not complete the live scan. Check the connection and try again.</div>`;
   } finally {
@@ -235,11 +238,11 @@ function updateRefreshTimer() {
 
   if (nextRunAt) {
     const remainingMs = Math.max(0, nextRunAt - Date.now());
-    els.refreshTitle.textContent = lastScanDurationMs ? `Last scan ${formatDuration(lastScanDurationMs)}` : "Deep live scan";
+    els.refreshTitle.textContent = lastScanDurationMs ? `Update took ${formatDuration(lastScanDurationMs)}` : "Updates automatically";
     els.nextScan.textContent = remainingMs ? `Next in ${formatDuration(remainingMs)}` : "Starting now";
     return;
   }
 
-  els.refreshTitle.textContent = "Deep live scan";
+  els.refreshTitle.textContent = "Updates automatically";
   els.nextScan.textContent = "Starting now";
 }

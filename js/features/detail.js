@@ -1,11 +1,12 @@
 import { applyLearningSignal, scoreSeries } from "../analysis/scoring.js";
 import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
+import { validHistoryPoints } from "../analysis/data-quality.js";
 import { applyQuoteSnapshot, loadMarketContext, loadMarketSeries, loadQuoteSnapshots } from "../data/market.js";
 import { uniqueArticles } from "../data/news-helpers.js";
 import { loadNewsSources } from "../data/news.js";
 import { loadFundamentalsSnapshot } from "../data/fundamentals.js";
 import { renderFundamentals } from "./fundamentals.js";
-import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
+import { formatNumber, formatPercent } from "../shared/format.js";
 import { isBlockedAssetTicker, parseDetailTicker } from "../shared/symbols.js";
 import { dateValue, escapeHtml, unique } from "../shared/text.js";
 import { persist, state } from "../storage.js";
@@ -35,7 +36,7 @@ export async function runStockDetail() {
   persist();
   els.detailTickerInput.value = parsed.ticker;
   els.detailButton.disabled = true;
-  els.detailOutput.innerHTML = `<div class="empty-state">Fetching live quote, one-year chart history, market context, and trusted-source evidence for ${escapeHtml(parsed.ticker)}...</div>`;
+  els.detailOutput.innerHTML = `<div class="empty-state">Loading prices, company data, and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
 
   try {
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
@@ -73,8 +74,10 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
   const sellSignal = sellSignalFor(item);
   const holdSignal = holdSignalFor(item);
   const currentVerdict = sellSignal?.label || holdSignal?.label || item.setup?.signal || item.label;
-  const dayRange = quote.dayLow && quote.dayHigh ? `${formatNumber(quote.dayLow)} - ${formatNumber(quote.dayHigh)}` : "-";
-  const quoteTime = quote.quoteTime ? quote.quoteTime.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "latest chart point";
+  const currency = item.currency || quote.currency || "";
+  const dayRange = Number.isFinite(quote.dayLow) && Number.isFinite(quote.dayHigh) ? `${formatNumber(quote.dayLow)} – ${formatNumber(quote.dayHigh)}` : "Unavailable";
+  const quoteTime = quote.quoteTime ? new Date(quote.quoteTime).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Quote time unavailable";
+  const historyDate = new Date(item.dataQuality.asOf).toLocaleDateString();
 
   els.detailOutput.innerHTML = `
     <article class="detail-card ${item.score >= 75 ? "grade-good" : item.score >= 60 ? "grade-watch" : item.score >= 45 ? "grade-mixed" : "grade-avoid"}">
@@ -86,34 +89,36 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
         </div>
         <strong>${item.score}/100</strong>
       </div>
-      <div class="detail-metrics">
-        ${renderMetric("Last price", `${formatNumber(item.latest)} ${quote.currency || ""}`.trim(), quote.marketState || "Yahoo intraday/chart")}
-        ${renderMetric("Today", formatPercent(item.oneDay), quote.dayChange ? formatNumber(quote.dayChange) : "daily move")}
-        ${renderMetric("1M / 6M", `${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}`, "trend")}
-        ${renderMetric("Event risk", item.eventRisk?.level || "Low", item.eventRisk?.hits?.join(", ") || "headline scan")}
-      </div>
+      <dl class="key-values">
+        ${renderMetric("Price", `${formatNumber(item.latest)} ${currency}`.trim())}
+        ${renderMetric("1D", formatPercent(item.oneDay))}
+        ${renderMetric("History as of", historyDate)}
+        ${renderMetric("Event risk", item.eventRisk?.level || "Unavailable")}
+      </dl>
+      ${item.eventRisk?.level === "High" ? `<p class="data-note">High event risk: ${escapeHtml(item.eventRisk.hits?.join(", ") || item.flags?.[0] || "Review matched articles before acting.")}</p>` : ""}
+      ${renderDetailChart(item)}
       ${fundamentals}
-      <div class="detail-columns">
+      <details class="secondary-details"><summary>Signal reasons and risks</summary><div class="detail-columns">
         <section>
           <span>Reasons</span>
-          <ul>${item.reasons.slice(0, 3).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+          <ul>${(item.reasons || []).slice(0, 3).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
         </section>
         <section>
           <span>Risk flags</span>
-          <ul>${item.flags.slice(0, 3).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
+          <ul>${(item.flags || []).slice(0, 3).map((flag) => `<li>${escapeHtml(flag)}</li>`).join("")}</ul>
         </section>
-      </div>
-      <details class="analysis-disclosure"><summary>Technical metrics &amp; scoring</summary>
-        <div class="detail-metrics">
-          ${renderMetric("Day range", dayRange, quoteTime)}
-          ${renderMetric("Volume", compactMoney(item.latest * (quote.volume || item.averageVolume60)), "latest dollar volume")}
-          ${renderMetric("Avg liquidity", compactMoney(item.averageDollarVolume), "average dollar volume")}
-          ${renderMetric("Exchange", quote.exchange || "-", quote.currency || quote.quoteType || "metadata")}
-          ${renderMetric("52W range", `${formatNumber(item.low52Week)} - ${formatNumber(item.high52Week)}`, "quote/chart")}
-          ${renderMetric("SMA 50 / 200", `${formatNumber(item.sma50)} / ${formatNumber(item.sma200)}`, item.latest > item.sma200 ? "above 200D" : "below 200D")}
-          ${renderMetric("RSI / MACD", `${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "-"} / ${item.macd?.histogram >= 0 ? "positive" : "negative"}`, "momentum")}
-          ${renderMetric("ATR / Vol", `${formatPercent(item.atrPercent)} / ${formatPercent(item.volatility)}`, "risk")}
-        </div>
+      </div></details>
+      <details class="secondary-details"><summary>Technical checks</summary>
+        <dl class="key-values">
+          ${renderMetric("1M / 6M", `${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}`)}
+          ${renderMetric("Day range", `${dayRange} ${currency}`, quoteTime)}
+          ${renderMetric("Average daily traded value", `${compactValue(item.averageDollarVolume)} ${currency}`)}
+          ${renderMetric("Exchange", quote.exchange || "Unavailable", quote.quoteType || "")}
+          ${renderMetric("52W range", `${formatNumber(item.low52Week)} – ${formatNumber(item.high52Week)} ${currency}`)}
+          ${renderMetric("SMA 50 / 200", `${formatNumber(item.sma50)} / ${formatNumber(item.sma200)}`, item.latest > item.sma200 ? "Above 200D" : "Below 200D")}
+          ${renderMetric("RSI / MACD", `${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "Unavailable"} / ${Number.isFinite(item.macd?.histogram) ? item.macd.histogram >= 0 ? "positive" : "negative" : "unavailable"}`)}
+          ${renderMetric("ATR / Volatility", `${formatPercent(item.atrPercent)} / ${formatPercent(item.volatility)}`)}
+        </dl>
         ${renderCategoryBars(item.categories)}
         <div class="setup-line">
           <span>Entry ${escapeHtml(item.setup?.entryZone || "-")}</span>
@@ -122,8 +127,8 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
           <span>Resistance ${escapeHtml(formatNumber(item.resistance))}</span>
         </div>
       </details>
-      <details class="analysis-disclosure"><summary>Company evidence &amp; market context (${links.length})</summary>
-        <div class="setup-line"><span>Market ${escapeHtml(marketContext.label)}</span><span>${escapeHtml(quoteSnapshot?.label || "Quote data checked")}</span></div>
+      <details class="secondary-details"><summary>Matched articles (${links.length})</summary>
+        <p class="data-note">Market: ${escapeHtml(marketContext.label)} · ${escapeHtml(quoteSnapshot?.label || "Quote data checked")}</p>
         <div class="detail-sources">
           ${links.length ? links.map((entry) => `<div class="detail-source-entry"><a href="${escapeHtml(entry.safeUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.source)}: ${escapeHtml(entry.title)}</a>
             <small>${escapeHtml(evidenceScope(entry, item.ticker))} · Published ${escapeHtml(articleDateLabel(entry.pubDate))}</small></div>`).join("") : '<p>No usable company or market source links matched this ticker in this scan.</p>'}
@@ -153,11 +158,32 @@ function safeArticleUrl(value) {
 }
 
 function renderMetric(label, value, note = "") {
-  return `
-    <article class="metric-card">
-      <span>${escapeHtml(label)}</span>
-      <strong>${escapeHtml(value)}</strong>
-      ${note ? `<small>${escapeHtml(note)}</small>` : ""}
-    </article>
-  `;
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}${note ? `<small>${escapeHtml(note)}</small>` : ""}</dd></div>`;
+}
+
+export function renderDetailChart(item) {
+  const now = Date.now();
+  const points = validHistoryPoints(item).filter((point) => new Date(point.date).getTime() <= now).slice(-252)
+    .map((point) => ({ ...point }));
+  const last = points.at(-1);
+  const daily = item.dailyClose;
+  // A quote can overlay the last daily bar. Restore the original observed daily
+  // price rather than presenting an intraday quote as historical chart data.
+  if (last && daily && new Date(daily.asOf).getTime() === new Date(last.date).getTime()
+    && daily.currency === item.currency && Number.isFinite(daily.price) && daily.price > 0) last.close = daily.price;
+  else if (last && /\+ Yahoo intraday/.test(item.source || "")) points.pop();
+  if (points.length < 2) return '<p class="data-note">Daily price chart unavailable.</p>';
+  const low = Math.min(...points.map((point) => point.close));
+  const high = Math.max(...points.map((point) => point.close));
+  const range = high - low || Math.max(high * 0.01, 1);
+  const firstTime = new Date(points[0].date).getTime();
+  const lastTime = new Date(points.at(-1).date).getTime();
+  const path = points.map((point, index) => `${index ? "L" : "M"}${(10 + (new Date(point.date).getTime() - firstTime) / (lastTime - firstTime) * 700).toFixed(1)},${(160 - (point.close - low) / range * 145).toFixed(1)}`).join(" ");
+  const firstDate = new Date(firstTime).toLocaleDateString();
+  const lastDate = new Date(lastTime).toLocaleDateString();
+  return `<figure class="detail-price-chart"><svg viewBox="0 0 720 175" role="img" aria-label="${escapeHtml(`${item.ticker} daily price history from ${firstDate} to ${lastDate}, ranging from ${formatNumber(low)} to ${formatNumber(high)} ${item.currency || ""}`)}"><path d="${path}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" /></svg><figcaption class="chart-caption"><span>${escapeHtml(firstDate)} – ${escapeHtml(lastDate)}</span><span>Daily prices · ${escapeHtml(item.currency || "Currency unavailable")}</span></figcaption></figure>`;
+}
+
+function compactValue(value) {
+  return Number.isFinite(value) ? new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value) : "Unavailable";
 }

@@ -1,15 +1,15 @@
 import { els } from "./dom.js";
 
 const pages = {
-  dashboard: ["Overview", "Your market, at a glance."],
-  screener: ["Stock screener", "Discover the strongest setups in your watchlist."],
-  detail: ["Stock detail", "A closer look at price action, risk, and research."],
-  portfolio: ["My portfolio", "Your holdings, allocation, and market context."],
-  performance: ["Performance", "Follow dated research picks against the S&P 500."],
-  ask: ["Ask the model", "Explore a stock with a focused market scan."],
-  signals: ["Market signals", "Review the evidence behind buy, hold, and sell signals."],
-  research: ["Research", "The sources and framework behind your market view."],
-  sources: ["Data sources", "Follow the coverage behind each scan."],
+  dashboard: "Overview",
+  screener: "Watchlist",
+  detail: "Stock details",
+  portfolio: "Portfolio",
+  performance: "Performance",
+  ask: "Stock check",
+  signals: "Signals",
+  research: "Market & research",
+  sources: "Data sources",
 };
 
 export function syncActivePage() {
@@ -26,9 +26,10 @@ export function syncActivePage() {
     if (active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
-  els.pageTitle.textContent = pages[activePage][0];
-  els.pageDescription.textContent = pages[activePage][1];
-  document.title = `${pages[activePage][0]} · Investing tool`;
+  els.pageTitle.textContent = pages[activePage];
+  const more = document.getElementById("navMore");
+  if (more && !["dashboard", "screener", "portfolio", "performance"].includes(activePage)) more.open = true;
+  document.title = `${pages[activePage]} · Investing`;
   if (requested !== activePage) window.history.replaceState(null, "", `#${activePage}`);
 }
 

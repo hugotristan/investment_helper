@@ -73,7 +73,7 @@ function portfolioHoldingReview(holding, marketContext) {
     return {
       label: "Review / possible trim",
       className: "holding-danger",
-      reason: `${holding.ticker} is down and the live model also sees technical or event damage.`,
+      reason: `${holding.ticker} has a loss and a weak trend, score, or event-risk check.`,
       detail: `${item.label} (${item.score}/100). ${item.flags[0] || "Trend, momentum, or risk filters are weak."}`
     };
   }
@@ -82,26 +82,26 @@ function portfolioHoldingReview(holding, marketContext) {
     return {
       label: "Avoid adding",
       className: "holding-warning",
-      reason: `${holding.ticker} does not clear the quality gate today.`,
-      detail: `${item.label} (${item.score}/100). Let the setup repair before adding more.`
+      reason: `${holding.ticker} has a weak trend, score, or event-risk check.`,
+      detail: `${item.label} (${item.score}/100). ${item.flags[0] || "Review the price trend and matched articles."}`
     };
   }
 
   if (healthy && down) {
     return {
-      label: "Hold, no panic sell",
+      label: "Hold signal",
       className: "holding-good",
-      reason: `${holding.ticker} is down for you, but the current setup is not broken.`,
-      detail: `${item.label} (${item.score}/100). The safer move is to avoid emotional selling and only add if the signal stays strong across scans.`
+      reason: `${holding.ticker} has a loss, but its price remains above the 200-day average.`,
+      detail: `${item.label} (${item.score}/100); no high event-risk flag was found in the matched articles.`
     };
   }
 
   if (largeCore && healthy) {
     return {
-      label: "Core hold",
+      label: "Fund concentration",
       className: "holding-good",
-      reason: "Your Vanguard/FTSE position is the portfolio anchor and currently passes the broad-holding checks.",
-      detail: `Weight ${holding.weight.toFixed(1)}%. Consider future additions carefully because it already drives most portfolio movement.`
+      reason: `${holding.ticker} represents ${holding.weight.toFixed(1)}% of tracked ${holding.currency} value.`,
+      detail: `The current price is above the 200-day average and its score is ${item.score}/100.`
     };
   }
 
@@ -109,42 +109,41 @@ function portfolioHoldingReview(holding, marketContext) {
     return {
       label: "Hold / avoid adding",
       className: "holding-warning",
-      reason: overweightSatellite ? `${holding.ticker} is a large satellite position.` : `${holding.ticker} looks stretched or volatile.`,
-      detail: `${item.label} (${item.score}/100). New money may be better reserved unless the setup improves.`
+      reason: overweightSatellite ? `${holding.ticker} exceeds 8% of tracked ${holding.currency} value.` : `${holding.ticker} has elevated RSI or volatility.`,
+      detail: `${item.label} (${item.score}/100). RSI ${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "unavailable"}; annualized volatility ${formatPercent(item.volatility)}.`
     };
   }
 
   return {
-    label: marketContext?.score < 45 ? "Hold, be selective" : "Hold / watch",
+    label: marketContext?.score < 45 ? "Watch · weak market" : "Hold / watch",
     className: "holding-watch",
-    reason: `${holding.ticker} does not show an urgent sell signal today.`,
+    reason: `${holding.ticker} does not trigger the position review rules in this scan.`,
     detail: `${item.label} (${item.score}/100). Watch the invalidation area near ${formatNumber(item.setup?.invalidation || item.sma50)}.`
   };
 }
 
 export function renderPortfolioReview(portfolio, priceSource) {
   if (!portfolio.holdings.length) {
-    els.portfolioReview.innerHTML = `<div class="empty-state">Add your holdings above to make the model position-aware.</div>`;
+    els.portfolioReview.innerHTML = `<div class="empty-state">Add a holding to track its value and gain or loss.</div>`;
     return;
   }
   const sourceWarning = priceSource === "sample"
     ? '<p class="data-note">Sample prices cannot value holdings or support position signals. Legacy amounts remain as entered.</p>'
-    : '<p class="data-note">Share positions use qualified prices in their purchase currency. Legacy amounts stay manual; currency totals remain separate.</p>';
+    : '<p class="data-note">Values are grouped by currency. Manual amounts stay as entered.</p>';
   els.portfolioReview.innerHTML = `
     ${sourceWarning}
-    <div class="portfolio-notes">
-      ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
-    </div>
     ${portfolio.groups.map((group) => `<section class="portfolio-currency-group"><h3>${escapeHtml(group.currency)} holdings</h3>
       <div class="portfolio-summary">
         <article><span>${group.complete ? "Tracked value" : "Known tracked value"}</span><strong>${escapeHtml(currencyMoney(group.total, group.currency))}</strong></article>
         <article><span>Cost basis</span><strong>${escapeHtml(currencyMoney(group.costBasis, group.currency))}</strong></article>
         <article><span>Unrealized gain / loss</span><strong>${escapeHtml(gainMoney(group.gain, group.currency))}</strong></article>
-        <article><span>Core fund weight</span><strong>${group.complete && group.total > 0 ? `${((group.coreValue / group.total) * 100).toFixed(1)}%` : "Unavailable"}</strong></article>
       </div>
       ${group.legacyCount ? `<p class="data-note">${group.legacyCount} legacy amount${group.legacyCount === 1 ? " is" : "s are"} included as entered. Group cost basis and gain / loss need share quantities and purchase prices for every holding.</p>` : ""}
       <div class="holding-grid">${group.holdings.map(renderHoldingCard).join("")}</div>
     </section>`).join("")}
+    <details class="secondary-details"><summary>Concentration checks</summary><div class="portfolio-notes">
+      ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
+    </div></details>
   `;
 }
 
@@ -168,17 +167,15 @@ function renderHoldingCard(holding) {
         </div>
         <strong>${Number.isFinite(holding.weight) ? `${holding.weight.toFixed(1)}%` : "Weight unavailable"}</strong>
       </div>
-      <div class="stock-stats">
-        <span>${escapeHtml(holding.ticker)}</span>
-        <span>${escapeHtml(holding.currency)}</span>
-        ${item?.dataQuality?.eligible ? `<span>Signal strength ${item.score}/100</span><span>1M ${formatPercent(item.oneMonth)}</span><span>Risk ${escapeHtml(item.setup?.riskLevel || "-")}</span>` : ""}
-      </div>
+      <p class="muted-line">${escapeHtml(holding.ticker)} · ${escapeHtml(holding.currency)}</p>
       <div class="holding-values">${values}</div>
       <p class="data-note">${manual ? "Legacy amount stays as entered. Edit to add shares and average purchase price." : Number.isFinite(holding.price)
         ? `Price ${escapeHtml(currencyMoney(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
         : escapeHtml(holding.valuationError || "A qualified price in the purchase currency is unavailable.")}</p>
-      <b class="holding-label">${escapeHtml(holding.review.label)}</b>
-      <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
+      <details class="secondary-details"><summary>Position checks · ${escapeHtml(holding.review.label)}</summary>
+        <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
+        ${item?.dataQuality?.eligible ? `<dl class="key-values"><div><dt>Score</dt><dd>${item.score}/100</dd></div><div><dt>1M</dt><dd>${formatPercent(item.oneMonth)}</dd></div><div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>` : ""}
+      </details>
       <button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>
     </article>
   `;

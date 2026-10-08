@@ -1,12 +1,11 @@
 import { applyLearningSignal, scoreSeries } from "../analysis/scoring.js";
 import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
-import { trustedSourceUniverse } from "../config/sources.js";
 import { applyQuoteSnapshot, loadMarketSeries, loadQuoteSnapshots } from "../data/market.js";
 import { uniqueArticles } from "../data/news-helpers.js";
 import { loadNewsSources } from "../data/news.js";
 import { formatNumber, formatPercent, formatSignal } from "../shared/format.js";
 import { isBlockedAssetTicker, parseQuestionTarget } from "../shared/symbols.js";
-import { escapeHtml, unique } from "../shared/text.js";
+import { dateValue, escapeHtml, unique } from "../shared/text.js";
 import { els, showToast } from "../ui/dom.js";
 
 let isQuestionRunning = false;
@@ -20,7 +19,7 @@ export async function answerQuestion() {
   const question = els.askInput.value.trim();
   const parsed = parseQuestionTarget(question);
   if (!parsed.ticker) {
-    els.askAnswer.innerHTML = `<div class="empty-state">I could not identify the stock. Try a ticker, like "Should I sell INTC today?", or a common company name like Intel, Apple, Microsoft, Nvidia, Tesla, or Amazon.</div>`;
+    els.askAnswer.innerHTML = `<div class="empty-state">No ticker recognized. Enter a ticker such as INTC or a company name such as Intel.</div>`;
     return;
   }
   if (isBlockedAssetTicker(parsed.ticker)) {
@@ -30,7 +29,7 @@ export async function answerQuestion() {
 
   isQuestionRunning = true;
   els.askButton.disabled = true;
-  els.askAnswer.innerHTML = `<div class="empty-state">Running deep live analysis for ${escapeHtml(parsed.ticker)}. This checks price action, sell/hold signals, recent headlines, trusted outlooks, and broad market context...</div>`;
+  els.askAnswer.innerHTML = `<div class="empty-state">Checking prices and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
 
   try {
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
@@ -48,7 +47,7 @@ export async function answerQuestion() {
     renderQuestionAnswer(answer);
   } catch (error) {
     console.error(error);
-    els.askAnswer.innerHTML = `<div class="empty-state">Could not complete the focused deep scan. Check the connection and try again.</div>`;
+    els.askAnswer.innerHTML = `<div class="empty-state">Could not complete the ticker check. Check the connection and try again.</div>`;
   } finally {
     isQuestionRunning = false;
     els.askButton.disabled = false;
@@ -58,12 +57,15 @@ export async function answerQuestion() {
 function buildQuestionAnswer(item, news, parsed) {
   const sellSignal = sellSignalFor(item);
   const holdSignal = holdSignalFor(item);
-  const activeSources = Math.max(0, news.sources.filter((source) => source.ok).length - 1);
+  const activeSources = news.sources.filter((source) => source.ok && source.id !== "live-source-index").length;
   const relevantItems = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []));
-  const links = relevantItems.filter((entry) => entry.link).slice(0, 5);
+  const links = relevantItems.map((entry) => ({ ...entry, link: safeArticleUrl(entry.link) })).filter((entry) => entry.link).slice(0, 5);
+  const quoteApplied = /\+ Yahoo intraday/.test(item.source || "") && item.quote?.price === item.latest
+    && (!item.currency || item.quote?.currency === item.currency);
+  const priceAsOf = quoteApplied ? item.quote.quoteTime : item.dataQuality?.asOf;
   let verdict = "Wait / watch";
   let className = "ask-verdict-watch";
-  let summary = "The model does not see enough evidence for an urgent sell, but it also does not have enough strength for a high-conviction hold.";
+  let summary = "Neither the sell nor hold rules are triggered by this scan.";
 
   if (sellSignal) {
     verdict = sellSignal.label;
@@ -83,11 +85,16 @@ function buildQuestionAnswer(item, news, parsed) {
     className,
     summary,
     score: item.score,
+    keyStats: [
+      ["Price", `${formatNumber(item.latest)} ${item.currency || item.quote?.currency || ""}`.trim(), `As of ${articleDateLabel(priceAsOf)}`],
+      ["1D", formatPercent(item.oneDay)],
+      ["Score", `${item.score}/100`],
+      ["Event risk", item.eventRisk?.level || "Unavailable"]
+    ],
     stats: [
       ["Signal", item.setup?.signal || item.label],
       ["Signal strength", `${item.score}/100`],
       ["Timeframe", item.setup?.timeframe || "1-4 weeks"],
-      ["Price", formatNumber(item.latest)],
       ["1M", formatPercent(item.oneMonth)],
       ["3M", formatPercent(item.threeMonth)],
       ["6M", formatPercent(item.sixMonth)],
@@ -114,32 +121,45 @@ function renderQuestionAnswer(answer) {
     <article class="ask-result ${answer.className}">
       <div class="ask-result-head">
         <div>
-          <span>Model answer for ${escapeHtml(answer.company || answer.ticker)}</span>
+          <span>Rule-based result · ${escapeHtml(answer.company || answer.ticker)}</span>
           <h3>${escapeHtml(answer.verdict)}</h3>
         </div>
         <strong>${answer.score}/100</strong>
       </div>
       <p>${escapeHtml(answer.summary)}</p>
-      <div class="stock-stats">
-        ${answer.stats.map(([label, value]) => `<span>${escapeHtml(label)} ${escapeHtml(value)}</span>`).join("")}
-      </div>
-      <ul>${answer.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
-      <div class="ask-source-line">${answer.activeSources} active trusted sources, ${answer.headlines} relevant headlines, ${answer.outlooks} outlook items in this focused scan.</div>
-      ${answer.links.length ? `
-        <div class="ask-links">
-          ${answer.links.map((item) => `<a href="${escapeHtml(item.link)}" target="_blank" rel="noreferrer">${escapeHtml(item.source)}: ${escapeHtml(item.title)}</a>`).join("")}
-        </div>
-      ` : `<span class="muted-line">No article links matched this ticker directly; answer relies more on price action and broad market context.</span>`}
+      <dl class="key-values">${answer.keyStats.map(renderMetric).join("")}</dl>
+      <details class="secondary-details"><summary>Checks behind this result</summary>
+        <dl class="key-values">${answer.stats.map(renderMetric).join("")}</dl>
+        <ul>${answer.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
+      </details>
+      <details class="secondary-details"><summary>Matched articles (${answer.links.length})</summary>
+        <p class="data-note">${answer.activeSources} feeds loaded · ${answer.headlines} articles · ${answer.outlooks} outlook items across the focused scan.</p>
+        ${answer.links.length ? `<div class="ask-links">${answer.links.map((item) => `<div class="detail-source-entry"><a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.source)}: ${escapeHtml(item.title)}</a><small>${escapeHtml(item.directTickers?.includes(answer.ticker) ? "Direct company evidence" : item.sectorTickers?.includes(answer.ticker) ? "Sector context" : "Market context")} · ${escapeHtml(articleDateLabel(item.pubDate))}</small></div>`).join("")}</div>` : '<p>No usable article links matched this ticker. The result relies on price history.</p>'}
+      </details>
     </article>
   `;
 }
 
 function buildQuestionReasons(item, activeSources, outlookCount) {
   return [
-    `Deep scan checked ${activeSources} active trusted sources from the ${trustedSourceUniverse.length}-source universe.`,
-    `The focused scan found ${item.headlineSourceCount} direct headline sources and ${item.outlookSourceCount} trusted outlook sources for ${item.ticker}.`,
+    `${activeSources} feeds loaded successfully.`,
+    `${item.headlineSourceCount || 0} headline sources and ${item.outlookSourceCount || 0} outlook sources matched ${item.ticker}; some matches provide sector or market context.`,
     `Trend check: ${item.latest > item.sma200 ? "above" : "below"} the 200-day average and ${item.latest > item.sma50 ? "above" : "below"} the 50-day average.`,
-    `Recent market context included ${outlookCount} strategist/outlook items across the scan.`,
-    item.flags[0] || item.reasons[0] || "No single dominant risk flag was detected."
+    `${outlookCount} outlook items were found across the focused scan.`,
+    item.flags[0] || item.reasons[0] || ""
   ].filter(Boolean);
+}
+
+function renderMetric([label, value, note]) {
+  return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}${note ? `<small>${escapeHtml(note)}</small>` : ""}</dd></div>`;
+}
+
+function safeArticleUrl(value) {
+  try { const url = new URL(value); return ["https:", "http:"].includes(url.protocol) ? url.href : ""; }
+  catch { return ""; }
+}
+
+function articleDateLabel(value) {
+  const time = dateValue(String(value || "").replace(/^(\d{8})T(\d{6})Z?$/, "$1$2"));
+  return time ? new Date(time).toLocaleDateString() : "Date unavailable";
 }

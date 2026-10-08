@@ -1,14 +1,15 @@
 import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
 import { scanState } from "../scan-state.js";
-import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
+import { formatNumber, formatPercent } from "../shared/format.js";
 import { clamp } from "../shared/math.js";
+import { parseTickers } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
-import { defaults } from "../storage.js";
+import { defaults, state } from "../storage.js";
 import { els } from "../ui/dom.js";
 
 export function renderScreener() {
   if (!scanState.latestRankedResults.length) {
-    els.screenerResults.innerHTML = `<div class="empty-state">The screener will populate after the first live scan.</div>`;
+    els.screenerResults.innerHTML = `<div class="empty-state">Waiting for watchlist prices.</div>`;
     return;
   }
 
@@ -17,28 +18,31 @@ export function renderScreener() {
   const minLiquidity = Math.max(0, Number(els.screenerMinLiquidity.value || defaults.screenerMinLiquidity)) * 1000000;
   const sort = els.screenerSort.value || defaults.screenerSort;
   const appliesScoreFloor = !["sell", "avoid"].includes(signal);
-  const filtered = scanState.latestRankedResults
+  const watched = new Set(parseTickers(state.tickerInput));
+  const results = scanState.latestRankedResults.filter((item) => watched.has(item.ticker));
+  const matches = results
     .filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score))
     .filter((item) => !appliesScoreFloor || item.score >= minScore)
-    .filter((item) => item.averageDollarVolume >= minLiquidity || item.isFund)
+    .filter((item) => minLiquidity === 0 || item.averageDollarVolume >= minLiquidity || item.isFund)
     .filter((item) => screenerSignalMatches(item, signal))
-    .sort((a, b) => sortScreenerResults(a, b, sort))
-    .slice(0, 40);
-  const top = filtered[0];
-  const unavailable = scanState.latestRankedResults.filter((item) => !item.dataQuality?.eligible);
+    .sort((a, b) => sortScreenerResults(a, b, sort));
+  const filtered = matches.slice(0, 40);
+  const remaining = matches.slice(40);
+  const unavailable = results.filter((item) => !item.dataQuality?.eligible);
+  const returned = new Set(results.map((item) => item.ticker));
+  const missing = [...watched].filter((ticker) => !returned.has(ticker));
+  const filterNotes = [signal !== "all" ? `Signal: ${signal}` : "", minScore > 0 ? `Score ≥ ${minScore}` : "",
+    minLiquidity > 0 ? `Daily traded value ≥ ${compactValue(minLiquidity)}` : ""].filter(Boolean);
+  const summary = document.querySelector("#watchlistFilters > summary");
+  if (summary) summary.textContent = filterNotes.length ? `Filters · ${filterNotes.join(" · ")}` : "Filters";
 
   els.screenerResults.innerHTML = `
-    <p class="data-note">${scanState.latestRankedResults.filter((item) => item.dataQuality?.eligible).length}/${scanState.latestRankedResults.length} instruments have qualified recent price history. Sample, stale, and incomplete history is excluded from signals.</p>
-    ${unavailable.length ? `<details class="data-gaps"><summary>Unavailable instruments (${unavailable.length})</summary><ul>${unavailable.map((item) => `<li><strong>${escapeHtml(item.ticker)}</strong> — ${escapeHtml(item.dataQuality?.reason || "Price history unavailable")}</li>`).join("")}</ul></details>` : ""}
-    <div class="screener-summary">
-      <article><span>Matched</span><strong>${filtered.length}/${scanState.latestRankedResults.length}</strong></article>
-      <article><span>Top ticker</span><strong>${escapeHtml(top?.ticker || "-")}</strong></article>
-      <article><span>Quote data</span><strong>${scanState.latestQuoteSnapshot?.count ? `${scanState.latestQuoteSnapshot.count}/${scanState.latestQuoteSnapshot.total}` : "Chart only"}</strong></article>
-      <article><span>Source set</span><strong>${scanState.latestNews?.label ? escapeHtml(scanState.latestNews.label.split(" ")[0]) : "-"}</strong></article>
+    <p class="data-note">${matches.length} of ${watched.size} watched${filterNotes.length ? ` · ${escapeHtml(filterNotes.join(" · "))}` : ""}</p>
+    ${unavailable.length || missing.length ? `<details class="secondary-details data-gaps"><summary>Unavailable prices (${unavailable.length + missing.length})</summary><ul>${unavailable.map((item) => `<li><strong>${escapeHtml(item.ticker)}</strong> — ${escapeHtml(item.dataQuality?.reason || "Price history unavailable")}</li>`).join("")}${missing.map((ticker) => `<li><strong>${escapeHtml(ticker)}</strong> — Not returned in the current scan.</li>`).join("")}</ul></details>` : ""}
+    <div class="scan-list">
+      ${filtered.length ? `${scanListHeading()}${filtered.map((item) => renderScanRow(item)).join("")}` : `<div class="empty-state">${watched.size ? "No watchlist symbols match these filters." : "Add a stock or ETF to your watchlist."}</div>`}
     </div>
-    <div class="screener-table">
-      ${filtered.length ? filtered.map((item, index) => renderScreenerRow(item, index)).join("") : `<div class="empty-state">No tickers match these filters. Lower the score or liquidity filter, or choose all scanned tickers.</div>`}
-    </div>
+    ${remaining.length ? `<details class="secondary-details"><summary>More stocks (${remaining.length})</summary><div class="scan-list">${scanListHeading()}${remaining.map((item) => renderScanRow(item)).join("")}</div></details>` : ""}
   `;
 }
 
@@ -61,33 +65,33 @@ function sortScreenerResults(a, b, sort) {
   return tie;
 }
 
-function renderScreenerRow(item, index) {
+export function scanListHeading() {
+  return '<div class="scan-list-head" aria-hidden="true"><span>Symbol</span><span>Signal</span><span>Price</span><span>1D</span><span>Score</span></div>';
+}
+
+export function renderScanRow(item, { showDetails = true } = {}) {
   const quote = item.quote || {};
-  const dayRange = quote.dayLow && quote.dayHigh ? `${formatNumber(quote.dayLow)}-${formatNumber(quote.dayHigh)}` : "-";
-  const source = quote.price ? "Intraday + chart" : item.source === "sample" ? "Sample fallback" : "Chart";
+  const currency = item.currency || quote.currency || "";
+  const date = new Date(item.dataQuality?.asOf || "");
+  const asOf = Number.isFinite(date.getTime()) ? date.toLocaleDateString() : "Date unavailable";
   return `
-    <article class="screener-row ${item.score >= 75 ? "grade-good" : item.score >= 60 ? "grade-watch" : item.score >= 45 ? "grade-mixed" : "grade-avoid"}">
-      <div class="rank">${index + 1}</div>
-      <div>
-        <div class="stock-title">
-          <h3><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a></h3>
-          <span>${item.score}/100</span>
-        </div>
-        <strong>${escapeHtml(quote.name && quote.name !== item.ticker ? quote.name : item.setup?.signal || item.label)}</strong>
-        <div class="stock-stats">
-          <span>Price ${escapeHtml(formatNumber(item.latest))}</span>
-          <span>Today ${formatPercent(item.oneDay)}</span>
-          <span>1M ${formatPercent(item.oneMonth)}</span>
-          <span>Day range ${escapeHtml(dayRange)}</span>
-          <span>Liquidity ${escapeHtml(compactMoney(item.averageDollarVolume))}</span>
-          <span>Source ${escapeHtml(source)}</span>
-        </div>
-      </div>
-      <div>
-        <b class="signal-pill">${escapeHtml(item.setup?.signal || item.label)}</b>
-        <p>${escapeHtml(item.reasons[0] || item.flags[0] || "No dominant note.")}</p>
-        <a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">Open detail</a>
-      </div>
+    <article class="scan-list-row">
+      <div class="scan-symbol"><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a>${quote.name && quote.name !== item.ticker ? `<small>${escapeHtml(quote.name)}</small>` : ""}</div>
+      <span class="scan-signal" data-label="Signal">${escapeHtml(item.setup?.signal || item.label)}</span>
+      <strong data-label="Price">${escapeHtml(formatNumber(item.latest))} ${escapeHtml(currency)}</strong>
+      <span class="${item.oneDay > 0 ? "positive" : item.oneDay < 0 ? "negative" : ""}" data-label="1D">${formatPercent(item.oneDay)}</span>
+      <span data-label="Score">${item.score}/100</span>
+      ${showDetails ? `<details class="secondary-details scan-row-details"><summary>Checks</summary>
+        <dl class="key-values"><div><dt>History as of</dt><dd>${escapeHtml(asOf)}</dd></div>
+        <div><dt>1M / 6M</dt><dd>${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}</dd></div>
+        <div><dt>Daily traded value</dt><dd>${escapeHtml(compactValue(item.averageDollarVolume))} ${escapeHtml(item.currency || "")}</dd></div>
+        <div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>
+        ${item.reasons?.[0] ? `<p>${escapeHtml(item.reasons[0])}</p>` : ""}
+      </details>` : ""}
     </article>
   `;
+}
+
+function compactValue(value) {
+  return Number.isFinite(value) ? new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(value) : "Unavailable";
 }

@@ -1,5 +1,3 @@
-import { calculateHoldings } from "../analysis/holdings.js";
-import { getPortfolioHoldings } from "../features/portfolio.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { parseTickers } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
@@ -9,76 +7,84 @@ const periods = { "1M": 1, "3M": 3, "1Y": 12 };
 const selectedPeriods = new Map();
 const boundCharts = new WeakSet();
 const chartInteractions = new WeakMap();
-const colors = ["#7189ff", "#36c8b1", "#f3bd66", "#c38af5", "#607085"];
+const colors = ["#7189ff", "#36c8b1"];
 let latestOverview = null;
 
 export function renderDashboardOverview(results, priceSource, news, marketContext, quotes, { researchPending = false } = {}) {
   const qualified = results.filter((item) => item.dataQuality?.eligible && Number.isFinite(item.score));
-  latestOverview = { results: qualified, priceSource, quotes };
-  const trusted = (news?.sources || []).filter((source) => source.ok && source.id !== "live-source-index").length;
-  const scores = results.map((item) => item.score).filter(Number.isFinite);
+  latestOverview = { results: qualified, priceSource };
+  const activeSources = (news?.sources || []).filter((source) => source.ok && source.id !== "live-source-index").length;
+  const scores = qualified.map((item) => item.score);
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
   const stats = [
-    ["Instruments scanned", results.length, "Watchlist + discovery universe", "scan"],
-    ["Average model score", average === null ? "—" : `${average}/100`, researchPending ? "Price signals · research pending" : "Trend, momentum & risk combined", "score"],
-    ["Live quote snapshots", quotes?.count || 0, quotes?.count ? `Of ${quotes.total} requested symbols` : "Daily chart prices used instead", "quote"],
-    ["Trusted sources", researchPending ? "Pending" : trusted, researchPending ? "Research scan is still running" : `Of ${news?.configured || 0} research sources`, "source"]
+    ["Instruments scanned", results.length, "Watchlist and research universe"],
+    ["Average technical score", average === null ? "—" : `${average}/100`, "Qualified price histories"],
+    ["Quote snapshots", quotes?.count || 0, quotes?.count ? `Of ${quotes.total} requested symbols` : "Using daily prices"],
+    ["Research sources", researchPending ? "Pending" : activeSources, researchPending ? "Research scan running" : `Of ${news?.configured || 0} configured sources`]
   ];
-  setHtml("dashboardStats", stats.map(([label, value, note, icon]) => `
+  setHtml("dashboardStats", stats.map(([label, value, note]) => `
     <article class="stat-card">
-      <span class="stat-icon" aria-hidden="true">${statIcon(icon)}</span>
       <span class="stat-label">${escapeHtml(label)}</span>
       <strong class="stat-value">${escapeHtml(value)}</strong>
       <span class="stat-note">${escapeHtml(note)}</span>
     </article>`).join(""));
-  const watched = new Set(parseTickers(state.tickerInput));
-  setHtml("featuredStocks", qualified.filter((item) => watched.has(item.ticker)).slice(0, 4).map((item, index) => featuredStock(item, quotes, priceSource, index)).join("")
-    || '<p class="empty-state">No qualified price history for your watchlist yet. Add stocks or ETFs below; sample, stale, and incomplete data cannot generate signals.</p>');
+  const watched = parseTickers(state.tickerInput).slice(0, 6);
+  setHtml("featuredStocks", watched.length ? `<ul class="watchlist-overview">${watched.map((ticker) =>
+    featuredStock(results.find((item) => item.ticker === ticker) || { ticker }, quotes, priceSource)).join("")}</ul>`
+    : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>');
   renderTrends();
-  renderPortfolioSnapshot();
   const top = qualified[0];
   const excludedCount = results.length - qualified.length;
   const activity = [
     ["Market regime", marketContext?.label || "Not available", `${marketContext?.liveCount || 0}/${marketContext?.total || 11} qualified market proxies`],
-    ["Research coverage", researchPending ? "Research scan running" : `${news?.items?.length || 0} relevant headlines`, researchPending ? "Price charts are ready. Headlines and source checks will follow." : `${trusted} trusted sources active in this scan`],
-    ["Leading instrument", top ? `${top.ticker} · ${top.score}/100` : "No result yet", top?.setup?.signal || top?.label || "Scan your watchlist to find a leader"],
-    ["Price data", `${qualified.length}/${results.length} instruments qualified`, excludedCount ? `${excludedCount} excluded: sample, stale, or incomplete history. See the screener for coverage.` : "Recent real daily history. Signal strength is a rules-based score, not a measured success probability."]
+    ["Research coverage", researchPending ? "Research scan running" : `${news?.items?.length || 0} matched headlines`, researchPending ? "Headlines pending" : `${activeSources} sources responded`],
+    ["Top technical score", top ? `${top.ticker} · ${top.score}/100` : "Unavailable", top?.setup?.signal || top?.label || "No qualified result"],
+    ["Price data", `${qualified.length}/${results.length} histories qualified`, excludedCount ? `${excludedCount} sample, stale, or incomplete histories excluded` : "Recent real daily prices"]
   ];
-  setHtml("scanActivity", activity.map(([label, title, note], index) => `
-    <div class="activity-row"><span class="activity-dot" style="--activity-color:${colors[index]}" aria-hidden="true"></span>
+  setHtml("scanActivity", activity.map(([label, title, note]) => `
+    <div class="activity-row">
       <div><span class="activity-label">${escapeHtml(label)}</span><strong class="activity-title">${escapeHtml(title)}</strong>
       <span class="activity-note">${escapeHtml(note)}</span></div>
     </div>`).join(""));
 }
 
-function featuredStock(item, quotes, priceSource, index) {
-  const quote = quotes?.byTicker?.get(item.ticker) || item.quote;
-  const sample = isSample(item, priceSource);
-  const change = Number.isFinite(quote?.dayChangePercent) ? quote.dayChangePercent : item.oneDay;
-  return `<article class="featured-stock" style="--stock-accent:${colors[index]}">
-    <div class="featured-stock-head"><span class="stock-avatar" aria-hidden="true">${escapeHtml(item.ticker.slice(0, 2))}</span>
-      <div><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a>
-      <span class="stock-name">${escapeHtml(quote?.name || item.ticker)}</span></div>
-      <span class="stock-score">${escapeHtml(item.score)}/100</span></div>
-    <div class="featured-stock-price"><strong>${priceLabel(item, quote)}</strong>
-      <span class="${changeClass(change)}">${percentLabel(change)} <small>1D</small></span></div>
-    <div class="mini-chart">${priceChart(item, chartPoints(item).slice(-40), true, `featured-${index}`)}</div>
-    <span class="stock-meta">${escapeHtml(item.setup?.signal || item.label || "Model signal")} · as of ${escapeHtml(dateLabel(item.dataQuality?.asOf))}</span>
-  </article>`;
+function featuredStock(item, quotes, priceSource) {
+  const quote = item.quote || quotes?.byTicker?.get(item.ticker);
+  const quoteTime = quote?.quoteTime ? new Date(quote.quoteTime).getTime() : NaN;
+  const now = Date.now();
+  const qualified = item.dataQuality?.eligible && Number.isFinite(item.score) && !isSample(item, priceSource);
+  const historyTime = new Date(item.dataQuality?.asOf || "").getTime();
+  const recentQuote = Number.isFinite(quote?.price) && quote.price > 0 && Number.isFinite(quoteTime)
+    && quoteTime <= now && now - quoteTime <= 7 * 86400000
+    && (!quote.ticker || quote.ticker === item.ticker)
+    && (!qualified || !Number.isFinite(historyTime) || quoteTime >= historyTime)
+    && (!qualified || !item.currency || quote.currency === item.currency);
+  const price = recentQuote ? quote.price : qualified ? item.latest : null;
+  const currency = recentQuote ? quote.currency : item.currency;
+  const change = recentQuote ? quote.dayChangePercent : qualified ? item.oneDay : null;
+  const asOf = recentQuote ? quote.quoteTime : qualified ? item.dataQuality.asOf : null;
+  const signal = qualified ? item.setup?.signal || item.label : item.dataQuality?.label || "Not scanned";
+  return `<li class="watchlist-overview-row">
+    <div class="watchlist-overview-name"><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a>
+      <span>${escapeHtml(quote?.name || item.name || item.ticker)}</span></div>
+    <div class="watchlist-overview-price"><strong>${Number.isFinite(price) ? `${escapeHtml(new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price))}${currency ? ` ${escapeHtml(currency)}` : ""}` : "Unavailable"}</strong>
+      <small>${asOf ? escapeHtml(dateLabel(asOf)) : "Price unavailable"}</small></div>
+    <div class="watchlist-overview-change ${changeClass(change)}"><span>${percentLabel(change)}</span><small>Today</small></div>
+    <span class="watchlist-overview-signal">${escapeHtml(signal || "Unavailable")}</span>
+  </li>`;
 }
 
 function renderTrends() {
   const container = document.getElementById("marketTrends");
   if (!container || !latestOverview) return;
-  const { results, priceSource, quotes } = latestOverview;
-  const marketProxies = ["SPY", "QQQ"].map((ticker) => results.find((item) => item.ticker === ticker)).filter(Boolean);
-  const selected = marketProxies.length === 2 ? marketProxies : results.slice(0, 2);
+  const { results, priceSource } = latestOverview;
+  const selected = ["SPY", "QQQ"].map((ticker) => results.find((item) => item.ticker === ticker && !isSample(item, priceSource))).filter(Boolean);
   const interactive = [];
   container.innerHTML = selected.map((item, index) => {
     const period = selectedPeriods.get(item.ticker) || "3M";
     const { points, partial } = periodHistory(item, periods[period]);
     const change = points.length > 1 ? points.at(-1).close / points[0].close - 1 : null;
-    const quote = quotes?.byTicker?.get(item.ticker) || item.quote;
+    const quote = chartQuote(item);
     const sample = isSample(item, priceSource);
     interactive.push({ points, currency: quote?.currency || item.currency || "", ticker: item.ticker });
     const range = points.length ? `${dateLabel(points[0].date)} – ${dateLabel(points.at(-1).date)}` : "Price history unavailable";
@@ -94,7 +100,7 @@ function renderTrends() {
       <div class="chart-axis"><span>${escapeHtml(dateLabel(points[0]?.date))}</span><span>${escapeHtml(dateLabel(points.at(-1)?.date))}</span></div>
       <p class="chart-caption">${escapeHtml(range)} · ${sample ? "Generated fallback data" : "Daily closing prices"}${partial ? " · available history only" : ""}${quote && !sample ? " · latest point updated from quote" : ""}<span class="chart-instructions">Hover or touch to inspect. Keyboard: ← →, Home, End.</span></p>
     </article>`;
-  }).join("") || '<p class="empty-state">Price charts will appear after your first scan.</p>';
+  }).join("") || '<p class="empty-state">Index charts unavailable. SPY and QQQ need recent real price history.</p>';
   container.querySelectorAll("svg[data-chart-inspect]").forEach((svg) => {
     const data = interactive[Number(svg.dataset.chartInspect)];
     if (!data || data.points.length < 2) return;
@@ -185,59 +191,6 @@ function chartReadout(point, currency) {
   return `${dateLabel(point.date)} · ${price}${currency ? ` ${currency}` : ""}`;
 }
 
-export function renderPortfolioSnapshot() {
-  const portfolio = calculateHoldings(getPortfolioHoldings(), latestOverview?.results || []);
-  if (!portfolio.holdings.length) {
-    setHtml("portfolioSnapshot", `<div class="portfolio-empty"><span class="portfolio-empty-icon" aria-hidden="true">${statIcon("quote")}</span>
-      <strong>Your portfolio starts here</strong><p>Add your holdings to see how your allocation is spread.</p>
-      <a class="button secondary" href="#portfolio">Add holdings <span aria-hidden="true">↗</span></a></div>`);
-    return;
-  }
-  setHtml("portfolioSnapshot", `<p class="snapshot-caption">${portfolio.holdings.length} holding${portfolio.holdings.length === 1 ? "" : "s"} · currency totals shown separately</p>
-    ${portfolio.groups.map((group) => snapshotCurrencyGroup(group, portfolio.holdings)).join("")}
-    <a class="snapshot-link" href="#portfolio">Manage portfolio <span aria-hidden="true">↗</span></a>`);
-}
-
-function snapshotCurrencyGroup(group, allHoldings) {
-  const holdings = allHoldings.filter((holding) => holding.currency === group.currency)
-    .sort((a, b) => (b.currentValue ?? -1) - (a.currentValue ?? -1));
-  const missing = holdings.filter((holding) => !Number.isFinite(holding.currentValue));
-  const rows = holdings.slice(0, 4).map((holding) => ({ ...holding }));
-  const remaining = holdings.slice(4).filter((holding) => Number.isFinite(holding.currentValue));
-  if (remaining.length) {
-    const currentValue = remaining.reduce((sum, holding) => sum + holding.currentValue, 0);
-    rows.push({ ticker: "Others", label: `${remaining.length} other valued holdings`, currentValue,
-      weight: group.total > 0 ? currentValue / group.total * 100 : null, source: "combined", currency: group.currency });
-  }
-  const valued = rows.filter((holding) => Number.isFinite(holding.currentValue));
-  const label = !group.complete ? "Partial known value" : group.legacyCount ? "Tracked value" : "Current value";
-  const gain = Number.isFinite(group.gain)
-    ? `<p class="snapshot-gain ${changeClass(group.gain)}">Unrealized ${group.gain > 0 ? "+" : ""}${escapeHtml(snapshotMoney(group.gain, group.currency))}${group.costBasis > 0 ? ` · ${escapeHtml(formatPercent(group.gain / group.costBasis))}` : ""}</p>`
-    : `<p class="snapshot-caption">${group.legacyCount ? "Gain/loss needs shares and purchase cost for amount-only holdings." : "Gain/loss unavailable until all prices match the purchase currency."}</p>`;
-  return `<section class="snapshot-currency-group"><span class="snapshot-caption">${escapeHtml(label)} · ${escapeHtml(group.currency)}</span>
-    <strong class="snapshot-total">${Number.isFinite(group.total) ? escapeHtml(snapshotMoney(group.total, group.currency)) : "Unavailable"}</strong>
-    ${gain}
-    ${group.legacyCount ? `<p class="snapshot-caption">Includes ${group.legacyCount} manually entered amount${group.legacyCount === 1 ? "" : "s"}.</p>` : ""}
-    ${valued.length && group.total > 0 ? `<div class="allocation-bar" aria-label="Allocation of known ${escapeHtml(group.currency)} values">${valued.map((holding) => {
-      const index = rows.indexOf(holding);
-      const weight = holding.currentValue / group.total * 100;
-      return `<span style="width:${weight.toFixed(3)}%;background:${colors[index]}" title="${escapeHtml(holding.ticker)} ${weight.toFixed(1)}%"></span>`;
-    }).join("")}</div>` : ""}
-    <div class="allocation-legend">${rows.map((holding, index) => {
-      const known = Number.isFinite(holding.currentValue);
-      const source = holding.source === "manual" ? "Entered amount" : holding.source === "daily" ? "Daily close" : holding.source === "quote" ? "Live quote" : holding.source === "combined" ? holding.label : "Price unavailable";
-      return `<div class="snapshot-row"><span class="allocation-dot" style="background:${colors[index]}" aria-hidden="true"></span>
-      <div><strong>${escapeHtml(holding.ticker)}</strong><span title="${escapeHtml(holding.label || holding.ticker)}">${escapeHtml(source)}</span></div>
-      <div><strong>${known ? escapeHtml(snapshotMoney(holding.currentValue, group.currency)) : "Unavailable"}</strong><span>${known && group.total > 0 ? `${(holding.currentValue / group.total * 100).toFixed(1)}% of known value` : "Quote needed"}</span></div></div>`;
-    }).join("")}</div>
-    ${missing.length ? `<p class="snapshot-unavailable">${missing.length} unpriced holding${missing.length === 1 ? "" : "s"}: ${escapeHtml(missing.slice(0, 3).map((holding) => holding.ticker).join(", "))}${missing.length > 3 ? ` +${missing.length - 3} more` : ""}. Partial values exclude unavailable prices.</p>` : ""}
-  </section>`;
-}
-
-function snapshotMoney(value, currency) {
-  return `${new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)} ${currency}`;
-}
-
 function priceChart(item, points, mini, id) {
   if (points.length < 2) return '<span class="chart-empty">Price history unavailable</span>';
   const { width, height, pad, coordinates } = chartGeometry(points, mini);
@@ -247,8 +200,7 @@ function priceChart(item, points, mini, id) {
   const label = `${item.ticker} price history, ${dateLabel(points[0].date)} to ${dateLabel(points.at(-1).date)}: ${formatNumber(points[0].close)} to ${formatNumber(points.at(-1).close)}. Use left and right arrows, Home, or End to inspect prices.`;
   const chartIndex = id.replace("trend-", "");
   return `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" ${mini ? 'aria-hidden="true"' : `tabindex="0" role="img" data-chart-inspect="${escapeHtml(chartIndex)}" aria-keyshortcuts="ArrowLeft ArrowRight Home End" aria-describedby="chart-readout-${escapeHtml(chartIndex)}" aria-label="${escapeHtml(label)}"`}>
-    <defs><linearGradient id="overview-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="currentColor" stop-opacity="0.22"/><stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>
-    ${grid}<path class="chart-area" d="${area}" fill="url(#overview-${id})"/>
+    ${grid}<path class="chart-area" d="${area}" fill="currentColor" fill-opacity="0.06"/>
     <path class="chart-line" d="${path}" fill="none" stroke="currentColor" stroke-width="${mini ? 1.8 : 2.4}" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
@@ -290,7 +242,18 @@ function periodHistory(item, months) {
 }
 
 function priceLabel(item, quote) {
-  return `${escapeHtml(formatNumber(item.latest))}${quote?.currency ? ` <small>${escapeHtml(quote.currency)}</small>` : ""}`;
+  const currency = quote?.currency || item.currency;
+  return `${escapeHtml(formatNumber(item.latest))}${currency ? ` <small>${escapeHtml(currency)}</small>` : ""}`;
+}
+
+function chartQuote(item) {
+  const quote = item.quote;
+  const time = quote?.quoteTime ? new Date(quote.quoteTime).getTime() : NaN;
+  const historyTime = new Date(item.dataQuality?.asOf || "").getTime();
+  const now = Date.now();
+  return quote && Number.isFinite(time) && time <= now && now - time <= 7 * 86400000
+    && time >= historyTime && Number.isFinite(quote.price) && quote.price === item.latest
+    && (!quote.ticker || quote.ticker === item.ticker) && (!item.currency || quote.currency === item.currency) ? quote : null;
 }
 
 function percentLabel(value) {
@@ -314,14 +277,4 @@ function isSample(item, source) {
 function setHtml(id, html) {
   const element = document.getElementById(id);
   if (element) element.innerHTML = html;
-}
-
-function statIcon(kind) {
-  const paths = {
-    scan: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
-    score: '<path d="M4 18V6m0 12h16M8 13l4-4 4 2 5-6"/><path d="M17 5h4v4"/>',
-    quote: '<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M3 9h18M16 13h5M6 5V3h12v2"/>',
-    source: '<path d="m12 3 8 4v5c0 5-8 9-8 9s-8-4-8-9V7l8-4Z"/><path d="m8 12 3 3 5-6"/>'
-  };
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths[kind]}</svg>`;
 }

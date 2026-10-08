@@ -3,347 +3,167 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Investing tool</title>
+    <title>Investing</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261005-fintech">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=20261008-minimal">
   </head>
   <body>
     <div class="app-layout">
       <aside class="sidebar">
-        <a class="sidebar-brand" href="#dashboard" aria-label="Investing tool home">
-          <span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 17V12m7 5V8m7 9V4"/></svg></span>
-          <span class="brand-text">Investing<span>Market intelligence</span></span>
-        </a>
-        <p class="nav-label">Workspace</p>
-        <nav class="page-nav" aria-label="App pages">
-          <a href="#dashboard" data-page-link="dashboard"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg><span>Overview</span></a>
-          <a href="#screener" data-page-link="screener"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/></svg><span>Stock screener</span></a>
-          <a href="#detail" data-page-link="detail"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 18V6m0 12h16M7 14l4-4 4 2 5-7"/></svg><span>Stock detail</span></a>
-          <a href="#portfolio" data-page-link="portfolio"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="18" height="14" rx="3"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18m-11-2h4v4h-4z"/></svg><span>My portfolio</span></a>
-          <a href="#ask" data-page-link="ask"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H8l-5 3V11a8 8 0 0 1 8-8h2a8 8 0 0 1 8 8Z"/><path d="M8 11h8m-8 4h4"/></svg><span>Ask the model</span></a>
-          <a href="#signals" data-page-link="signals"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 12 4-7 4 14 4-11 3 4h3"/></svg><span>Market signals</span></a>
-          <a href="#performance" data-page-link="performance"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V4m0 16h16M8 16v-5m5 5V8m5 8V5"/><path d="m7 6 5-3 6 1"/></svg><span>Performance</span></a>
-          <a href="#research" data-page-link="research"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 3h12l4 4v14H4zM16 3v5h4M8 12h8m-8 4h5"/></svg><span>Research</span></a>
-          <a href="#sources" data-page-link="sources"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z"/></svg><span>Data sources</span></a>
+        <a class="sidebar-brand" href="#dashboard" aria-label="Investing home"><span class="brand-text">Investing</span></a>
+        <nav class="page-nav" aria-label="Main pages">
+          <a href="#dashboard" data-page-link="dashboard">Overview</a>
+          <a href="#screener" data-page-link="screener">Watchlist</a>
+          <a href="#portfolio" data-page-link="portfolio">Portfolio</a>
+          <a href="#performance" data-page-link="performance">Performance</a>
         </nav>
-        <div class="sidebar-note">
-          <span class="sidebar-note-icon" aria-hidden="true">✦</span>
-          <strong>A clearer market view</strong>
-          <p>Explore the evidence behind every signal.</p>
-          <a href="#research">Explore research <span aria-hidden="true">↗</span></a>
-        </div>
-        <div class="workspace-badge"><span class="local-dot" aria-hidden="true"></span> Saved in your browser</div>
+        <details class="nav-more" id="navMore">
+          <summary>More</summary>
+          <nav class="page-nav secondary-nav" aria-label="Additional tools">
+            <a href="#detail" data-page-link="detail">Stock details</a>
+            <a href="#research" data-page-link="research">Market &amp; research</a>
+            <a href="#signals" data-page-link="signals">Signals</a>
+            <a href="#ask" data-page-link="ask">Stock check</a>
+            <a href="#sources" data-page-link="sources">Data sources</a>
+          </nav>
+        </details>
+        <p class="workspace-badge">Saved in this browser</p>
       </aside>
-
       <div class="workspace">
         <header class="topbar">
-          <div>
-            <p class="eyebrow">Your investment workspace</p>
-            <h1 id="pageTitle" class="hero-title">Overview</h1>
-            <p id="pageDescription" class="hero-copy">Your market, at a glance.</p>
-            <p id="scanStage" class="scan-stage" role="status" aria-live="polite">Refreshing market data…</p>
-          </div>
+          <h1 id="pageTitle" class="hero-title">Overview</h1>
           <div class="top-actions">
             <form id="quickSearchForm" class="quick-search" role="search" aria-label="Find a stock">
-              <input id="quickSearchInput" type="search" aria-label="Stock or ETF ticker" placeholder="Search ticker…" autocomplete="off" spellcheck="false">
-              <button type="submit" aria-label="Analyze ticker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button>
+              <input id="quickSearchInput" type="search" aria-label="Stock or ETF ticker" placeholder="Find a ticker" autocomplete="off" spellcheck="false">
+              <button type="submit" aria-label="Open stock details">Find</button>
             </form>
-            <span id="dataStatus" class="status-pill" role="status">Starting live scan</span>
+            <details class="update-status">
+              <summary>Data <span id="dataStatus" role="status">Loading…</span></summary>
+              <div class="update-details">
+                <p id="scanStage" class="scan-stage" role="status" aria-live="polite">Updating prices and headlines.</p>
+                <dl class="refresh-box"><dt>Last update</dt><dd id="lastScan">Not yet</dd><dt>Next update</dt><dd id="nextScan">Starting now</dd></dl>
+                <p id="refreshTitle">Updating</p>
+                <a href="#sources">Source coverage</a>
+              </div>
+            </details>
           </div>
         </header>
-
-    <main class="app-shell">
-      <section class="view-page active" data-page="dashboard">
-        <section class="panel opportunities-panel" aria-labelledby="opportunityHeading">
-          <div class="panel-heading"><div><p class="eyebrow">Evidence-led discovery</p><h2 id="opportunityHeading">Today's opportunities</h2></div><a href="#screener">Explore all <span aria-hidden="true">↗</span></a></div>
-          <div id="opportunityCards" class="opportunity-cards"><div class="empty-state">Checking recent real prices and company-specific evidence. An opportunity appears only when the data and risk checks pass.</div></div>
-          <p id="opportunityMessage" role="status" aria-live="polite"></p>
-        </section>
-        <div id="dashboardStats" class="dashboard-stats" aria-label="Scan summary">
-          <article class="stat-card"><span class="stat-label">Tickers scanned</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
-          <article class="stat-card"><span class="stat-label">Average score</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
-          <article class="stat-card"><span class="stat-label">Live quotes</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
-          <article class="stat-card"><span class="stat-label">Trusted sources</span><strong class="stat-value">—</strong><span class="stat-note">Waiting for your scan</span></article>
-        </div>
-
-        <div class="dashboard-overview">
-          <div class="dashboard-main">
-            <section class="panel overview-panel">
-              <div class="panel-heading"><div><p class="eyebrow">On your radar</p><h2>Your watchlist</h2></div><a href="#screener">View all <span aria-hidden="true">↗</span></a></div>
-              <div id="featuredStocks" class="featured-stocks"><div class="empty-state">Your strongest setups will appear after the scan.</div></div>
+        <main class="app-shell">
+          <section class="view-page active" data-page="dashboard" aria-label="Overview">
+            <section class="panel overview-section opportunities-panel" aria-labelledby="opportunityHeading">
+              <div class="panel-heading"><h2 id="opportunityHeading">Stocks to review</h2><a href="#performance">Past picks ↗</a></div>
+              <div id="opportunityCards" class="opportunity-cards"><p class="empty-state">Checking prices and recent company news.</p></div>
+              <p id="opportunityMessage" role="status" aria-live="polite"></p>
             </section>
-            <section class="panel overview-panel">
-              <div class="panel-heading"><div><p class="eyebrow">Price action</p><h2>Market trends</h2></div><span class="disclaimer">Price history</span></div>
-              <div id="marketTrends" class="market-trends"><div class="empty-state">Charts will appear when price history is available.</div></div>
+            <section class="panel overview-section" aria-labelledby="overviewWatchlistHeading">
+              <div class="panel-heading"><h2 id="overviewWatchlistHeading">Your watchlist</h2><a href="#screener">View all ↗</a></div>
+              <div id="featuredStocks" class="featured-stocks"><p class="empty-state">Loading watchlist prices.</p></div>
             </section>
-            <section class="panel overview-panel">
-              <div class="panel-heading"><div><p class="eyebrow">The bigger picture</p><h2>Market outlook</h2></div><a href="#research">See evidence <span aria-hidden="true">↗</span></a></div>
-              <div id="marketForecast" class="forecast-box"><div class="empty-state">Market outlook will appear after the first scan.</div></div>
-            </section>
-          </div>
-          <aside class="dashboard-rail" aria-label="Portfolio and scan activity">
-            <section class="panel overview-panel"><div class="panel-heading"><h2>My portfolio</h2><a href="#portfolio" aria-label="Open my portfolio">↗</a></div><div id="portfolioSnapshot" class="portfolio-snapshot"><div class="empty-state">Add holdings on the Portfolio page to see your allocation.</div></div></section>
-            <section class="panel overview-panel"><div class="panel-heading"><h2>Scan highlights</h2><span class="disclaimer">Latest scan</span></div><div id="scanActivity" class="scan-activity"><div class="empty-state">Following market trends, headlines, and research.</div></div></section>
-            <section class="panel refresh-panel"><div class="panel-heading"><h2 id="refreshTitle">Deep live scan</h2><span class="refresh-dot" aria-hidden="true"></span></div><div class="refresh-box"><span>Last updated</span><strong id="lastScan">Not yet</strong><span>Next update</span><strong id="nextScan">Starting now</strong></div><p class="data-note">Market signals refresh automatically.</p></section>
-          </aside>
-        </div>
+          </section>
 
-        <details class="panel control-panel">
-          <summary class="control-summary"><span><strong>Manage watchlist</strong><span>Customize the stocks and ETFs in your scan</span></span><span class="disclaimer">Stocks &amp; ETFs</span></summary>
-          <div class="control-content"><div class="controls-grid">
-            <section class="watchlist-editor" aria-labelledby="watchlistHeading">
-              <div class="watchlist-heading">
-                <h3 id="watchlistHeading">Watchlist</h3>
-                <span id="watchlistCount" class="watchlist-count"></span>
+          <section class="view-page" data-page="screener" aria-label="Watchlist" hidden>
+            <details class="panel control-panel" id="watchlistEditor">
+              <summary class="control-summary"><strong>Edit watchlist</strong><span id="watchlistCount" class="watchlist-count"></span></summary>
+              <div class="control-content">
+                <section class="watchlist-editor" aria-labelledby="watchlistHeading">
+                  <h2 id="watchlistHeading">Saved tickers</h2>
+                  <p class="watchlist-hint">Stocks and ETFs. New symbols are checked before saving.</p>
+                  <div id="watchlistChips" class="watchlist-chips" aria-label="Watchlist tickers"></div>
+                  <button id="watchlistToggle" class="watchlist-toggle ghost" type="button" aria-expanded="false" aria-controls="watchlistChips" hidden>Show all</button>
+                  <form id="watchlistAddForm" class="watchlist-add">
+                    <label for="watchlistAddInput"><span>Add tickers</span></label>
+                    <div class="watchlist-add-row"><input id="watchlistAddInput" type="text" placeholder="AAPL, MSFT" autocomplete="off" spellcheck="false" aria-describedby="watchlistMessage"><button type="submit">Add</button></div>
+                  </form>
+                  <p id="watchlistMessage" class="watchlist-message" role="status" aria-live="polite"></p>
+                  <details class="watchlist-bulk"><summary>Edit as text</summary><label for="tickerInput"><span>Separate tickers with commas or spaces</span></label><textarea id="tickerInput" rows="3" spellcheck="false" aria-describedby="watchlistMessage"></textarea><button id="watchlistApplyButton" type="button">Save tickers</button></details>
+                </section>
               </div>
-              <p class="watchlist-hint">Stocks and ETFs. New symbols are checked before adding. Remove a ticker with ×.</p>
-              <div id="watchlistChips" class="watchlist-chips" aria-label="Watchlist tickers"></div>
-              <button id="watchlistToggle" class="watchlist-toggle ghost" type="button" aria-expanded="false" aria-controls="watchlistChips" hidden>Show all</button>
-              <form id="watchlistAddForm" class="watchlist-add">
-                <label for="watchlistAddInput"><span>Add tickers</span></label>
-                <div class="watchlist-add-row">
-                  <input id="watchlistAddInput" type="text" placeholder="e.g. AAPL, MSFT" autocomplete="off" spellcheck="false" aria-describedby="watchlistMessage">
-                  <button type="submit">Add +</button>
+            </details>
+            <section class="panel">
+              <details class="filter-disclosure" id="watchlistFilters">
+                <summary>Filter and sort</summary>
+                <div class="screener-controls">
+                  <label><span>Signal</span><select id="screenerSignal"><option value="all" selected>All</option><option value="actionable">Buy or watch</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="avoid">Avoid</option><option value="sell">Sell or reduce</option></select></label>
+                  <label><span>Minimum score</span><input id="screenerMinScore" type="number" min="0" max="100" step="1" value="0"></label>
+                  <label><span>Minimum liquidity, $M</span><input id="screenerMinLiquidity" type="number" min="0" step="1" value="0"></label>
+                  <label><span>Sort by</span><select id="screenerSort"><option value="score" selected>Score</option><option value="momentum">Momentum</option><option value="risk">Risk control</option><option value="liquidity">Liquidity</option><option value="volume">Volume pressure</option></select></label>
                 </div>
-              </form>
-              <p id="watchlistMessage" class="watchlist-message" role="status" aria-live="polite"></p>
-              <details class="watchlist-bulk">
-                <summary>Edit as text</summary>
-                <label for="tickerInput"><span>Tickers separated by commas or spaces</span></label>
-                <textarea id="tickerInput" rows="3" spellcheck="false" aria-describedby="watchlistMessage"></textarea>
-                <button id="watchlistApplyButton" type="button">Apply changes</button>
               </details>
+              <div id="screenerResults" class="screener-results"><p class="empty-state">Loading your watchlist.</p></div>
             </section>
-            <div class="scan-explainer"><p class="eyebrow">A broader perspective</p><h3>More than a price check</h3><p>Each scan brings together price trends, market conditions, trusted headlines, and research. Your watchlist and portfolio holdings shape the review.</p><a href="#sources">Explore data sources <span aria-hidden="true">↗</span></a><p class="data-note">Changes are saved in this browser. Holdings can be edited on the <a href="#portfolio">Portfolio page</a>.</p></div>
-          </div></div>
-        </details>
-        <details class="panel scan-details"><summary class="control-summary"><span><strong>Scan details</strong><span>Data coverage and market context</span></span></summary><div class="control-content"><h2 id="marketPulseTitle">Scanning market</h2><div id="marketPulse" class="pulse-grid"></div></div></details>
-      </section>
+          </section>
 
-      <section class="view-page" data-page="screener" hidden>
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Live screener</p>
-              <h2>Find the strongest setups</h2>
-            </div>
-            <span class="disclaimer">Current scan</span>
-          </div>
-          <p class="helper-text">Filter the live watchlist by score, signal type, liquidity, momentum, and risk. The screener uses current Yahoo intraday chart data when available, one-year chart history, and the trusted-source headline/outlook scan.</p>
-          <div class="screener-controls">
-            <label>
-              <span>Signal filter</span>
-              <select id="screenerSignal">
-                <option value="actionable" selected>Actionable setups</option>
-                <option value="buy">Buy / buy-watch</option>
-                <option value="hold">Hold candidates</option>
-                <option value="avoid">Avoid new buys</option>
-                <option value="sell">Sell / reduce</option>
-                <option value="all">All scanned tickers</option>
-              </select>
-            </label>
-            <label>
-              <span>Minimum score</span>
-              <input id="screenerMinScore" type="number" min="0" max="100" step="1" value="50">
-            </label>
-            <label>
-              <span>Minimum liquidity, $M</span>
-              <input id="screenerMinLiquidity" type="number" min="0" step="1" value="5">
-            </label>
-            <label>
-              <span>Sort by</span>
-              <select id="screenerSort">
-                <option value="score" selected>Overall score</option>
-                <option value="momentum">Momentum</option>
-                <option value="risk">Risk control</option>
-                <option value="liquidity">Liquidity</option>
-                <option value="volume">Volume pressure</option>
-              </select>
-            </label>
-          </div>
-          <div id="screenerResults" class="screener-results">
-            <div class="empty-state">The screener will populate after the first live scan.</div>
-          </div>
-        </section>
-      </section>
+          <section class="view-page" data-page="detail" aria-label="Stock details" hidden>
+            <section class="panel">
+              <div class="detail-controls"><label for="detailTickerInput"><span>Ticker</span><input id="detailTickerInput" type="search" placeholder="MSFT" autocomplete="off" spellcheck="false"></label><button id="detailButton" type="button">Open</button></div>
+              <div id="detailOutput" class="detail-output"><p class="empty-state">Enter a ticker to see its price, financials, and recent news.</p></div>
+            </section>
+          </section>
 
-      <section class="view-page" data-page="detail" hidden>
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Stock detail</p>
-              <h2>One ticker, full scan</h2>
-            </div>
-            <span class="disclaimer">Fresh fetch</span>
-          </div>
-          <p class="helper-text">Explore a stock's current price, financial results, risks, and company evidence.</p>
-          <div class="detail-controls">
-            <input id="detailTickerInput" type="search" placeholder="Example: MSFT">
-            <button id="detailButton" type="button">Analyze ticker</button>
-          </div>
-          <div id="detailOutput" class="detail-output">
-            <div class="empty-state">Enter a ticker or open one from the screener.</div>
-          </div>
-        </section>
-      </section>
+          <section class="view-page" data-page="portfolio" aria-label="Portfolio" hidden>
+            <section class="panel">
+              <div class="section-heading"><h2>Holdings</h2><button id="openHoldingEditor" class="ghost" type="button">Add or edit holdings</button></div>
+              <div id="portfolioReview" class="portfolio-review"><p class="empty-state">Add a holding to track its value and gain.</p></div>
+            </section>
+            <details class="panel portfolio-editor" id="portfolioEditor">
+              <summary class="control-summary"><strong>Add or edit holdings</strong></summary>
+              <div class="control-content">
+                <form id="holdingForm" class="holding-form" aria-describedby="portfolioInputHelp">
+                  <input id="holdingId" type="hidden">
+                  <label for="holdingTicker"><span>Ticker</span><input id="holdingTicker" type="text" placeholder="AAPL" autocomplete="off" spellcheck="false" required></label>
+                  <label for="holdingLabel"><span>Label <small>optional</small></span><input id="holdingLabel" type="text" placeholder="Apple" maxlength="120" autocomplete="off"></label>
+                  <label for="holdingShares"><span>Shares</span><input id="holdingShares" type="number" min="0.00000001" step="any" inputmode="decimal" required></label>
+                  <label for="holdingCost"><span>Average purchase price</span><input id="holdingCost" type="number" min="0" step="any" inputmode="decimal" placeholder="Per share" required></label>
+                  <label for="holdingCurrency"><span>Currency</span><select id="holdingCurrency"><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
+                  <div class="holding-form-actions"><button id="holdingSave" type="submit">Save holding</button><button id="holdingCancel" class="ghost" type="button" hidden>Cancel edit</button></div>
+                </form>
+                <p id="portfolioInputHelp" class="data-note">Saved in this browser. Totals use separate currencies; gains exclude fees, dividends, and taxes.</p>
+                <div id="holdingEditorMessage" class="holding-editor-message" role="status" aria-live="polite"></div>
+                <div id="holdingEditorRows" class="holding-editor-rows"></div>
+                <textarea id="myPortfolioInput" hidden aria-hidden="true" tabindex="-1"></textarea>
+              </div>
+            </details>
+          </section>
 
-      <section class="view-page" data-page="portfolio" hidden>
-        <details class="panel portfolio-editor" open>
-          <summary class="control-summary"><span><strong>Your holdings</strong><span>Track shares, purchase cost, and current value</span></span></summary>
-          <div class="control-content">
-            <form id="holdingForm" class="holding-form" aria-describedby="portfolioInputHelp">
-              <input id="holdingId" type="hidden">
-              <label for="holdingTicker"><span>Ticker</span><input id="holdingTicker" type="text" placeholder="e.g. AAPL" autocomplete="off" spellcheck="false" required></label>
-              <label for="holdingLabel"><span>Label <small>optional</small></span><input id="holdingLabel" type="text" placeholder="e.g. Apple" maxlength="120" autocomplete="off"></label>
-              <label for="holdingShares"><span>Number of shares</span><input id="holdingShares" type="number" min="0.00000001" step="any" inputmode="decimal" placeholder="e.g. 5" required></label>
-              <label for="holdingCost"><span>Average purchase price</span><input id="holdingCost" type="number" min="0" step="any" inputmode="decimal" placeholder="Per share" required></label>
-              <label for="holdingCurrency"><span>Purchase currency</span><select id="holdingCurrency"><option value="USD">USD · US dollar</option><option value="EUR">EUR · Euro</option><option value="GBP">GBP · Pound sterling</option><option value="JPY">JPY · Japanese yen</option><option value="CHF">CHF · Swiss franc</option><option value="CAD">CAD · Canadian dollar</option><option value="AUD">AUD · Australian dollar</option></select></label>
-              <div class="holding-form-actions"><button id="holdingSave" type="submit">Save holding</button><button id="holdingCancel" class="ghost" type="button" hidden>Cancel edit</button></div>
-            </form>
-            <p id="portfolioInputHelp" class="data-note">Gains update from qualified prices in the same currency as your purchase cost. Currency totals stay separate. Your holdings are saved in this browser.</p>
-            <div id="holdingEditorMessage" class="holding-editor-message" role="status" aria-live="polite"></div>
-            <div id="holdingEditorRows" class="holding-editor-rows"></div>
-            <textarea id="myPortfolioInput" hidden aria-hidden="true" tabindex="-1"></textarea>
-          </div>
-        </details>
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Personal portfolio</p>
-              <h2>Your current holdings</h2>
-            </div>
-            <span class="disclaimer">Position-aware</span>
-          </div>
-          <div id="portfolioReview" class="portfolio-review">
-            <div class="empty-state">Your portfolio review will appear after the live scan.</div>
-          </div>
-        </section>
-      </section>
+          <section class="view-page" data-page="performance" aria-label="Performance" hidden>
+            <section class="panel performance-panel" aria-labelledby="performanceHeading">
+              <div class="section-heading"><h2 id="performanceHeading">Recorded picks</h2><button id="exportRecommendations" class="ghost" type="button" disabled>Export</button></div>
+              <div id="performanceSummary" class="performance-summary" aria-label="Pick performance summary"></div>
+              <p id="performanceStatus" class="performance-status-line" role="status" aria-live="polite">Loading saved picks.</p>
+              <div id="performanceEmpty" class="performance-empty empty-state">No saved picks yet. Results appear after 5 and 21 matching trading sessions.</div>
+              <div id="performanceTable" class="performance-table-container"></div>
+              <details class="performance-method-disclosure"><summary>How returns are measured</summary><p class="performance-method">Each pick keeps its original date, evidence, and price. Returns are compared with SPY after 5 and 21 matching trading sessions. They exclude dividends, fees, taxes, and currency conversion. Records stay in this browser.</p></details>
+            </section>
+          </section>
 
-      <section class="view-page" data-page="ask" hidden>
-        <section class="panel ask-panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Ask the model</p>
-              <h2>Ask whether to sell a stock today</h2>
-            </div>
-            <span class="disclaimer">Deep answer</span>
-          </div>
-          <div class="ask-controls">
-            <input id="askInput" type="search" placeholder="Example: Should I sell Microsoft today?">
-            <button id="askButton" type="button">Ask</button>
-          </div>
-          <div id="askAnswer" class="ask-answer">
-            <div class="empty-state">Ask about a ticker or company name and the model will run a focused live stock scan.</div>
-          </div>
-        </section>
-      </section>
+          <section class="view-page" data-page="research" aria-label="Market and research" hidden>
+            <section class="panel"><div class="section-heading"><h2>Market conditions</h2></div><div id="marketForecast" class="forecast-box"><p class="empty-state">Waiting for market prices.</p></div></section>
+            <details class="panel analysis-disclosure"><summary>Index price charts</summary><div id="marketTrends" class="market-trends"><p class="empty-state">Waiting for price history.</p></div></details>
+            <details class="panel analysis-disclosure"><summary>News used in stock signals</summary><div id="researchEvidence" class="evidence-grid"><p class="empty-state">Waiting for company news.</p></div></details>
+            <details class="panel analysis-disclosure"><summary>Scoring inputs and coverage</summary><div id="marketFramework" class="framework-grid"><p class="empty-state">Waiting for the scan.</p></div></details>
+          </section>
 
-      <section class="view-page" data-page="signals" hidden>
-        <section class="panel primary-output">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Signal ranking</p>
-              <h2>Market signals ranked today</h2>
-            </div>
-            <span class="disclaimer">Not personal advice</span>
-          </div>
-          <div id="modelInstructions" class="model-instructions">
-            <div class="empty-state">Running live research...</div>
-          </div>
-        </section>
+          <section class="view-page" data-page="signals" aria-label="Signals" hidden>
+            <section class="panel"><div class="section-heading"><h2>Allocation signals</h2></div><div id="modelInstructions" class="model-instructions"><p class="empty-state">Waiting for the scan.</p></div></section>
+            <details class="panel analysis-disclosure"><summary>Sell and hold signals</summary><div id="sellGuidance" class="sell-guidance"><p class="empty-state">Waiting for prices.</p></div></details>
+            <details class="panel analysis-disclosure"><summary>Full stock ranking</summary><div id="analysisResults" class="analysis-results"><p class="empty-state">Waiting for the scan.</p></div></details>
+          </section>
 
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Exit model</p>
-              <h2>What the model would sell or hold</h2>
-            </div>
-            <span class="disclaimer">Watchlist only</span>
-          </div>
-          <div id="sellGuidance" class="sell-guidance">
-            <div class="empty-state">Sell and hold signals will appear after the live scan.</div>
-          </div>
-        </section>
+          <section class="view-page" data-page="ask" aria-label="Stock check" hidden>
+            <section class="panel ask-panel"><h2>Check a stock</h2><p class="helper-text">Checks the same price and news rules as the stock detail page.</p><div class="ask-controls"><input id="askInput" type="search" aria-label="Stock or company to check" placeholder="Should I sell Microsoft?"><button id="askButton" type="button">Check</button></div><div id="askAnswer" class="ask-answer"><p class="empty-state">Enter a stock or company name.</p></div></section>
+          </section>
 
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Full ranking</p>
-              <h2>All scanned tickers</h2>
-            </div>
-          </div>
-          <div id="analysisResults" class="analysis-results">
-            <div class="empty-state">Waiting for ranked output.</div>
-          </div>
-        </section>
-      </section>
-
-      <section class="view-page" data-page="performance" hidden>
-        <section class="panel performance-panel" aria-labelledby="performanceHeading">
-          <div class="section-heading">
-            <div><p class="eyebrow">Forward tracking</p><h2 id="performanceHeading">Recommendation performance</h2></div>
-            <button id="exportRecommendations" class="ghost" type="button" disabled>Export records</button>
-          </div>
-          <p class="performance-intro">Follow dated picks saved in this browser and compare their later price returns with SPY. Tracking starts when a pick is recorded; its original signal and evidence stay frozen.</p>
-          <div id="performanceSummary" class="performance-summary" aria-label="Recommendation tracking summary">
-            <article class="performance-metric"><span>Completed outcomes</span><strong>—</strong><small>After matching trading sessions</small></article>
-            <article class="performance-metric"><span>Pending outcomes</span><strong>—</strong><small>Waiting for enough price history</small></article>
-            <article class="performance-metric"><span>Unavailable outcomes</span><strong>—</strong><small>Missing qualified comparison data</small></article>
-          </div>
-          <p id="performanceStatus" class="performance-status-line" role="status" aria-live="polite">Loading the recommendations saved in this browser.</p>
-          <div id="performanceEmpty" class="performance-empty empty-state">No tracked recommendations yet. Qualified future picks will appear here with their recorded dates; price outcomes become available as trading sessions pass.</div>
-          <div id="performanceTable" class="performance-table-container"></div>
-          <p class="performance-method">Returns are checked after 5 and 21 matching stock and SPY trading sessions. Price returns exclude fees, dividends, and currency conversion. These records track signals; the app places no trades.</p>
-        </section>
-      </section>
-
-      <section class="view-page" data-page="research" hidden>
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Evidence</p>
-              <h2>Why the model chose this</h2>
-            </div>
-          </div>
-          <div id="researchEvidence" class="evidence-grid">
-            <div class="empty-state">Evidence will appear after the first live scan.</div>
-          </div>
-        </section>
-
-        <details class="panel analysis-disclosure">
-          <summary>How the model scores the market</summary>
-          <div id="marketFramework" class="framework-grid">
-            <div class="empty-state">Framework details will appear after the first scan.</div>
-          </div>
-        </details>
-      </section>
-
-      <section class="view-page" data-page="sources" hidden>
-        <section class="panel">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Source coverage</p>
-              <h2>Live sources checked</h2>
-            </div>
-          </div>
-          <div id="sourceStatus" class="source-grid">
-            <div class="empty-state">Source status will appear after the first live scan.</div>
-          </div>
-        </section>
-
-        <section class="source-note">
-          <strong>Data sources:</strong> Yahoo Finance intraday and one-year chart data plus a 260-source trusted universe scanned through GDELT live news JSON and direct RSS feeds where available, including official SEC, Fed, BLS, BEA, FTC, EIA, and ECB feeds. The app also checks broad-market proxies including SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GLD, USO, UUP, and VIX to estimate market regime. Signals are rules-based scores, not calibrated probabilities. Sample and stale data cannot generate investment signals. This app does not place trades or guarantee returns.
-        </section>
-      </section>
-    </main>
+          <section class="view-page" data-page="sources" aria-label="Data sources" hidden>
+            <section class="panel"><div class="section-heading"><h2>Source coverage</h2></div><div id="sourceStatus" class="source-grid"><p class="empty-state">Checking news sources.</p></div></section>
+            <details class="panel data-disclosure"><summary>Update diagnostics</summary><div id="dashboardStats" class="dashboard-stats"></div><div id="scanActivity" class="scan-activity"></div><h2 id="marketPulseTitle">Scan coverage</h2><div id="marketPulse" class="pulse-grid"></div></details>
+            <details class="panel data-disclosure"><summary>Data and limitations</summary><p class="source-note">Prices come from Yahoo Finance. Annual financials use SEC companyfacts, with Yahoo annual statements as a fallback. Earnings dates come from a limited set of issuer announcements. News is collected through GDELT and available RSS feeds. Scores use fixed rules; they are not probabilities. Missing or stale price history cannot produce signals. The app does not place trades.</p></details>
+          </section>
+        </main>
       </div>
     </div>
-
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-    <script type="module" src="app.js?v=20261005-fintech"></script>
+    <script type="module" src="app.js?v=20261008-minimal"></script>
   </body>
 </html>

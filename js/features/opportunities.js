@@ -22,46 +22,52 @@ export function renderOpportunities(results, marketContext) {
     weight: portfolio.groups.find((group) => group.currency === holding.currency)?.complete ? holding.weight : null
   })) });
   if (!model.candidates.length) {
-    container.innerHTML = `<div class="opportunity-empty"><span class="eyebrow">Research opportunities</span>
-      <h3>No qualified opportunity right now</h3><p>${escapeHtml(model.reason)}</p>
-      <p class="muted-line">The next scan will check recent market prices and direct company evidence again.</p></div>`;
+    container.innerHTML = `<div class="opportunity-empty"><h3>No stocks to review</h3><p>${escapeHtml(model.reason)}</p></div>`;
     return;
   }
   const watched = new Set(parseTickers(state.tickerInput));
-  container.innerHTML = model.candidates.slice(0, 3).map((candidate, index) => renderCandidate(candidate, index, watched)).join("");
+  container.innerHTML = model.candidates.slice(0, 3).map((candidate) => renderCandidate(candidate, watched)).join("");
 }
 
-function renderCandidate(candidate, index, watched) {
+function renderCandidate(candidate, watched) {
   const quote = candidate.quote || scanState.latestQuoteSnapshot?.byTicker?.get(candidate.ticker);
   const name = quote?.name || candidate.name || candidate.ticker;
-  const currency = quote?.currency || candidate.currency || "";
+  const currency = candidate.quote?.currency || candidate.currency || "";
   const score = Number.isFinite(candidate.score) ? candidate.score : null;
   const alreadyWatched = watched.has(candidate.ticker);
   const adding = busyTicker === candidate.ticker;
-  const signal = candidate.setup?.signal || candidate.label || "Research signal";
   const evidence = candidate.evidence || [];
-  const reasons = (candidate.reasons || []).slice(0, index === 0 ? 3 : 2);
-  const risks = (candidate.risks || []).slice(0, index === 0 ? 2 : 1);
+  const reasons = (candidate.reasons || []).filter((reason) => !/^Direct company coverage:/.test(reason));
+  const risks = candidate.risks || [];
+  const asOf = candidate.quote?.quoteTime || candidate.asOf;
+  const priceDate = dateValue(asOf) ? new Date(dateValue(asOf)).toISOString() : "";
   const invalidation = Number.isFinite(candidate.invalidation) && candidate.invalidation > 0
     ? `Below ${priceLabel(candidate.invalidation)}${currency ? ` ${escapeHtml(currency)}` : ""}` : "Unavailable";
   const owned = Number.isFinite(candidate.holdingWeight) && candidate.holdingWeight > 0;
-  return `<article class="opportunity-card${index === 0 ? " opportunity-lead" : ""}">
-    <div class="opportunity-head"><div><span class="eyebrow">${index === 0 ? "Leading research candidate" : `Alternative ${index}`}</span>
-      <h3><a href="#detail" data-detail-ticker="${escapeHtml(candidate.ticker)}">${escapeHtml(candidate.ticker)}</a></h3>
-      <span class="opportunity-name">${escapeHtml(name)}</span></div>
-      <div class="opportunity-price"><strong>${priceLabel(candidate.latest)}</strong>${currency ? `<span>${escapeHtml(currency)}</span>` : ""}</div>
+  return `<article class="opportunity-row">
+    <div class="opportunity-summary">
+      <div class="opportunity-identity"><h3><a href="#detail" data-detail-ticker="${escapeHtml(candidate.ticker)}">${escapeHtml(candidate.ticker)}</a></h3>
+        <span class="opportunity-name">${escapeHtml(name)}</span></div>
+      <div class="opportunity-price"><strong>${priceLabel(candidate.latest)}</strong>${currency ? `<span>${escapeHtml(currency)}</span>` : ""}
+        ${priceDate ? `<time datetime="${escapeHtml(priceDate)}">${escapeHtml(dateLabel(asOf))}</time>` : '<span>Date unavailable</span>'}</div>
+      <div class="opportunity-context"><p class="opportunity-reason">${escapeHtml(reasons[0] || "")}</p>
+        ${score === null ? "" : `<small class="opportunity-score">Technical score ${escapeHtml(score)}/100</small>`}</div>
+      <div class="opportunity-actions"><a class="button secondary" href="#detail" data-detail-ticker="${escapeHtml(candidate.ticker)}">View analysis</a>
+        ${alreadyWatched ? '<small class="opportunity-watchlist-status">On watchlist</small>'
+    : `<button type="button" class="button" data-opportunity-ticker="${escapeHtml(candidate.ticker)}" ${busyTicker ? "disabled" : ""}>${adding ? "Checking…" : "Add to watchlist"}</button>`}</div>
     </div>
-    <div class="opportunity-strength"><span class="signal-pill">${escapeHtml(signal)}</span>
-      <strong>Model strength ${score === null ? "—" : `${escapeHtml(score)}/100`}</strong></div>
-    <div class="opportunity-reasons"><h4>Why it qualifies</h4><ul>${reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul></div>
-    <div class="opportunity-risks"><h4>Risks to watch</h4><ul>${risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul></div>
-    <dl class="opportunity-meta"><div><dt>Timeframe</dt><dd>${escapeHtml(candidate.horizon || "Unavailable")}</dd></div>
-      <div><dt>Signal invalidation</dt><dd>${invalidation}</dd></div>
-      <div><dt>Real price history as of</dt><dd>${escapeHtml(dateLabel(candidate.asOf))}</dd></div>
-      ${owned ? `<div><dt>Already held</dt><dd>${candidate.holdingWeight.toFixed(1)}% of entered portfolio</dd></div>` : ""}</dl>
-    <details class="opportunity-sources"><summary>Direct company evidence (${evidence.length})</summary>${evidence.map(renderEvidence).join("")}</details>
-    <div class="opportunity-actions"><a class="button secondary" href="#detail" data-detail-ticker="${escapeHtml(candidate.ticker)}">View analysis <span aria-hidden="true">↗</span></a>
-      <button type="button" class="button" data-opportunity-ticker="${escapeHtml(candidate.ticker)}" ${alreadyWatched || busyTicker ? "disabled" : ""}>${adding ? "Checking…" : alreadyWatched ? "On your watchlist" : "Add to watchlist"}</button></div>
+    <details class="opportunity-evidence"><summary>Why this stock?</summary><div class="opportunity-evidence-body">
+      ${reasons.length > 1 ? `<section class="opportunity-evidence-section opportunity-reasons"><h4>Price setup</h4>
+        <ul>${reasons.slice(1).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul></section>` : ""}
+      <section class="opportunity-evidence-section opportunity-sources"><h4>Company headlines</h4>${evidence.map(renderEvidence).join("")}</section>
+      <section class="opportunity-evidence-section opportunity-risks"><h4>Risks</h4>
+        <ul>${risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul></section>
+      <section class="opportunity-evidence-section opportunity-parameters"><h4>Setup limits</h4>
+        <dl class="opportunity-meta"><div><dt>Timeframe</dt><dd>${escapeHtml(candidate.horizon || "Unavailable")}</dd></div>
+          <div><dt>Setup invalidation</dt><dd>${invalidation}</dd></div>
+          <div><dt>Price history</dt><dd>${escapeHtml(dateLabel(candidate.asOf))}</dd></div>
+          ${owned ? `<div><dt>Already held</dt><dd>${candidate.holdingWeight.toFixed(1)}% of a portfolio currency group</dd></div>` : ""}</dl></section>
+    </div></details>
   </article>`;
 }
 
@@ -118,7 +124,7 @@ function setMessage(message) {
 
 function dateLabel(value) {
   const time = dateValue(value);
-  return time ? new Date(time).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Date unavailable";
+  return time ? new Date(time).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "Date unavailable";
 }
 
 function priceLabel(value) {

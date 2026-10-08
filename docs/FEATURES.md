@@ -10,7 +10,7 @@ Each feature is delivered in its own commit. This log records the behavior, impl
 
 **Validation:** Tests cover sample/stale/mixed data, weekends, duplicate dates, quote timestamps, deterministic scoring, and company-name/keyword false matches. Existing portfolio and storage regression checks remain in place.
 
-## 2. Evidence-led stock opportunities
+## 2. Stock discovery
 
 **What changed:** The overview highlights one leading stock and up to two alternatives, with reasons, risks, dated article links, price-history timestamps, timeframe, and invalidation. A qualified stock can be added to the watchlist or opened for a full analysis. Empty states explain when no opportunity passes the checks.
 
@@ -53,3 +53,11 @@ Each feature is delivered in its own commit. This log records the behavior, impl
 **How:** Only complete fresh scans record qualified candidates, once per ticker per UTC day. Stock and benchmark baselines use the same date and currency. Outcomes require later matched dates and exclude today's incomplete bar. Known splits block unadjusted comparisons. Mature observations persist when older histories disappear; averages include only mature results. No historical picks, trade fills, dividends, fees, or currency conversion are assumed.
 
 **Validation:** Tests cover immutable recording, duplicate refreshes, fresh-scan guards, exact matching sessions, missing/currency/stale/sample data, split events, mature observation retention, storage failures, and the export payload. Browser checks cover the new page, pending results, frozen evidence, ticker links, reload persistence, and responsive layout.
+
+## 7. Minimal layout and plain copy
+
+**What changed:** Overview has two sections: stocks to review and six saved watchlist tickers. Prices, dates, and one reason appear in simple rows; evidence and risks expand on demand. Overview, Watchlist, Portfolio, and Performance are the four main destinations. Stock details, market research, signals, stock checks, and source diagnostics remain under More. Rounded corners, decorative cards, taglines, and repeated explanatory text were removed.
+
+**How:** The layout uses square controls, flat sections, and thin separators. Watchlist editing and filters, portfolio editing, technical checks, and scan diagnostics start collapsed. Watchlist results include only saved tickers; more than 40 matching rows remain accessible in a disclosure. New browser filter settings show all signals without a minimum score or liquidity floor; saved settings remain intact. The existing analysis rules, data-quality checks, and browser storage keys are retained. Index charts show qualified SPY/QQQ history and report unavailable data explicitly.
+
+**Validation:** All 126 module tests pass. Navigation tests cover all nine direct routes, unknown routes, and ticker search. Watchlist tests cover discovery exclusion, missing volume with no liquidity floor, long lists, and unavailable histories. Focused rendering checks cover overview quotes, opportunity actions, disclosures, and empty or unavailable data. Browser automation failed to start in this session, so the visual layout still needs a browser review.

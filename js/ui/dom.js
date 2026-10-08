@@ -2,7 +2,6 @@
 
 export const els = {
   pageTitle: document.getElementById("pageTitle"),
-  pageDescription: document.getElementById("pageDescription"),
   quickSearchForm: document.getElementById("quickSearchForm"),
   quickSearchInput: document.getElementById("quickSearchInput"),
   dataStatus: document.getElementById("dataStatus"),

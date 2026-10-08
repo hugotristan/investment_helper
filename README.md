@@ -1,6 +1,6 @@
 # Investing tool
 
-A multi-page stock market dashboard hosted on GitHub Pages that produces ranked market signals for today's watchlist.
+A personal stock research app hosted on GitHub Pages, with a watchlist, holdings, and dated research picks saved in your browser.
 
 ## Run It
 
@@ -32,17 +32,18 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 ## What It Does
 
 - Runs immediately when the page opens.
-- Uses a dark fintech dashboard with blue accents, sidebar navigation, compact stock cards, price-history charts, a portfolio allocation summary, responsive layouts, and reduced-motion fallbacks.
-- Provides one-month, three-month, and one-year chart views, with labels when only shorter history is available. The header ticker search opens a fresh stock detail scan.
-- Chart hover, touch, and keyboard controls reveal exact dates and closing prices. The overview separates your watchlist from stock discovery; technical scoring and longer evidence are expandable on detail pages.
+- Opens to two sections: up to three stocks to review and six saved watchlist tickers. Rows show prices, dates, and concrete reasons; supporting evidence and risks are expandable.
+- Uses square controls, flat sections, thin separators, and responsive layouts. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
+- Provides one-month, three-month, and one-year charts under Market & research, plus a closing-price chart on stock details. The header ticker search opens a fresh stock detail scan.
+- Market chart hover, touch, and keyboard controls reveal exact dates and closing prices. Technical checks, scoring inputs, and longer explanations are expandable.
 - Reopens the last qualified browser-local scan immediately with its original timestamp. Fresh prices render before the longer background news scan completes, with a clear preliminary status. Invalid, stale, oversized, and sample caches are rejected.
 - Refreshes automatically on a slower cadence, and lets slow source scans run longer when needed so each output is a fuller consolidated review.
 - Pulls Yahoo Finance chart data for watchlist price history and broad-market proxy data.
 - Pulls Yahoo Finance intraday chart data for current/latest price, day change, day range, volume, exchange metadata, and 52-week range when available.
 - Starts with a broad cross-sector opportunity universe across index ETFs, sector ETFs, mega caps, semiconductors, software, internet, financials, energy, healthcare, consumer, industrials, defense, and materials.
-- Shows the watchlist as removable ticker chips with a compact preview, an expandable full list, an add-tickers field, and a collapsible text editor for bulk changes.
-- Checks new watchlist symbols against live Yahoo Finance metadata before saving, accepting only stocks and ETFs. Bulk edits use an Apply changes button and the same validation. Unknown symbols, unsupported instruments, and temporary lookup failures leave the saved watchlist unchanged.
-- Adds a live screener page that filters the current scan by signal type, minimum score, liquidity, momentum, risk control, and volume pressure.
+- Shows saved watchlist tickers as compact price and signal rows. Edit watchlist opens removable tickers, an add-tickers field, and a text editor for bulk changes.
+- Checks new watchlist symbols against live Yahoo Finance metadata before saving, accepting only stocks and ETFs. Bulk edits use Save tickers and the same validation. Unknown symbols, unsupported instruments, and temporary lookup failures leave the saved watchlist unchanged.
+- Filters and sorts your saved watchlist by signal type, minimum score, liquidity, momentum, risk control, and volume pressure. Filters are collapsed initially; new browser settings show all signals with no minimum score or liquidity threshold.
 - Adds a stock detail page that runs a fresh single-ticker quote, chart, technical, news, outlook, and market-context scan.
 - Pulls and analyzes a 260-source trusted stock-market universe for current headlines and macro context when available.
 - Scores trend, momentum, RSI, MACD, Bollinger position, ATR, volatility, drawdown, volume pressure, liquidity, event risk, cross-source headline tone, trusted market outlook tone, source breadth, diversification, and local score changes.
@@ -54,7 +55,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 - Shows annual company fundamentals from SEC XBRL snapshots, with Yahoo Finance annual statements as a fallback: revenue, net income, operating/free cash flow, supported debt, growth, and annual diluted EPS valuation. Each metric names its source and reporting period. SEC data includes filing links; Yahoo data uses provider reporting dates and does not invent filing dates. Missing facts stay unavailable. Snapshots refresh on deployment and daily.
 - Produces a rules-based market-regime score using qualified equity breadth, VIX, credit appetite, bond/rate pressure, dollar pressure, oil, and gold histories.
 - Outputs model allocations by ticker and percentage.
-- Answers focused natural-language questions such as "Should I sell Intel stock today?" or "Should I sell Microsoft today?"
+- Provides a Stock check tool for focused questions such as "Should I sell Microsoft?", using the same fixed price and news rules as stock details.
 - Shows sell/reduce and do-not-sell/hold signals for the current watchlist.
 - Saves structured holdings with shares, average purchase price, and currency. Calculates current value and unrealized gain from qualified matching-currency prices, with separate totals for each currency.
 - Shows a "do not buy today" ticker from the weakest setup.
@@ -93,7 +94,7 @@ The market-regime score combines qualified SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GL
 
 Sources can explain and score candidates, but they cannot recommend a stock the app never scans. The default watchlist now includes a much wider opportunity universe instead of only SPY, QQQ, AAPL, MSFT, NVDA, TSLA, JPM, XOM, and UNH. Changing the watchlist or portfolio holdings automatically schedules a fresh scan.
 
-The personal portfolio starts empty. On My portfolio, enter a stock/ETF symbol, shares, average purchase price, and purchase currency, then select Save holding. New symbols are validated before saving. Qualified matching-currency quotes calculate current value, cost basis, unrealized gain, and allocation within each currency. Totals keep different currencies separate; gains exclude fees, dividends, taxes, and currency conversion. Missing or stale prices remain unavailable.
+The personal portfolio starts empty. On Portfolio, select Add or edit holdings, enter a stock/ETF symbol, shares, average purchase price, and purchase currency, then select Save holding. New symbols are validated before saving. Qualified matching-currency quotes calculate current value, cost basis, unrealized gain, and allocation within each currency. Totals keep different currencies separate; gains exclude fees, dividends, taxes, and currency conversion. Missing or stale prices remain unavailable.
 
 Existing text entries are preserved as manual amounts until edited into structured holdings; the app does not infer share counts or purchase prices. Holdings can be edited, removed, and restored with Undo. Saved holdings stay in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
 

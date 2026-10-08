@@ -102,7 +102,7 @@ function setWatchlistValidating(busy) {
 export function bindWatchlistEvents(onChange) {
   onWatchlistChange = onChange;
   els.tickerInput.addEventListener("input", () => {
-    els.watchlistMessage.textContent = "Draft changes. Choose Apply changes to check new symbols and save.";
+    els.watchlistMessage.textContent = "Unsaved changes. Choose Save tickers to check new symbols and save.";
   });
   els.watchlistApplyButton.addEventListener("click", () => {
     saveWatchlistInput(els.tickerInput.value, true);
