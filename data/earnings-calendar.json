@@ -5,16 +5,72 @@
     "JNJ": {
       "date": "2026-10-13",
       "status": "confirmed",
-      "source": "Johnson & Johnson investor announcement",
-      "sourceUrl": "https://www.jnj.com/media-center/press-releases/johnson-johnson-to-host-investor-conference-call-on-second-quarter-results-2026",
-      "verifiedAt": "2026-10-05"
+      "source": "Johnson & Johnson third-quarter investor conference call announcement",
+      "sourceUrl": "https://www.jnj.com/media-center/press-releases/johnson-johnson-host-investor-conference-call-on-third-quarter-results",
+      "verifiedAt": "2026-10-07"
     },
     "MRK": {
       "date": "2026-10-29",
       "status": "confirmed",
-      "source": "Merck investor relations",
-      "sourceUrl": "https://www.msd.com/investor-relations/",
-      "verifiedAt": "2026-10-05"
+      "source": "Merck third-quarter sales and earnings conference call announcement",
+      "sourceUrl": "https://www.merck.com/news/merck-to-hold-third-quarter-2026-sales-and-earnings-conference-call-oct-29/",
+      "verifiedAt": "2026-10-07"
+    },
+    "AAPL": {
+      "date": "2026-11-02",
+      "status": "confirmed",
+      "source": "Apple FY26 fourth-quarter results investor event",
+      "sourceUrl": "https://investor.apple.com/event-details/2026/FY-26-Fourth-Quarter-Results/default.aspx",
+      "verifiedAt": "2026-10-07"
+    },
+    "GOOGL": {
+      "date": "2026-10-28",
+      "status": "confirmed",
+      "source": "Alphabet third-quarter financial results conference call announcement",
+      "sourceUrl": "https://abc.xyz/investor/news/news-details/2026/Alphabet-Announces-Date-of-Third-Quarter-2026-Financial-Results-Conference-Call-2026-8tpGZsLS6v/default.aspx",
+      "verifiedAt": "2026-10-07"
+    },
+    "NVDA": {
+      "date": "2026-11-17",
+      "status": "confirmed",
+      "source": "NVIDIA Q2 FY2027 earnings call transcript, next earnings date on page 15",
+      "sourceUrl": "https://investor.nvidia.com/files/content_files/TRANSCRIPT_-NVIDIA-Corp-NVDA-US-Q2-2027-Earnings-Call-26-August-2026-5_00-PM-ET.pdf",
+      "verifiedAt": "2026-10-07"
+    },
+    "AMD": {
+      "date": "2026-11-03",
+      "status": "confirmed",
+      "source": "AMD fiscal third-quarter financial results announcement",
+      "sourceUrl": "https://ir.amd.com/news-events/press-releases/detail/1300/amd-to-report-fiscal-third-quarter-2026-financial-results",
+      "verifiedAt": "2026-10-07"
+    },
+    "TSLA": {
+      "date": "2026-10-21",
+      "status": "confirmed",
+      "source": "Tesla third-quarter production release and financial results webcast announcement",
+      "sourceUrl": "https://ir.tesla.com/press-release/tesla-third-quarter-2026-production-deliveries-and-deployments",
+      "verifiedAt": "2026-10-07"
+    },
+    "NFLX": {
+      "date": "2026-10-20",
+      "status": "confirmed",
+      "source": "Netflix third-quarter financial results announcement",
+      "sourceUrl": "https://ir.netflix.net/investor-news-and-events/financial-releases/press-release-details/2026/Netflix-to-Announce-Third-Quarter-2026-Financial-Results/default.aspx",
+      "verifiedAt": "2026-10-07"
+    },
+    "JPM": {
+      "date": "2026-10-13",
+      "status": "confirmed",
+      "source": "JPMorganChase third-quarter earnings call announcement",
+      "sourceUrl": "https://www.jpmorganchase.com/ir/news/2026/jpmc-to-host-third-quarter-2026-earnings-call",
+      "verifiedAt": "2026-10-07"
+    },
+    "TSM": {
+      "date": "2026-10-15",
+      "status": "confirmed",
+      "source": "TSMC third-quarter earnings conference investor event",
+      "sourceUrl": "https://investor.tsmc.com/english/quarterly-results/2026/q3",
+      "verifiedAt": "2026-10-07"
     }
   }
 }

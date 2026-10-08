@@ -24,7 +24,11 @@ Each feature is delivered in its own commit. This log records the behavior, impl
 
 **How:** A throttled Node generator normalizes SEC companyfacts into a same-origin snapshot for GitHub Pages. It selects full annual periods and comparable units, deduplicates restatements, and derives free cash flow only from matching cash-flow/capex periods. Deployment and daily workflows refresh the snapshot and cache successful prior facts. Dates come from a limited curated issuer-announcement calendar, expire after the event, and are never extrapolated.
 
+**Provider reliability follow-up:** A failed SEC ticker lookup no longer prevents all company requests. A dated, verified SEC mapping snapshot provides a bounded fallback, with issuer identity checks and independent mapping verification dates. SEC remains preferred; Yahoo Finance annual statements supply usable facts when SEC is blocked or lacks supported annual data. Yahoo sources are explicitly labelled, use provider reporting dates, and contain no invented SEC filing information. Only reported Yahoo free cash flow is accepted. SEC diagnostics remain visible when Yahoo succeeds; failed refreshes retain original financial retrieval dates. The confirmed earnings calendar now covers ten configured companies.
+
 **Validation:** Tests cover annual/quarterly distinctions, restatements, currencies, missing debt, retained snapshots after provider failure, valuation, provenance, and unavailable/ETF states. The local SEC endpoint returned HTTP 403; provider failure is handled without fabricated metrics.
+
+**Follow-up validation:** All 120 module tests pass, including provider fallback, identity mismatches, mapping age, retained acquisition dates, Yahoo annual provenance, currency checks, retry limits, and rendered diagnostics. A real update on October 8, 2026 retrieved usable Yahoo annual financials for all 62 configured stocks, with ten confirmed earnings dates. Individual unsupported metrics remain unavailable. SEC still returned HTTP 403.
 
 ## 4. Clearer screens and faster feedback
 

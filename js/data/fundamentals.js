@@ -16,18 +16,19 @@ async function fetchSnapshot() {
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const response = await fetch(SNAPSHOT_URL, { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
-    if (!response.ok) throw new Error("Snapshot request failed");
+    if (!response.ok) throw new Error(`Published snapshot request returned HTTP ${response.status}.`);
     const snapshot = await response.json();
     if (snapshot?.schemaVersion !== 1 || !snapshot.byTicker || typeof snapshot.byTicker !== "object" || Array.isArray(snapshot.byTicker)) {
       throw new Error("Snapshot format is unavailable");
     }
     return snapshot;
-  } catch {
+  } catch (error) {
     // Short-lived failure caching avoids duplicate requests while still letting
     // a later detail scan recover after deployment or a temporary outage.
     cacheUntil = Date.now() + 60 * 1000;
-    return { schemaVersion: 1, generatedAt: null, provider: "SEC companyfacts", byTicker: {}, available: false,
-      reason: "The published company filings snapshot is unavailable. Financial values are not estimated." };
+    return { schemaVersion: 1, generatedAt: null, provider: "Company fundamentals snapshot", byTicker: {}, available: false,
+      snapshotStatus: "unavailable", providerStatus: "unknown",
+      reason: `The published company fundamentals snapshot is unavailable. ${error?.message || "The snapshot could not be loaded."} Financial values are not estimated.` };
   } finally {
     clearTimeout(timeout);
   }

@@ -44,7 +44,7 @@ jobs:
           restore-keys: |
             fundamentals-
 
-      - name: Refresh SEC fundamentals snapshot
+      - name: Refresh company fundamentals snapshot
         run: node scripts/update-fundamentals.mjs
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
