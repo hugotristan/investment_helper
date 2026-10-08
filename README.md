@@ -33,7 +33,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 
 - Runs immediately when the page opens.
 - Opens to an index-performance chart, a graph of six saved watchlist tickers' one-day moves, and up to three stocks to review. Prices, dates, and concrete reasons remain available; supporting evidence and risks are expandable.
-- Uses a light canvas, white square panels, a fixed desktop sidebar, and compact navigation icons. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
+- Uses a soft grey canvas, slightly lighter square panels, a fixed desktop sidebar, and compact navigation icons. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
 - Compares SPY and QQQ percentage changes from the same displayed daily-close baseline over one month, three months, or one year. Missing or unqualified history has an explicit unavailable state.
 - Provides one-month, three-month, and one-year charts under Market & research, plus a closing-price chart on stock details. The header ticker search opens a fresh stock detail scan.
 - Market chart hover, touch, and keyboard controls reveal dates, closing prices, and relative changes. Technical checks, scoring inputs, and longer explanations are expandable.

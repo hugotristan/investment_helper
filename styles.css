@@ -1,20 +1,20 @@
 :root {
   color-scheme: light;
-  --background: #fafafa;
+  --background: #d4d8dc;
   --foreground: #171717;
-  --muted: #f5f5f5;
-  --muted-strong: #ededed;
-  --muted-foreground: #646464;
-  --accent: #047857;
+  --muted: #d5d9dd;
+  --muted-strong: #cbd1d6;
+  --muted-foreground: #505a64;
+  --accent: #03664b;
   --accent-strong: #065f46;
   --accent-foreground: #fff;
-  --border: #e5e5e5;
-  --border-strong: #d4d4d4;
-  --input: #fff;
-  --card: #fff;
-  --good: #047857;
+  --border: #bcc4cb;
+  --border-strong: #7e8a95;
+  --input: #e8ebed;
+  --card: #e2e5e8;
+  --good: #03664b;
   --warn: #92400e;
-  --bad: #b91c1c;
+  --bad: #991b1b;
   --info: var(--accent);
   --container: 1380px;
 }
@@ -52,7 +52,7 @@ small { font-size: .75rem; }
 summary { cursor: pointer; }
 dl { margin: 0; }
 
-/* A light workspace and a quiet, persistent sidebar. */
+/* A soft grey workspace and a quiet, persistent sidebar. */
 .app-layout { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
 .sidebar { position: sticky; top: 0; display: flex; flex-direction: column; align-self: start; min-height: 100vh; height: 100vh; overflow-y: auto; padding: 28px 16px 24px; border-right: 1px solid var(--border); background: var(--card); scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .sidebar-brand, .sidebar-brand:visited { display: flex; align-items: center; gap: 12px; margin: 0 12px 38px; color: var(--foreground); font-size: 1.05rem; font-weight: 600; }
@@ -115,17 +115,17 @@ dl { margin: 0; }
 .market-chart-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 14px; }
 .market-chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; color: var(--muted-foreground); font-size: .75rem; }
 .market-chart-legend > span { display: inline-flex; align-items: center; gap: 7px; }
-.market-legend-swatch { display: inline-block; width: 20px; height: 0; flex-shrink: 0; border-top: 2px solid #059669; }
+.market-legend-swatch { display: inline-block; width: 20px; height: 0; flex-shrink: 0; border-top: 2px solid var(--good); }
 .market-legend-swatch.market-series-benchmark { border-top-color: #64748b; border-top-style: dashed; }
 .market-chart-periods { display: flex; gap: 3px; }
 .market-chart-periods button { min-height: 30px; padding: 5px 9px; border: 1px solid transparent; background: transparent; color: var(--muted-foreground); font-family: "JetBrains Mono", Consolas, monospace; font-size: .75rem; }
 .market-chart-periods button:hover { background: var(--muted); color: var(--foreground); }
 .market-chart-periods button.active, .market-chart-periods button[aria-pressed="true"] { border-color: var(--border); background: var(--muted); color: var(--foreground); }
 .market-comparison-chart { display: block; width: 100%; height: 300px; overflow: visible; cursor: crosshair; touch-action: pan-y; }
-.market-series-primary { color: #047857; stroke: #059669; }
+.market-series-primary { color: var(--good); stroke: var(--good); }
 .market-series-benchmark { color: #64748b; stroke: #64748b; stroke-dasharray: 6 4; }
 .market-comparison-chart path.market-series-primary, .market-comparison-chart path.market-series-benchmark { fill: none; stroke-width: 2; vector-effect: non-scaling-stroke; }
-.market-chart-area { fill: #059669; fill-opacity: .05; stroke: none; }
+.market-chart-area { fill: var(--good); fill-opacity: .05; stroke: none; }
 .market-chart-grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .market-chart-zero { stroke: #8a8a8a; stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
 .market-chart-cursor { stroke: #737373; stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; pointer-events: none; }
