@@ -2,6 +2,7 @@ import { formatNumber, formatPercent } from "../shared/format.js";
 import { parseTickers } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
+import { renderIndexComparison, renderWatchlistMoves } from "./market-chart.js";
 
 const periods = { "1M": 1, "3M": 3, "1Y": 12 };
 const selectedPeriods = new Map();
@@ -28,10 +29,8 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
       <strong class="stat-value">${escapeHtml(value)}</strong>
       <span class="stat-note">${escapeHtml(note)}</span>
     </article>`).join(""));
-  const watched = parseTickers(state.tickerInput).slice(0, 6);
-  setHtml("featuredStocks", watched.length ? `<ul class="watchlist-overview">${watched.map((ticker) =>
-    featuredStock(results.find((item) => item.ticker === ticker) || { ticker }, quotes, priceSource)).join("")}</ul>`
-    : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>');
+  renderIndexComparison(results, priceSource);
+  renderWatchlistMoves(results, parseTickers(state.tickerInput), quotes, priceSource);
   renderTrends();
   const top = qualified[0];
   const excludedCount = results.length - qualified.length;
@@ -46,32 +45,6 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
       <div><span class="activity-label">${escapeHtml(label)}</span><strong class="activity-title">${escapeHtml(title)}</strong>
       <span class="activity-note">${escapeHtml(note)}</span></div>
     </div>`).join(""));
-}
-
-function featuredStock(item, quotes, priceSource) {
-  const quote = item.quote || quotes?.byTicker?.get(item.ticker);
-  const quoteTime = quote?.quoteTime ? new Date(quote.quoteTime).getTime() : NaN;
-  const now = Date.now();
-  const qualified = item.dataQuality?.eligible && Number.isFinite(item.score) && !isSample(item, priceSource);
-  const historyTime = new Date(item.dataQuality?.asOf || "").getTime();
-  const recentQuote = Number.isFinite(quote?.price) && quote.price > 0 && Number.isFinite(quoteTime)
-    && quoteTime <= now && now - quoteTime <= 7 * 86400000
-    && (!quote.ticker || quote.ticker === item.ticker)
-    && (!qualified || !Number.isFinite(historyTime) || quoteTime >= historyTime)
-    && (!qualified || !item.currency || quote.currency === item.currency);
-  const price = recentQuote ? quote.price : qualified ? item.latest : null;
-  const currency = recentQuote ? quote.currency : item.currency;
-  const change = recentQuote ? quote.dayChangePercent : qualified ? item.oneDay : null;
-  const asOf = recentQuote ? quote.quoteTime : qualified ? item.dataQuality.asOf : null;
-  const signal = qualified ? item.setup?.signal || item.label : item.dataQuality?.label || "Not scanned";
-  return `<li class="watchlist-overview-row">
-    <div class="watchlist-overview-name"><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a>
-      <span>${escapeHtml(quote?.name || item.name || item.ticker)}</span></div>
-    <div class="watchlist-overview-price"><strong>${Number.isFinite(price) ? `${escapeHtml(new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price))}${currency ? ` ${escapeHtml(currency)}` : ""}` : "Unavailable"}</strong>
-      <small>${asOf ? escapeHtml(dateLabel(asOf)) : "Price unavailable"}</small></div>
-    <div class="watchlist-overview-change ${changeClass(change)}"><span>${percentLabel(change)}</span><small>Today</small></div>
-    <span class="watchlist-overview-signal">${escapeHtml(signal || "Unavailable")}</span>
-  </li>`;
 }
 
 function renderTrends() {

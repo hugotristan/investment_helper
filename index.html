@@ -7,17 +7,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261008-minimal">
+    <link rel="stylesheet" href="styles.css?v=20261008-charts">
   </head>
   <body>
     <div class="app-layout">
       <aside class="sidebar">
-        <a class="sidebar-brand" href="#dashboard" aria-label="Investing home"><span class="brand-text">Investing</span></a>
+        <a class="sidebar-brand" href="#dashboard" aria-label="Investing home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 18V6M4 18h16M7 14l4-4 4 2 5-6" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="brand-text">Investing</span></a>
+        <p class="nav-section-label">Workspace</p>
         <nav class="page-nav" aria-label="Main pages">
-          <a href="#dashboard" data-page-link="dashboard">Overview</a>
-          <a href="#screener" data-page-link="screener">Watchlist</a>
-          <a href="#portfolio" data-page-link="portfolio">Portfolio</a>
-          <a href="#performance" data-page-link="performance">Performance</a>
+          <a href="#dashboard" data-page-link="dashboard"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span><span class="nav-label">Overview</span></a>
+          <a href="#screener" data-page-link="screener"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h2M3 12h2M3 18h2M9 6h12M9 12h12M9 18h12"/></svg></span><span class="nav-label">Watchlist</span></a>
+          <a href="#portfolio" data-page-link="portfolio"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18v14H3zM8 7V3h8v4M3 12h18M10 12v3h4v-3"/></svg></span><span class="nav-label">Portfolio</span></a>
+          <a href="#performance" data-page-link="performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/></svg></span><span class="nav-label">Performance</span></a>
         </nav>
         <details class="nav-more" id="navMore">
           <summary>More</summary>
@@ -29,11 +30,11 @@
             <a href="#sources" data-page-link="sources">Data sources</a>
           </nav>
         </details>
-        <p class="workspace-badge">Saved in this browser</p>
+        <div class="sidebar-footer"><p class="workspace-badge">Saved in this browser</p></div>
       </aside>
       <div class="workspace">
         <header class="topbar">
-          <h1 id="pageTitle" class="hero-title">Overview</h1>
+          <div class="page-title-group"><h1 id="pageTitle" class="hero-title">Overview</h1></div>
           <div class="top-actions">
             <form id="quickSearchForm" class="quick-search" role="search" aria-label="Find a stock">
               <input id="quickSearchInput" type="search" aria-label="Stock or ETF ticker" placeholder="Find a ticker" autocomplete="off" spellcheck="false">
@@ -52,14 +53,20 @@
         </header>
         <main class="app-shell">
           <section class="view-page active" data-page="dashboard" aria-label="Overview">
+            <div class="overview-visual-grid">
+              <section class="panel market-overview-panel" aria-labelledby="marketChartHeading">
+                <div class="panel-heading"><div><h2 id="marketChartHeading">Index performance</h2><p class="panel-description">Change since the first displayed daily close.</p></div><a href="#research">Market research ↗</a></div>
+                <div id="overviewMarketChart"><p class="empty-state">Waiting for SPY and QQQ price history.</p></div>
+              </section>
+              <section class="panel watchlist-moves-panel" aria-labelledby="watchlistMovesHeading">
+                <div class="panel-heading"><div><h2 id="watchlistMovesHeading">Watchlist moves</h2><p class="panel-description">1-day price change</p></div><a href="#screener">View all ↗</a></div>
+                <div id="watchlistMoves"><p class="empty-state">Waiting for your watchlist prices.</p></div>
+              </section>
+            </div>
             <section class="panel overview-section opportunities-panel" aria-labelledby="opportunityHeading">
               <div class="panel-heading"><h2 id="opportunityHeading">Stocks to review</h2><a href="#performance">Past picks ↗</a></div>
               <div id="opportunityCards" class="opportunity-cards"><p class="empty-state">Checking prices and recent company news.</p></div>
               <p id="opportunityMessage" role="status" aria-live="polite"></p>
-            </section>
-            <section class="panel overview-section" aria-labelledby="overviewWatchlistHeading">
-              <div class="panel-heading"><h2 id="overviewWatchlistHeading">Your watchlist</h2><a href="#screener">View all ↗</a></div>
-              <div id="featuredStocks" class="featured-stocks"><p class="empty-state">Loading watchlist prices.</p></div>
             </section>
           </section>
 
@@ -164,6 +171,6 @@
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="app.js?v=20261008-minimal"></script>
+    <script type="module" src="app.js?v=20261008-charts"></script>
   </body>
 </html>

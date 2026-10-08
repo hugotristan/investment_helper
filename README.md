@@ -32,10 +32,11 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 ## What It Does
 
 - Runs immediately when the page opens.
-- Opens to two sections: up to three stocks to review and six saved watchlist tickers. Rows show prices, dates, and concrete reasons; supporting evidence and risks are expandable.
-- Uses square controls, flat sections, thin separators, and responsive layouts. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
+- Opens to an index-performance chart, a graph of six saved watchlist tickers' one-day moves, and up to three stocks to review. Prices, dates, and concrete reasons remain available; supporting evidence and risks are expandable.
+- Uses a light canvas, white square panels, a fixed desktop sidebar, and compact navigation icons. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
+- Compares SPY and QQQ percentage changes from the same displayed daily-close baseline over one month, three months, or one year. Missing or unqualified history has an explicit unavailable state.
 - Provides one-month, three-month, and one-year charts under Market & research, plus a closing-price chart on stock details. The header ticker search opens a fresh stock detail scan.
-- Market chart hover, touch, and keyboard controls reveal exact dates and closing prices. Technical checks, scoring inputs, and longer explanations are expandable.
+- Market chart hover, touch, and keyboard controls reveal dates, closing prices, and relative changes. Technical checks, scoring inputs, and longer explanations are expandable.
 - Reopens the last qualified browser-local scan immediately with its original timestamp. Fresh prices render before the longer background news scan completes, with a clear preliminary status. Invalid, stale, oversized, and sample caches are rejected.
 - Refreshes automatically on a slower cadence, and lets slow source scans run longer when needed so each output is a fuller consolidated review.
 - Pulls Yahoo Finance chart data for watchlist price history and broad-market proxy data.
