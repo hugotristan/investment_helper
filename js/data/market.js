@@ -1,13 +1,17 @@
 import { analyzeMarketContext } from "../analysis/market-context.js";
 import { evaluateDataQuality } from "../analysis/data-quality.js";
-import { PRICE_TIMEOUT_MS, broadFunds, marketProxyTickers } from "../config/settings.js";
+import { PRICE_TIMEOUT_MS, marketProxyTickers } from "../config/settings.js";
 import { fetchWithRetry, fetchWithTimeout, mapLimit } from "./http.js";
-import { finiteNumber } from "../shared/math.js";
 import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { unique } from "../shared/text.js";
+import { loadPriceSnapshot, readSnapshotQuote, readSnapshotSeries } from "./price-snapshot.js";
+import { parseYahooChart, parseYahooQuote } from "./yahoo-chart.js";
+import { loadScanCache } from "./scan-cache.js";
 
 export async function validateWatchlistTicker(ticker) {
-  // Validate live metadata directly; sample price fallbacks cannot establish a real symbol.
+  const published = readSnapshotSeries(await loadPriceSnapshot(), ticker);
+  if (published) return ["EQUITY", "ETF"].includes(published.instrumentType.toUpperCase()) ? "valid" : "unsupported";
+  // Newly added symbols outside the published universe still need metadata.
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=5d&interval=1d`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
   for (const url of [directUrl, proxyUrl]) {
@@ -30,9 +34,11 @@ export async function validateWatchlistTicker(ticker) {
 }
 
 export async function loadTickerSeries(tickers) {
-  const settled = await mapLimit(tickers, 12, (ticker) => loadMarketSeries(ticker));
+  const snapshot = await loadPriceSnapshot();
+  const cachedSeries = loadScanCache()?.series || [];
+  const settled = await mapLimit(tickers, 3, (ticker) => loadMarketSeries(ticker, { snapshot, cachedSeries }));
   return settled
-    .map((result, index) => result.status === "fulfilled" ? result.value : sampleSeries(tickers[index]));
+    .map((result, index) => result.status === "fulfilled" ? result.value : unavailableSeries(tickers[index]));
 }
 
 export async function loadQuoteSnapshots(tickers) {
@@ -43,17 +49,24 @@ export async function loadQuoteSnapshots(tickers) {
     return { byTicker: new Map(), count: 0, total: 0, source: "none", label: "No live quote symbols requested" };
   }
 
-  const settled = await mapLimit(symbols, 10, (ticker) => loadIntradayQuote(ticker));
+  const snapshot = await loadPriceSnapshot();
+  const savedQuotes = loadScanCache()?.quotes?.byTicker;
+  const settled = await mapLimit(symbols, 3, (ticker) => {
+    const published = readSnapshotQuote(snapshot, ticker);
+    const saved = savedQuotes?.get(ticker);
+    if (published) return saved && saved.quoteTime > published.quoteTime ? saved : published;
+    return saved || loadIntradayQuote(ticker);
+  });
   const quotes = settled
     .map((result) => result.status === "fulfilled" ? result.value : null)
     .filter(Boolean);
-  const source = quotes.length ? "Yahoo Finance intraday chart" : "unavailable";
+  const source = quotes.length ? [...new Set(quotes.map((quote) => quote.source))].join(" / ") : "unavailable";
   return {
     byTicker: new Map(quotes.map((quote) => [quote.ticker, quote])),
     count: quotes.length,
     total: symbols.length,
     source,
-    label: quotes.length ? `Live quotes: ${quotes.length}/${symbols.length} from ${source}` : "Live quotes unavailable; one-year chart data used"
+    label: quotes.length ? `Dated quotes: ${quotes.length}/${symbols.length} from ${source}` : "Quotes unavailable; daily price history used"
   };
 }
 
@@ -66,12 +79,12 @@ async function loadIntradayQuote(ticker) {
       const response = await fetchWithRetry(url, {
         timeoutMs: index === 0 ? PRICE_TIMEOUT_MS : PRICE_TIMEOUT_MS + 6000,
         type: "json",
-        attempts: index === 0 ? 2 : 1,
+        attempts: 1,
         delayMs: 900
       });
       if (!response.ok) continue;
       const json = await response.json();
-      const quote = parseIntradayQuote(json, ticker);
+      const quote = parseYahooQuote(json, ticker);
       if (quote) return quote;
     } catch {
       // Fall through to the relay or daily-chart fallback.
@@ -79,51 +92,6 @@ async function loadIntradayQuote(ticker) {
   }
 
   return null;
-}
-
-function parseIntradayQuote(json, ticker) {
-  const result = json?.chart?.result?.[0];
-  const meta = result?.meta || {};
-  const symbol = String(meta.symbol || ticker || "").toUpperCase();
-  const price = finiteNumber(meta.regularMarketPrice);
-  if (!symbol || symbol !== String(ticker).toUpperCase() || !price) return null;
-  const previousClose = finiteNumber(meta.previousClose || meta.chartPreviousClose);
-  return {
-    ticker: symbol,
-    name: meta.longName || meta.shortName || symbol,
-    exchange: meta.fullExchangeName || meta.exchangeName || "",
-    marketState: marketStateFromMeta(meta),
-    currency: meta.currency || "",
-    price,
-    previousClose,
-    dayChange: previousClose ? price - previousClose : null,
-    dayChangePercent: previousClose ? price / previousClose - 1 : null,
-    volume: finiteNumber(meta.regularMarketVolume),
-    averageVolume: 0,
-    marketCap: 0,
-    bid: 0,
-    ask: 0,
-    high52Week: finiteNumber(meta.fiftyTwoWeekHigh),
-    low52Week: finiteNumber(meta.fiftyTwoWeekLow),
-    dayHigh: finiteNumber(meta.regularMarketDayHigh),
-    dayLow: finiteNumber(meta.regularMarketDayLow),
-    quoteTime: meta.regularMarketTime ? new Date(meta.regularMarketTime * 1000) : null,
-    epsTrailingTwelveMonths: 0,
-    trailingPE: 0,
-    dividendYield: 0,
-    quoteType: meta.instrumentType || ""
-  };
-}
-
-function marketStateFromMeta(meta) {
-  const now = Date.now() / 1000;
-  const regular = meta?.currentTradingPeriod?.regular;
-  if (regular?.start && regular?.end) {
-    if (now >= regular.start && now <= regular.end) return "Market open";
-    if (now < regular.start) return "Pre-market";
-    return "After hours";
-  }
-  return meta.marketState || "";
 }
 
 export function applyQuoteSnapshot(series, quoteMap) {
@@ -157,11 +125,17 @@ export function applyQuoteSnapshot(series, quoteMap) {
     quote,
     dailyClose: series.dailyClose || { price: latest?.close, currency: series.currency, asOf: quality.asOf },
     historyAsOf: series.historyAsOf ?? quality.asOf,
-    source: `${series.source} + Yahoo intraday`
+    source: `${series.source} + ${quote.source || "Yahoo intraday"}`
   };
 }
 
-export async function loadMarketSeries(ticker) {
+export async function loadMarketSeries(ticker, { snapshot, cachedSeries } = {}) {
+  const published = readSnapshotSeries(snapshot || await loadPriceSnapshot(), ticker);
+  const saved = (cachedSeries || loadScanCache()?.series || []).find((item) => item.ticker === ticker && evaluateDataQuality(item).eligible);
+  // Keep a later real history already saved in this browser if a deployment
+  // temporarily publishes an older snapshot. Neither path changes its date.
+  if (published) return saved && Date.parse(evaluateDataQuality(saved).asOf) > Date.parse(published.historyAsOf) ? saved : published;
+  if (saved) return { ...saved, source: `${saved.source.replace(/ \(saved history\)$/, "")} (saved history)` };
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d&events=splits`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
@@ -170,13 +144,13 @@ export async function loadMarketSeries(ticker) {
       const response = await fetchWithRetry(url, {
         timeoutMs: index === 0 ? PRICE_TIMEOUT_MS : PRICE_TIMEOUT_MS + 6000,
         type: "json",
-        attempts: index === 0 ? 2 : 1,
+        attempts: 1,
         delayMs: 1200
       });
       if (!response.ok) continue;
       const json = await response.json();
       const parsed = parseYahooChart(json, ticker);
-      if (parsed.prices.length) {
+      if (parsed?.prices.length) {
         parsed.source = url === directUrl ? "Yahoo Finance chart" : "Yahoo Finance via CORS relay";
         return parsed;
       }
@@ -185,63 +159,16 @@ export async function loadMarketSeries(ticker) {
     }
   }
 
-  return sampleSeries(ticker);
-}
-
-function parseYahooChart(json, ticker) {
-  const result = json?.chart?.result?.[0];
-  const timestamps = result?.timestamp || [];
-  const quote = result?.indicators?.quote?.[0] || {};
-  const closes = quote.close || [];
-  const highs = quote.high || [];
-  const lows = quote.low || [];
-  const volumes = quote.volume || [];
-  const prices = timestamps.map((time, index) => ({
-    date: new Date(time * 1000),
-    close: Number(closes[index]),
-    high: Number(highs[index]),
-    low: Number(lows[index]),
-    volume: Number(volumes[index] || 0)
-  })).filter((point) => Number.isFinite(point.close) && point.close > 0);
-
-  return {
-    ticker: String(result?.meta?.symbol || ticker).toUpperCase(),
-    prices,
-    historyAsOf: prices.at(-1)?.date?.toISOString() || null,
-    instrumentType: result?.meta?.instrumentType || "",
-    currency: result?.meta?.currency || "",
-    splits: Object.values(result?.events?.splits || {}).map((event) => ({
-      date: Number.isFinite(event.date) ? new Date(event.date * 1000).toISOString() : null,
-      numerator: event.numerator, denominator: event.denominator, splitRatio: event.splitRatio
-    })).filter((event) => event.date),
-    source: "Yahoo Finance chart"
-  };
+  return unavailableSeries(ticker);
 }
 
 export async function loadMarketContext() {
-  const series = await Promise.all(marketProxyTickers.map(async (proxy) => ({
-    ...proxy,
-    series: await loadMarketSeries(proxy.ticker)
-  })));
+  const prices = await loadTickerSeries(marketProxyTickers.map((proxy) => proxy.ticker));
+  const series = marketProxyTickers.map((proxy, index) => ({ ...proxy, series: prices[index] }));
   return analyzeMarketContext(series);
 }
 
-function sampleSeries(ticker) {
-  const days = 252;
-  const seed = ticker.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const drift = broadFunds.has(ticker) ? 0.00034 : ((seed % 9) - 2) / 10000;
-  const vol = broadFunds.has(ticker) ? 0.010 : 0.014 + (seed % 7) / 1000;
-  let price = 50 + (seed % 180);
-  const prices = [];
-  const today = new Date();
-
-  for (let i = days; i >= 0; i -= 1) {
-    price = Math.max(5, price * (1 + drift + Math.sin((days - i + seed) / 13) * vol + Math.sin((days - i + seed) / 37) * vol * 0.7));
-    const range = price * vol * 1.8;
-    const date = new Date(today);
-    date.setDate(today.getDate() - i);
-    prices.push({ date, close: price, high: price + range, low: Math.max(1, price - range), volume: 1000000 + seed * 1000 });
-  }
-
-  return { ticker, prices, source: "sample" };
+function unavailableSeries(ticker) {
+  return { ticker, prices: [], source: "unavailable", historyAsOf: null,
+    error: "No recent published or saved prices; the live provider and relay could not return usable history." };
 }

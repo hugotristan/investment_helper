@@ -74,15 +74,18 @@ export function renderScanRow(item, { showDetails = true } = {}) {
   const currency = item.currency || quote.currency || "";
   const date = new Date(item.dataQuality?.asOf || "");
   const asOf = Number.isFinite(date.getTime()) ? date.toLocaleDateString() : "Date unavailable";
+  const observed = new Date(quote.quoteTime || item.dataQuality?.asOf || "");
+  const priceAsOf = Number.isFinite(observed.getTime()) ? observed.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Date unavailable";
   return `
     <article class="scan-list-row">
       <div class="scan-symbol"><a href="#detail" data-detail-ticker="${escapeHtml(item.ticker)}">${escapeHtml(item.ticker)}</a>${quote.name && quote.name !== item.ticker ? `<small>${escapeHtml(quote.name)}</small>` : ""}</div>
       <span class="scan-signal" data-label="Signal">${escapeHtml(item.setup?.signal || item.label)}</span>
-      <strong data-label="Price">${escapeHtml(formatNumber(item.latest))} ${escapeHtml(currency)}</strong>
+      <strong data-label="Price" title="${escapeHtml(`${quote.source || item.source || "Daily close"} · ${priceAsOf}`)}">${escapeHtml(formatNumber(item.latest))} ${escapeHtml(currency)}</strong>
       <span class="${item.oneDay > 0 ? "positive" : item.oneDay < 0 ? "negative" : ""}" data-label="1D">${formatPercent(item.oneDay)}</span>
       <span data-label="Score">${item.score}/100</span>
       ${showDetails ? `<details class="secondary-details scan-row-details"><summary>Checks</summary>
-        <dl class="key-values"><div><dt>History as of</dt><dd>${escapeHtml(asOf)}</dd></div>
+        <dl class="key-values"><div><dt>Price as of</dt><dd>${escapeHtml(priceAsOf)} · ${escapeHtml(quote.source || item.source || "Daily close")}</dd></div>
+        <div><dt>History as of</dt><dd>${escapeHtml(asOf)}</dd></div>
         <div><dt>1M / 6M</dt><dd>${formatPercent(item.oneMonth)} / ${formatPercent(item.sixMonth)}</dd></div>
         <div><dt>Daily traded value</dt><dd>${escapeHtml(compactValue(item.averageDollarVolume))} ${escapeHtml(item.currency || "")}</dd></div>
         <div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>

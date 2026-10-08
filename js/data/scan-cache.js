@@ -10,11 +10,14 @@ const ARTICLE_ARRAY_FIELDS = ["tickers", "directTickers", "sectorTickers", "mark
 export function saveScanCache({ series, quotes, news, marketContext }, { storage = globalThis.localStorage, now = Date.now() } = {}) {
   try {
     if (!Number.isFinite(now) || !Array.isArray(series)) return false;
-    const qualified = qualifySeries(series, now);
-    if (!qualified.length) return false;
+    const incoming = qualifySeries(series, now);
+    if (!incoming.length) return false;
+    const previous = loadScanCache({ storage, now });
+    const qualified = mergeSeries(series, incoming, previous?.series || []);
+    const retainedQuotes = mergeQuotes(quotes, previous?.quotes, qualified, now);
     const savedAt = new Date(now).toISOString();
     const data = { schemaVersion: 1, savedAt, series: qualified,
-      quotes: packQuotes(quotes, qualified, now), news: packNews(news),
+      quotes: packQuotes(retainedQuotes, qualified, now), news: packNews(news),
       marketContext: qualifyContext(marketContext, now) };
     const serialized = JSON.stringify(data);
     if (oversized(serialized)) return false;
@@ -43,16 +46,45 @@ function qualifySeries(series, now) {
   const seen = new Set();
   return series.filter((item) => {
     if (!item || !validTicker(item.ticker) || seen.has(item.ticker) || !evaluateDataQuality(item, now).eligible) return false;
+    // Retention must not let a newer metadata date revive older actual bars.
+    const points = validHistoryPoints(item);
+    if (!evaluateDataQuality({ ...item, prices: points, historyAsOf: points.at(-1)?.date }, now).eligible) return false;
     seen.add(item.ticker);
     return true;
   }).slice(0, 180).map((item) => ({ ...item, prices: validHistoryPoints(item) }));
 }
 
+function mergeSeries(requested, incoming, previous) {
+  const selected = new Map(previous.map((item) => [item.ticker, item]));
+  for (const item of incoming) {
+    const old = selected.get(item.ticker);
+    if (!old || historyTime(item) >= historyTime(old)) selected.set(item.ticker, item);
+  }
+  const order = [...new Set(requested.map((item) => item?.ticker).concat(previous.map((item) => item.ticker)))];
+  return order.filter((ticker) => selected.has(ticker)).slice(0, 180).map((ticker) => selected.get(ticker));
+}
+
+function historyTime(item) {
+  return new Date(item.prices.at(-1)?.date || "invalid").getTime();
+}
+
+function mergeQuotes(incoming, previous, series, now) {
+  const chosen = new Map();
+  for (const quotes of [previous, incoming]) {
+    for (const [ticker, quote] of packQuotes(quotes, series, now).entries) {
+      const old = chosen.get(ticker);
+      if (!old || new Date(quote.quoteTime).getTime() >= new Date(old.quoteTime).getTime()) chosen.set(ticker, quote);
+    }
+  }
+  return { ...incoming, source: chosen.size ? "saved quote snapshots" : "none", byTicker: chosen, count: chosen.size, total: series.length };
+}
+
 function packQuotes(quotes, series, now) {
-  const tickers = new Set(series.map((item) => item.ticker));
+  const byTicker = new Map(series.map((item) => [item.ticker, item]));
   const entries = quotes?.byTicker instanceof Map ? [...quotes.byTicker] : Array.isArray(quotes?.entries) ? quotes.entries : [];
-  return { count: 0, total: series.length, source: "none", ...quotes, byTicker: undefined,
-    entries: entries.filter(([ticker, quote]) => tickers.has(ticker) && validQuote(quote, ticker, now)).slice(0, 180) };
+  return { source: "none", ...quotes, byTicker: undefined, total: series.length,
+    entries: /^sample\b/i.test(quotes?.source || "") ? [] : entries
+      .filter(([ticker, quote]) => byTicker.has(ticker) && validQuote(quote, ticker, byTicker.get(ticker), now)).slice(0, 180) };
 }
 
 function unpackQuotes(stored, series, now) {
@@ -63,10 +95,12 @@ function unpackQuotes(stored, series, now) {
     label: `Saved quote snapshots: ${byTicker.size}/${metadata.total || series.length}` };
 }
 
-function validQuote(quote, ticker, now) {
+function validQuote(quote, ticker, series, now) {
   const time = new Date(quote?.quoteTime || "invalid").getTime();
   return quote && Number.isFinite(quote.price) && quote.price > 0 && Number.isFinite(time)
-    && time <= now && now - time <= MAX_AGE_MS && (!quote.ticker || quote.ticker === ticker);
+    && time <= now && now - time <= MAX_AGE_MS && time >= historyTime(series)
+    && (!quote.ticker || quote.ticker === ticker) && (!series.currency || quote.currency === series.currency)
+    && !/^sample\b/i.test(quote.source || "");
 }
 
 function reviveSeries(series) {

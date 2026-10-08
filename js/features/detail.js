@@ -90,7 +90,7 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
         <strong>${item.score}/100</strong>
       </div>
       <dl class="key-values">
-        ${renderMetric("Price", `${formatNumber(item.latest)} ${currency}`.trim())}
+        ${renderMetric("Price", `${formatNumber(item.latest)} ${currency}`.trim(), quote.quoteTime ? `${quote.source || "Quote"} · ${quoteTime}` : `Daily history · ${historyDate}`)}
         ${renderMetric("1D", formatPercent(item.oneDay))}
         ${renderMetric("History as of", historyDate)}
         ${renderMetric("Event risk", item.eventRisk?.level || "Unavailable")}

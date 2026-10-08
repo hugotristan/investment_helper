@@ -103,3 +103,99 @@ test("cache caps symbols and articles while keeping only normal evidence arrays"
   assert.deepEqual(restored.news.items[0].directTickers, []);
   assert.deepEqual(restored.news.items[0].sectorTickers, ["SYM0"]);
 });
+
+test("partial scans retain qualified failed and missing tickers in incoming order without redating prices or research", () => {
+  const saved = storage();
+  const first = payload();
+  first.series[0].currency = "USD";
+  first.series.push(series("KEEP", { currency: "EUR" }));
+  assert.equal(saveScanCache(first, { storage: saved, now: NOW }), true);
+  const originalDates = first.series[0].prices.map((point) => point.date.toISOString());
+  const update = { series: [series("ACME", { source: "sample" }), series("NEW", { currency: "USD" })],
+    quotes: { byTicker: new Map() }, news: { items: [], sources: [], label: "Current scan has no research" },
+    marketContext: { available: false, score: null } };
+  assert.equal(saveScanCache(update, { storage: saved, now: NOW + DAY }), true);
+  const restored = loadScanCache({ storage: saved, now: NOW + DAY });
+  assert.deepEqual(restored.series.map((item) => item.ticker), ["ACME", "NEW", "KEEP"]);
+  assert.deepEqual(restored.series[0].prices.map((point) => point.date.toISOString()), originalDates);
+  assert.equal(restored.series[0].historyAsOf, first.series[0].historyAsOf);
+  assert.equal(restored.quotes.byTicker.get("ACME").quoteTime.toISOString(), first.quotes.byTicker.get("ACME").quoteTime.toISOString());
+  assert.equal(restored.savedAt, new Date(NOW + DAY).toISOString());
+  assert.equal(restored.news.items.length, 0);
+  assert.match(restored.news.label, /Current scan has no research/);
+  assert.equal(restored.marketContext.available, false);
+});
+
+test("newer actual histories replace saved prices while older incoming bars cannot replace them", () => {
+  const saved = storage();
+  assert.equal(saveScanCache(payload(), { storage: saved, now: NOW }), true);
+  const newer = series("ACME", { currency: "USD", historyAsOf: new Date(NOW).toISOString() });
+  newer.prices = newer.prices.map((point) => ({ ...point, date: new Date(point.date.getTime() + DAY), close: point.close + 20 }));
+  const newQuote = { ticker: "ACME", price: 319, currency: "USD", quoteTime: new Date(NOW), dayChangePercent: 0 };
+  assert.equal(saveScanCache({ ...payload(), series: [newer], quotes: { byTicker: new Map([["ACME", newQuote]]) } }, { storage: saved, now: NOW + DAY }), true);
+  let restored = loadScanCache({ storage: saved, now: NOW + DAY });
+  assert.equal(restored.series[0].historyAsOf, newer.historyAsOf);
+  assert.equal(restored.series[0].prices.at(-1).close, 319);
+  assert.equal(restored.quotes.byTicker.get("ACME").quoteTime.toISOString(), newQuote.quoteTime.toISOString());
+  assert.equal(saveScanCache(payload(), { storage: saved, now: NOW + 2 * DAY }), true);
+  restored = loadScanCache({ storage: saved, now: NOW + 2 * DAY });
+  assert.equal(restored.series[0].historyAsOf, newer.historyAsOf);
+  assert.equal(restored.series[0].prices.at(-1).close, 319);
+  assert.equal(restored.quotes.byTicker.get("ACME").quoteTime.toISOString(), newQuote.quoteTime.toISOString());
+});
+
+test("retention cannot revive sample or expired actual histories with a recent metadata date", () => {
+  const saved = storage();
+  saveScanCache(payload(), { storage: saved, now: NOW });
+  const raw = JSON.parse(saved.items.get(SCAN_CACHE_KEY));
+  raw.series[0].historyAsOf = new Date(NOW).toISOString();
+  raw.series[0].prices = raw.series[0].prices.map((point) => ({ ...point, date: new Date(Date.parse(point.date) - 20 * DAY) }));
+  raw.series.push(series("SAMPLE", { source: "sample" }));
+  saved.items.set(SCAN_CACHE_KEY, JSON.stringify(raw));
+  saveScanCache({ ...payload(), series: [series("NEW")] }, { storage: saved, now: NOW });
+  assert.deepEqual(loadScanCache({ storage: saved, now: NOW }).series.map((item) => item.ticker), ["NEW"]);
+  const serialized = saved.items.get(SCAN_CACHE_KEY);
+  assert.equal(saveScanCache({ ...payload(), series: [series("NEW", { source: "sample" })] }, { storage: saved, now: NOW + DAY }), false);
+  assert.equal(saved.items.get(SCAN_CACHE_KEY), serialized);
+});
+
+test("retained quotes keep original times and require ticker, currency, age, and daily-history consistency", () => {
+  const saved = storage();
+  const initial = payload();
+  initial.series[0].currency = "USD";
+  saveScanCache(initial, { storage: saved, now: NOW });
+  const quote = initial.quotes.byTicker.get("ACME");
+  const update = { ...payload(), series: [series("ACME", { source: "sample" }), series("NEW", { currency: "USD" })],
+    quotes: { byTicker: new Map([["ACME", { ...quote, quoteTime: new Date(NOW), currency: "EUR" }]]) } };
+  saveScanCache(update, { storage: saved, now: NOW + DAY });
+  let restored = loadScanCache({ storage: saved, now: NOW + DAY });
+  assert.equal(restored.quotes.byTicker.get("ACME").currency, "USD");
+  assert.equal(restored.quotes.byTicker.get("ACME").quoteTime.toISOString(), quote.quoteTime.toISOString());
+  const recent = series("ACME", { currency: "GBP", historyAsOf: new Date(NOW).toISOString() });
+  recent.prices = recent.prices.map((point) => ({ ...point, date: new Date(point.date.getTime() + DAY) }));
+  saveScanCache({ ...payload(), series: [recent], quotes: { byTicker: new Map([["ACME", { ...quote, currency: "GBP" }]]) } }, { storage: saved, now: NOW + DAY });
+  restored = loadScanCache({ storage: saved, now: NOW + DAY });
+  assert.equal(restored.quotes.byTicker.has("ACME"), false);
+  const invalid = [
+    { ...quote, ticker: "OTHER", quoteTime: new Date(NOW) },
+    { ...quote, currency: "GBp", quoteTime: new Date(NOW) },
+    { ...quote, currency: "GBP", quoteTime: new Date(NOW + 2 * DAY) },
+    { ...quote, currency: "GBP", quoteTime: new Date(NOW - 8 * DAY) },
+    { ...quote, currency: "GBP", quoteTime: new Date(NOW), source: "sample" }
+  ];
+  for (const bad of invalid) {
+    saveScanCache({ series: [recent], quotes: { byTicker: new Map([["ACME", bad]]) } }, { storage: saved, now: NOW + DAY });
+    assert.equal(loadScanCache({ storage: saved, now: NOW + DAY }).quotes.byTicker.has("ACME"), false);
+  }
+});
+
+test("merged caches keep the 180-symbol cap and prioritize incoming order including failed saved tickers", () => {
+  const saved = storage();
+  const previous = Array.from({ length: 180 }, (_, index) => series(`OLD${index}`));
+  assert.equal(saveScanCache({ series: previous }, { storage: saved, now: NOW }), true);
+  assert.equal(saveScanCache({ series: [series("NEW"), series("OLD179", { source: "sample" })] }, { storage: saved, now: NOW + DAY }), true);
+  const tickers = loadScanCache({ storage: saved, now: NOW + DAY }).series.map((item) => item.ticker);
+  assert.equal(tickers.length, 180);
+  assert.deepEqual(tickers.slice(0, 3), ["NEW", "OLD179", "OLD0"]);
+  assert.equal(tickers.includes("OLD178"), false);
+});

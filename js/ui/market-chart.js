@@ -176,7 +176,8 @@ export function buildWatchlistMoves(results, tickers, quotes, { now = Date.now()
       && (!quote.ticker || quote.ticker === ticker) && (!item?.currency || quote.currency === item.currency)
       && (!Number.isFinite(historyTime) || time >= historyTime)
       && finiteChange(quote.dayChangePercent) && quote.dayChangePercent > -1;
-    if (recent) return { ticker, change: quote.dayChangePercent, asOf: new Date(time).toISOString(), source: "Quote" };
+    if (recent) return { ticker, change: quote.dayChangePercent, asOf: new Date(time).toISOString(),
+      source: /published/i.test(quote.source || "") ? "Published quote" : "Quote" };
     const points = /^sample\b/i.test(priceSource) ? [] : dailyHistory(item, now);
     if (points.length < 2) return { ticker, change: null, asOf: null, source: "Unavailable" };
     const change = points.at(-1).close / points.at(-2).close - 1;
@@ -193,10 +194,11 @@ export function renderWatchlistMoves(results, tickers, quotes, priceSource) {
   container.innerHTML = moves.length ? `<ul class="watchlist-moves-list">${moves.map((move) => {
     const known = Number.isFinite(move.change);
     const width = known ? Math.abs(move.change) / scale * 50 : 0;
-    return `<li class="watchlist-move"><div class="watchlist-move-label"><a href="#detail" data-detail-ticker="${escapeHtml(move.ticker)}">${escapeHtml(move.ticker)}</a><small>${known ? escapeHtml(dateLabel(move.asOf)) : "Price unavailable"}</small></div>
+    const asOf = move.source.includes("quote") || move.source === "Quote" ? new Date(move.asOf).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : dateLabel(move.asOf);
+    return `<li class="watchlist-move"><div class="watchlist-move-label"><a href="#detail" data-detail-ticker="${escapeHtml(move.ticker)}">${escapeHtml(move.ticker)}</a><small>${known ? escapeHtml(asOf) : "Price unavailable"}</small></div>
       <div class="watchlist-move-value ${known ? move.change < 0 ? "change-negative" : move.change > 0 ? "change-positive" : "change-neutral" : "change-neutral"}">${known ? escapeHtml(formatPercent(move.change)) : "Unavailable"}<small>${escapeHtml(move.source)}</small></div>
       <div class="watchlist-move-bar" aria-hidden="true"><span class="${move.change < 0 ? "negative" : "positive"}" style="left:${move.change < 0 ? 50 - width : 50}%;width:${width}%"></span></div></li>`;
-  }).join("")}</ul><p class="data-note">Bars share a scale; dates may differ.</p>` : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>';
+  }).join("")}</ul><p class="data-note">Dated price observations; published quotes refresh about every 30 minutes during U.S. market hours.</p>` : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>';
 }
 
 function day(value) {

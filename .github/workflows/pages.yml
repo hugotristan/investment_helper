@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '30 6 * * *'
+    - cron: '7,37 13-22 * * 1-5'
 
 permissions:
   contents: read
@@ -45,16 +46,37 @@ jobs:
             fundamentals-
 
       - name: Refresh company fundamentals snapshot
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
         run: node scripts/update-fundamentals.mjs
         env:
           SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
 
       - name: Preserve fundamentals snapshot
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
         uses: actions/cache/save@v4
         continue-on-error: true
         with:
           path: data/fundamentals.json
           key: fundamentals-${{ github.run_id }}
+
+      - name: Restore latest price snapshot
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: data/prices.json
+          key: prices-${{ github.run_id }}
+          restore-keys: |
+            prices-
+
+      - name: Refresh real price snapshot
+        run: node scripts/update-prices.mjs
+
+      - name: Preserve price snapshot
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: data/prices.json
+          key: prices-${{ github.run_id }}
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

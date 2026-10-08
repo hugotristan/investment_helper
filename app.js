@@ -135,15 +135,18 @@ async function runAnalysis(options = {}) {
       loadQuoteSnapshots(tickers),
       loadMarketContext()
     ]);
-    const priceSource = series.find((item) => item.source !== "sample")?.source || "sample";
+    const priceSource = series.find((item) => item.prices.length && item.source !== "sample")?.source || "unavailable";
     const preliminary = rankSeries(series, quotes, {});
     scanState.latestRankedResults = preliminary;
+    scanState.latestPriceSource = priceSource;
     scanState.latestQuoteSnapshot = quotes;
     scanState.latestMarketContext = marketContext;
     renderDashboardOverview(preliminary, priceSource, { sources: [], items: [] }, marketContext, quotes, { researchPending: true });
     renderPortfolioReview(buildPortfolioReview(preliminary, marketContext), priceSource);
-    setStatus("Prices ready");
-    setScanStage("Prices are ready. Technical scores are preliminary while company evidence is gathered.");
+    renderScreener();
+    const readyCount = preliminary.filter((item) => item.dataQuality?.eligible).length;
+    setStatus(readyCount ? "Prices ready" : "Prices unavailable");
+    setScanStage(`${readyCount}/${series.length} qualified price histories. Scores are preliminary while company evidence is gathered.`);
     const response = await newsRequest;
     if (response.error) throw response.error;
     const news = response.news;
@@ -155,7 +158,7 @@ async function runAnalysis(options = {}) {
     saveLearningSnapshot(ranked, priceSource, news.label);
     saveScanCache({ series, quotes, news, marketContext });
     const qualifiedCount = ranked.filter((item) => item.dataQuality?.eligible).length;
-    setStatus("Updated");
+    setStatus(qualifiedCount ? "Updated" : "Prices unavailable");
     setScanStage(`Scan complete · ${qualifiedCount} qualified histories · research and market checks updated.`);
   } catch (error) {
     console.error(error);
