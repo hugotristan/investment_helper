@@ -39,6 +39,7 @@ beforeEach(() => {
   state.myPortfolioInput = "AAPL | Apple | 1000 | up";
   node("portfolioSetupCurrency").value = "EUR";
   node("portfolioSetupDate").value = "2026-10-01";
+  node("portfolioSetupMode").value = "opening";
 });
 
 function fixture(initial = null, options = {}) {
@@ -256,7 +257,7 @@ test("a stale tab cannot overwrite a newer revision or reuse its old form", asyn
   assert.match(node("transactionMessage").textContent, /Cancel and reopen/);
 });
 
-test("reporting currency stays editable but start date is fixed after transactions", async () => {
+test("start dates remain editable after transactions, with explicit review of opening positions", async () => {
   const f = fixture(book());
   await f.controller.initialize();
   fill(f.controller, { type: "deposit", amount: "100" });
@@ -264,11 +265,131 @@ test("reporting currency stays editable but start date is fixed after transactio
   node("portfolioStartDate").value = "2026-10-02";
   assert.equal(await f.controller.saveSettings(), false);
   assert.equal(f.stored.settings.startDate, "2026-10-01");
-  node("portfolioStartDate").value = "2026-10-01";
+  node("portfolioStartConfirmed").checked = true;
+  assert.equal(await f.controller.saveSettings(), true);
+  assert.equal(f.stored.settings.startDate, "2026-10-02");
+  assert.equal(f.stored.transactions[0].date, "2026-10-09");
   node("portfolioBaseCurrency").value = "USD";
   assert.equal(await f.controller.saveSettings(), true);
   assert.equal(f.stored.settings.baseCurrency, "USD");
   assert.equal(f.stored.transactions[0].currency, "USD");
+});
+
+test("history setup starts empty and preserves the previous browser snapshot", async () => {
+  const f = fixture();
+  await f.controller.initialize();
+  node("portfolioSetupMode").value = "history";
+  node("portfolioSetupDate").value = "2021-05-01";
+  await f.controller.setup();
+  assert.deepEqual(f.stored.openingHoldings, []);
+  assert.deepEqual(state.holdings, [holding]);
+  assert.equal(f.stored.legacyPortfolioInput, state.myPortfolioInput);
+  assert.equal(f.stored.settings.startDate, "2021-05-01");
+});
+
+test("past transactions automatically extend an empty opening portfolio to the earliest date", async () => {
+  const empty = createPortfolioBook({ holdings: [], startDate: "2026-10-09", now: timestamp });
+  const f = fixture(empty);
+  await f.controller.initialize();
+  assert.equal(node("transactionDate").min, "");
+  fill(f.controller, { date: "2021-05-03" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.settings.startDate, "2021-05-03");
+  assert.equal(f.stored.transactions[0].date, "2021-05-03");
+  assert.equal(getPortfolioHoldings()[0].shares, 2);
+  fill(f.controller, { type: "deposit", amount: "1000", date: "2021-05-01" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.settings.startDate, "2021-05-01");
+  assert.equal(f.stored.transactions[0].date, "2021-05-03");
+  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "USD", amount: 699 }]);
+});
+
+test("backdating cannot silently double-count today's opening holdings", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { date: "2020-05-01" });
+  assert.equal(await f.controller.saveTransaction(), false);
+  assert.match(node("transactionMessage").textContent, /full transaction history/);
+  assert.equal(f.writes, 0);
+  assert.equal(getPortfolioHoldings()[0].shares, 10);
+  assert.equal(node("transactionDate").value, "2020-05-01");
+});
+
+test("full history exports the old book and keeps transactions before removing opening positions", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { type: "deposit", amount: "1000" });
+  await f.controller.saveTransaction();
+  node("portfolioHistoryStartDate").value = "2021-01-01";
+  node("portfolioHistoryConfirmed").checked = true;
+  assert.equal(await f.controller.startHistory(), true);
+  assert.equal(JSON.parse(f.exported).portfolio.openingHoldings[0].shares, 10);
+  assert.deepEqual(f.stored.openingHoldings, []);
+  assert.equal(f.stored.transactions[0].type, "deposit");
+  assert.equal(f.stored.settings.startDate, "2021-01-01");
+  assert.deepEqual(state.holdings, [holding]);
+  fill(f.controller, { date: "2021-01-02", quantity: "10" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(getPortfolioHoldings()[0].shares, 10); // no duplicate opening shares
+});
+
+test("full history requires explicit selection and rejects unsupported existing sales", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  node("portfolioHistoryStartDate").value = "2021-01-01";
+  assert.equal(await f.controller.startHistory(), false);
+  assert.equal(f.writes, 0);
+  fill(f.controller, { type: "sell", quantity: "5" });
+  await f.controller.saveTransaction();
+  node("portfolioHistoryConfirmed").checked = true;
+  assert.equal(await f.controller.startHistory(), false);
+  assert.match(node("portfolioBookStatus").textContent, /Cannot sell more/);
+  assert.equal(f.exported, null);
+  assert.equal(f.stored.openingHoldings.length, 1);
+  assert.equal(f.stored.transactions.length, 1);
+});
+
+test("opening cash is never silently moved to an earlier date", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { type: "opening_cash", date: "2026-10-01", amount: "100" });
+  await f.controller.saveTransaction();
+  node("portfolioStartDate").value = "2021-01-01";
+  node("portfolioStartConfirmed").checked = true;
+  assert.equal(await f.controller.saveSettings(), false);
+  node("portfolioHistoryStartDate").value = "2021-01-01";
+  node("portfolioHistoryConfirmed").checked = true;
+  assert.equal(await f.controller.startHistory(), false);
+  assert.equal(f.stored.transactions[0].date, "2026-10-01");
+  assert.equal(f.stored.transactions[0].amount, 100);
+  assert.equal(f.exported, null);
+  assert.match(node("portfolioBookStatus").textContent, /original date/);
+});
+
+test("history write failures keep the current book and its exported recovery copy", async () => {
+  const f = fixture(book(), { writeError: new Error("Storage full") });
+  await f.controller.initialize();
+  node("portfolioHistoryStartDate").value = "2021-01-01";
+  node("portfolioHistoryConfirmed").checked = true;
+  assert.equal(await f.controller.startHistory(), false);
+  assert.equal(f.stored.openingHoldings[0].shares, 10);
+  assert.equal(JSON.parse(f.exported).portfolio.openingHoldings[0].shares, 10);
+});
+
+test("invalid or future dates and moving start past a saved trade leave history unchanged", async () => {
+  const empty = createPortfolioBook({ holdings: [], startDate: "2026-10-01", now: timestamp });
+  const f = fixture(empty);
+  await f.controller.initialize();
+  fill(f.controller, { date: "2026-02-30" });
+  assert.equal(await f.controller.saveTransaction(), false);
+  fill(f.controller, { date: "2026-10-10" });
+  assert.equal(await f.controller.saveTransaction(), false);
+  fill(f.controller, { date: "2026-10-03" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  node("portfolioStartDate").value = "2026-10-04";
+  assert.equal(await f.controller.saveSettings(), false);
+  assert.equal(f.stored.settings.startDate, "2026-10-01");
+  assert.equal(f.stored.transactions[0].date, "2026-10-03");
 });
 
 test("the existing holding editor saves opening positions after a transaction, with removal and Undo", async (t) => {

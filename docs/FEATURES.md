@@ -2,13 +2,21 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Past portfolio transactions
+
+**What changed:** Transaction dates can be in the past. An empty opening portfolio automatically extends its tracking start to the earliest transaction. Setup offers an empty starting point for full history; an existing portfolio can switch through Reporting settings → Enter my full transaction history, with an exported recovery backup and explicit confirmation. Existing transactions are kept.
+
+**How:** The candidate start date and transaction are committed together and validated against the whole ledger. Opening positions are never silently subtracted or redated. Changing their start date requires confirmation; a full-history switch removes them only after validation. Opening cash keeps its original date and must be deliberately removed/re-entered when a different start is needed. Browser date inputs no longer use the tracking start as their minimum; clear date help explains any opening-balance conflict.
+
+**Validation:** Controller checks cover real older dates, automatically extending empty history, legacy preservation, no duplicate opening shares, backup-before-switch, unsupported sales, opening-cash provenance, write failures, future/invalid dates, and a start date after an existing trade. Existing ledger, storage, and portfolio regressions remain required.
+
 ## Portfolio foundation: opening positions and manual transactions
 
 **What changed:** Portfolio setup saves a reporting currency and tracking start date, preserving current holdings as opening positions without inventing earlier trades. Purchases, sales, deposits, withdrawals, cash dividends, fees, and opening cash update holdings and separate currency cash balances. The old editor remains available for correcting opening positions; later activity belongs in Transactions. Settings, the ledger, and backup controls are collapsed to keep the page compact.
 
 **How:** A versioned pure ledger projects chronological transactions with weighted purchase cost including fees. Complete-book validation rejects overselling even when a supporting purchase/opening position is edited or deleted, future dates, unsupported assets, duplicate IDs, and numeric overflow. A committed IndexedDB record becomes the source of holdings; the original localStorage holdings/text remain intact. Atomic revision checks prevent stale tabs from overwriting changes. Export/restore uses a bounded, validated portfolio-only JSON format; importing previews the contents and requires a separate Restore click. No server database is needed.
 
-**Limits:** Cash is recorded per currency and negative balances warn of incomplete funding. Historical returns, FX, monthly performance, stock splits, tax calculations, reports, and the AI analyst are later steps. The reporting currency does not convert balances yet. Opening positions describe the selected start date; entering old trades again would double-count them.
+**Limits:** Cash is recorded per currency and negative balances warn of incomplete funding. Historical returns, FX, monthly performance, stock splits, tax calculations, reports, and the AI analyst are later steps. The reporting currency does not convert balances yet. Opening positions describe the selected start date; use the full-history starting point when entering the purchases that created them.
 
 **Validation:** All 202 tests pass, including 43 new model, storage, and controller checks for legacy preservation, same-day ordering, cost/cash math, atomic failures, stale tabs, overselling after edits/deletions, new ticker validation, opening-position editing/removal/Undo, backup previews, restore conflicts, and export isolation. HTML control/label structure and responsive form rules were checked. Browser inspection could not start: its helper exited with `windows sandbox failed: helper_unknown_error: setup refresh had errors`, so visual browser verification remains unavailable.
 

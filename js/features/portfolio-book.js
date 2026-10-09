@@ -94,10 +94,12 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     event?.preventDefault();
     return work("portfolioBookStatus", async () => {
       if (getActivePortfolioBook()) throw new TypeError("Tracking is already set up.");
-      const book = createPortfolioBook({ holdings: getPortfolioHoldings(), legacyPortfolioInput: state.myPortfolioInput || "",
+      const fromHistory = el("portfolioSetupMode").value === "history";
+      const book = createPortfolioBook({ holdings: fromHistory ? [] : getPortfolioHoldings(), legacyPortfolioInput: state.myPortfolioInput || "",
         baseCurrency: el("portfolioSetupCurrency").value, startDate: el("portfolioSetupDate").value, now: now() });
       await commit(book, null);
-      message("portfolioBookStatus", "Tracking started. Your saved holdings are opening positions. Record only changes after the start date.");
+      message("portfolioBookStatus", fromHistory ? "Ready for your past transactions. Your previous holdings remain in the original browser snapshot."
+        : "Tracking started. Your saved holdings are opening positions. Record changes after the start date, or choose full transaction history in Reporting settings.");
     });
   }
 
@@ -119,21 +121,30 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       if (id && !book.transactions.some((t) => t.id === id)) throw new TypeError("This transaction is no longer saved.");
       const type = el("transactionType").value;
       const trade = ["buy", "sell"].includes(type);
+      const date = el("transactionDate").value;
+      let startDate = book.settings.startDate;
+      if (date < startDate) {
+        if (book.openingHoldings.length || book.transactions.some((t) => t.type === "opening_cash")) {
+          throw new TypeError(`This transaction is before your ${startDate} opening balances. In Reporting settings, choose an earlier start date and review the opening positions, or use Enter my full transaction history.`);
+        }
+        // With no opening balances there is no snapshot to reinterpret or double-count.
+        startDate = date;
+      }
       const normalized = normalizeTransaction({ id: id || uuid(), type,
-        date: el("transactionDate").value, currency: el("transactionCurrency").value,
+        date, currency: el("transactionCurrency").value,
         ...(trade || type === "dividend" ? { ticker: el("transactionTicker").value } : {}),
         ...(trade ? { quantity: el("transactionQuantity").value, price: el("transactionPrice").value, fee: el("transactionFee").value || 0 }
           : { amount: el("transactionAmount").value }), note: el("transactionNote").value },
-      { startDate: book.settings.startDate, now: now() });
+      { startDate, now: now() });
       if (!normalized.ok) throw new TypeError(normalized.error);
       const transaction = normalized.transaction;
       message("transactionMessage", transaction.ticker ? `Checking ${transaction.ticker}…` : "Saving…");
       if (transaction.ticker) await verifyTicker(transaction.ticker, book);
       const transactions = id ? book.transactions.map((t) => t.id === id ? transaction : t) : [...book.transactions, transaction];
-      await commit(changed(book, { transactions }), book.updatedAt);
+      await commit(changed(book, { transactions, settings: { ...book.settings, startDate } }), book.updatedAt);
       clearTransaction();
       el("portfolioTransactionEditor").open = false;
-      message("transactionMessage", `${labels[transaction.type]} ${id ? "updated" : "recorded"}.`);
+      message("transactionMessage", `${labels[transaction.type]} ${id ? "updated" : "recorded"}.${startDate !== book.settings.startDate ? ` Tracking now starts on ${startDate}.` : ""}`);
     });
   }
 
@@ -162,10 +173,41 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const book = getActivePortfolioBook();
       if (!book || settingsRevision !== book.updatedAt) throw new TypeError("Portfolio settings changed. Reload before saving.");
       const settings = { baseCurrency: el("portfolioBaseCurrency").value, startDate: el("portfolioStartDate").value };
-      if (book.transactions.length && settings.startDate !== book.settings.startDate) throw new TypeError("The tracking start date cannot change after transactions have been recorded.");
+      if (settings.startDate !== book.settings.startDate) {
+        checkOpeningCashDate(book, settings.startDate);
+        if (book.openingHoldings.length && !el("portfolioStartConfirmed").checked) {
+          throw new TypeError("Confirm that your opening positions represent holdings on the new start date. If you are entering all purchases, use Enter my full transaction history instead.");
+        }
+      }
       await commit(changed(book, { settings }), book.updatedAt);
       clearTransaction();
       message("portfolioBookStatus", "Reporting settings saved. Amounts remain in their recorded currencies.");
+    });
+  }
+
+  function checkOpeningCashDate(book, startDate) {
+    if (book.transactions.some((t) => t.type === "opening_cash" && t.date !== startDate)) {
+      throw new TypeError("Opening cash belongs to its original date. Remove that opening cash transaction first, then record the correct balance for the new start date. Its date was not changed.");
+    }
+  }
+
+  async function startHistory(event) {
+    event?.preventDefault();
+    return work("portfolioBookStatus", async () => {
+      const book = getActivePortfolioBook();
+      if (!book || settingsRevision !== book.updatedAt) throw new TypeError("The portfolio changed. Reload before starting transaction history.");
+      if (!el("portfolioHistoryConfirmed").checked) throw new TypeError("Confirm that you will enter the purchases that created your holdings.");
+      const startDate = el("portfolioHistoryStartDate").value;
+      checkOpeningCashDate(book, startDate);
+      const candidate = changed(book, { openingHoldings: [], settings: { ...book.settings, startDate } });
+      const checked = validatePortfolioBook(candidate, { now: now() });
+      if (!checked.ok) throw new TypeError(`${checked.error} Your current portfolio was kept. Existing sales may need their earlier purchases recorded first.`);
+      // Keep a recoverable copy before replacing the opening snapshot. No trades are erased.
+      download(serializePortfolioBackup(book, { now: now() }), `investment-helper-before-history-${today()}.json`);
+      await commit(candidate, book.updatedAt);
+      clearTransaction();
+      el("portfolioHistoryConfirmed").checked = false;
+      message("portfolioBookStatus", `Ready for history from ${startDate}. A backup of your previous portfolio was downloaded. Existing transactions were kept; record the purchases that created your holdings.`);
     });
   }
 
@@ -255,10 +297,27 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     el("transactionAmount").min = opening ? "0" : "0.00000001";
     el("transactionDate").disabled = opening;
     if (opening) el("transactionDate").value = getActivePortfolioBook()?.settings.startDate || today();
+    updateDateHelp();
     el("transactionHelp").textContent = trade ? "Enter the execution price in the selected currency. An optional fee is recorded in the same currency."
       : opening ? "Cash already held on your tracking start date. Record one opening balance per currency."
         : type === "dividend" ? "Enter the cash dividend you received. Record any separately charged tax or fee as a Fee transaction."
           : "Enter the cash amount and its currency. Deposits and withdrawals describe money entering or leaving your portfolio.";
+  }
+
+  function updateDateHelp() {
+    const book = getActivePortfolioBook();
+    if (!book) return;
+    const date = el("transactionDate").value;
+    message("transactionDateHelp", el("transactionType").value === "opening_cash"
+      ? `Opening cash is the balance on ${book.settings.startDate}.`
+      : date && date < book.settings.startDate && (book.openingHoldings.length || book.transactions.some((t) => t.type === "opening_cash"))
+        ? `Your opening balances are dated ${book.settings.startDate}. Move the start date in Reporting settings and review those balances, or choose Enter my full transaction history.`
+        : "Enter the actual transaction date, including past dates. With no opening balances, tracking starts at your earliest recorded transaction.");
+  }
+
+  function updateStartConfirmation() {
+    const book = getActivePortfolioBook();
+    el("portfolioStartConfirmation").hidden = !book?.openingHoldings.length || el("portfolioStartDate").value === book.settings.startDate;
   }
 
   function openTransactionEditor(id = null) {
@@ -306,15 +365,22 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     if (!book) {
       el("portfolioSetupDate").value ||= today();
       el("portfolioSetupDate").max = today();
-      message("portfolioSetupSummary", `${getPortfolioHoldings().length} saved holdings will become opening positions. Add or correct holdings below before starting.`);
+      message("portfolioSetupSummary", el("portfolioSetupMode").value === "history"
+        ? "Start with no opening positions and enter your actual past purchases and sales. Your saved holdings remain in the original browser snapshot."
+        : `${getPortfolioHoldings().length} saved holdings will become opening positions. Add or correct holdings below before starting.`);
       return;
     }
     el("portfolioBaseCurrency").value = book.settings.baseCurrency;
     el("portfolioStartDate").value = book.settings.startDate;
     el("portfolioStartDate").max = today();
-    el("portfolioStartDate").disabled = Boolean(book.transactions.length);
+    el("portfolioStartConfirmed").checked = false;
+    updateStartConfirmation();
+    el("portfolioHistoryStartDate").value ||= book.settings.startDate;
+    el("portfolioHistoryConfirmed").checked = false;
+    el("portfolioHistoryStartDate").max = today();
+    message("portfolioHistorySummary", `${book.openingHoldings.length} opening positions would be removed; ${book.transactions.length} saved transactions would be kept. Your current portfolio is exported before this change.`);
     settingsRevision = book.updatedAt;
-    el("transactionDate").min = book.settings.startDate;
+    el("transactionDate").min = "";
     el("transactionDate").max = today();
     renderRows();
     if (formRevision === null) clearTransaction();
@@ -322,7 +388,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
 
   function setBusy(value) {
     busy = value;
-    for (const id of ["portfolioSetupForm", "portfolioSettingsForm", "transactionForm"]) {
+    for (const id of ["portfolioSetupForm", "portfolioSettingsForm", "portfolioHistoryForm", "transactionForm"]) {
       el(id).setAttribute("aria-busy", String(value));
       el(id).querySelectorAll("input,select,textarea,button").forEach((control) => { control.disabled = value; });
     }
@@ -331,7 +397,6 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     doc.querySelectorAll("[data-edit-transaction], [data-delete-transaction]").forEach((control) => { control.disabled = value; });
     if (!value && getActivePortfolioBook()) {
       syncTransactionFields();
-      el("portfolioStartDate").disabled = Boolean(getActivePortfolioBook().transactions.length);
     }
   }
 
@@ -341,6 +406,12 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     el("portfolioSetupForm").addEventListener("submit", setup);
     el("transactionForm").addEventListener("submit", saveTransaction);
     el("portfolioSettingsForm").addEventListener("submit", saveSettings);
+    el("portfolioHistoryForm").addEventListener("submit", startHistory);
+    el("portfolioSetupMode").addEventListener("change", render);
+    el("portfolioStartDate").addEventListener("input", updateStartConfirmation);
+    el("portfolioStartDate").addEventListener("change", updateStartConfirmation);
+    el("transactionDate").addEventListener("input", updateDateHelp);
+    el("transactionDate").addEventListener("change", updateDateHelp);
     el("transactionType").addEventListener("change", syncTransactionFields);
     el("openTransactionEditor").addEventListener("click", () => openTransactionEditor());
     el("transactionCancel").addEventListener("click", () => { clearTransaction(); el("portfolioTransactionEditor").open = false; message("transactionMessage", "Edit cancelled."); });
@@ -357,7 +428,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     });
   }
 
-  return { initialize, setup, saveTransaction, saveSettings, removeTransaction, importBackup, restoreBackup, exportBackup,
+  return { initialize, setup, saveTransaction, saveSettings, startHistory, removeTransaction, importBackup, restoreBackup, exportBackup,
     openTransactionEditor, writeOpeningHoldings, refreshFromStorage, render,
     get book() { return getActivePortfolioBook(); }, get pendingBackup() { return pendingBackup; } };
 }
