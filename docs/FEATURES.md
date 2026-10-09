@@ -2,6 +2,16 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Portfolio foundation: opening positions and manual transactions
+
+**What changed:** Portfolio setup saves a reporting currency and tracking start date, preserving current holdings as opening positions without inventing earlier trades. Purchases, sales, deposits, withdrawals, cash dividends, fees, and opening cash update holdings and separate currency cash balances. The old editor remains available for correcting opening positions; later activity belongs in Transactions. Settings, the ledger, and backup controls are collapsed to keep the page compact.
+
+**How:** A versioned pure ledger projects chronological transactions with weighted purchase cost including fees. Complete-book validation rejects overselling even when a supporting purchase/opening position is edited or deleted, future dates, unsupported assets, duplicate IDs, and numeric overflow. A committed IndexedDB record becomes the source of holdings; the original localStorage holdings/text remain intact. Atomic revision checks prevent stale tabs from overwriting changes. Export/restore uses a bounded, validated portfolio-only JSON format; importing previews the contents and requires a separate Restore click. No server database is needed.
+
+**Limits:** Cash is recorded per currency and negative balances warn of incomplete funding. Historical returns, FX, monthly performance, stock splits, tax calculations, reports, and the AI analyst are later steps. The reporting currency does not convert balances yet. Opening positions describe the selected start date; entering old trades again would double-count them.
+
+**Validation:** All 202 tests pass, including 43 new model, storage, and controller checks for legacy preservation, same-day ordering, cost/cash math, atomic failures, stale tabs, overselling after edits/deletions, new ticker validation, opening-position editing/removal/Undo, backup previews, restore conflicts, and export isolation. HTML control/label structure and responsive form rules were checked. Browser inspection could not start: its helper exited with `windows sandbox failed: helper_unknown_error: setup refresh had errors`, so visual browser verification remains unavailable.
+
 ## 1. Qualified market signals
 
 **What changed:** Sample, stale, future-dated, and incomplete daily histories cannot generate buy, hold, sell, or allocation suggestions. Missing data has an explicit unavailable state. Signal strength is a rules-based score; market coverage is a count of qualified proxies, not a success probability.

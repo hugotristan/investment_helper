@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261008-grey">
+  <link rel="stylesheet" href="styles.css?v=20261009-portfolio">
   </head>
   <body>
     <div class="app-layout">
@@ -110,6 +110,17 @@
           </section>
 
           <section class="view-page" data-page="portfolio" aria-label="Portfolio" hidden>
+            <section class="panel portfolio-setup" id="portfolioSetup" aria-labelledby="portfolioSetupHeading">
+              <div class="section-heading"><h2 id="portfolioSetupHeading">Start portfolio tracking</h2></div>
+              <p id="portfolioSetupHelp" class="data-note">Your saved holdings become opening positions on the selected date. Earlier transactions and performance are not inferred.</p>
+              <form id="portfolioSetupForm" class="portfolio-book-form" aria-describedby="portfolioSetupHelp">
+                <label for="portfolioSetupCurrency"><span>Reporting currency</span><select id="portfolioSetupCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
+                <label for="portfolioSetupDate"><span>Tracking start date</span><input id="portfolioSetupDate" type="date" required></label>
+                <div class="portfolio-book-actions"><button id="portfolioSetupSave" type="submit">Start tracking</button></div>
+              </form>
+              <div id="portfolioSetupSummary" class="portfolio-setup-summary"></div>
+            </section>
+            <p id="portfolioBookStatus" class="portfolio-book-status" role="status" aria-live="polite" aria-atomic="true"></p>
             <section class="panel">
               <div class="section-heading"><h2>Holdings</h2><button id="openHoldingEditor" class="ghost" type="button">Add or edit holdings</button></div>
               <div id="portfolioReview" class="portfolio-review"><p class="empty-state">Add a holding to track its value and gain.</p></div>
@@ -132,6 +143,57 @@
                 <textarea id="myPortfolioInput" hidden aria-hidden="true" tabindex="-1"></textarea>
               </div>
             </details>
+            <div id="portfolioBookControls" class="portfolio-book-controls" hidden>
+              <details class="panel portfolio-book-disclosure">
+                <summary>Reporting settings</summary>
+                <div class="portfolio-book-content">
+                  <form id="portfolioSettingsForm" class="portfolio-book-form" aria-describedby="portfolioSettingsHelp">
+                    <label for="portfolioBaseCurrency"><span>Reporting currency</span><select id="portfolioBaseCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
+                    <label for="portfolioStartDate"><span>Tracking start date</span><input id="portfolioStartDate" type="date" required></label>
+                    <div class="portfolio-book-actions"><button id="portfolioSettingsSave" type="submit">Save settings</button></div>
+                  </form>
+                  <p id="portfolioSettingsHelp" class="data-note">Amounts stay in their original currencies. Currency conversion will be added later. The start date is fixed once transactions are recorded.</p>
+                </div>
+              </details>
+              <details class="panel portfolio-book-disclosure" id="portfolioTransactions">
+                <summary>Transactions <span id="portfolioTransactionCount" class="portfolio-transaction-count"></span></summary>
+                <div class="portfolio-book-content">
+                  <button id="openTransactionEditor" class="ghost" type="button" aria-controls="portfolioTransactionEditor">Record transaction</button>
+                  <details class="portfolio-transaction-editor" id="portfolioTransactionEditor">
+                    <summary>Record transaction</summary>
+                    <form id="transactionForm" class="portfolio-transaction-form" aria-describedby="transactionHelp">
+                      <input id="transactionId" type="hidden">
+                      <label for="transactionType"><span>Type</span><select id="transactionType" required><option value="buy">Buy</option><option value="sell">Sell</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="dividend">Dividend</option><option value="fee">Fee</option><option value="opening_cash">Opening cash</option></select></label>
+                      <label for="transactionDate"><span>Date</span><input id="transactionDate" type="date" required></label>
+                      <label for="transactionCurrency"><span>Currency</span><select id="transactionCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
+                      <label id="transactionTickerField" for="transactionTicker"><span>Ticker</span><input id="transactionTicker" type="text" placeholder="AAPL" autocomplete="off" spellcheck="false" required></label>
+                      <label id="transactionQuantityField" for="transactionQuantity"><span>Shares</span><input id="transactionQuantity" type="number" min="0.00000001" step="any" inputmode="decimal" required></label>
+                      <label id="transactionPriceField" for="transactionPrice"><span>Price per share</span><input id="transactionPrice" type="number" min="0" step="any" inputmode="decimal" required></label>
+                      <label id="transactionAmountField" for="transactionAmount" hidden><span>Amount</span><input id="transactionAmount" type="number" min="0" step="any" inputmode="decimal"></label>
+                      <label id="transactionFeeField" for="transactionFee"><span>Fee <small>optional</small></span><input id="transactionFee" type="number" min="0" step="any" inputmode="decimal" value="0"></label>
+                      <label class="portfolio-form-wide" for="transactionNote"><span>Note <small>optional</small></span><textarea id="transactionNote" rows="3" maxlength="500"></textarea></label>
+                      <p id="transactionHelp" class="data-note portfolio-form-wide">Use the actual transaction date and currency. Record deposits and withdrawals separately from trades.</p>
+                      <div class="portfolio-book-actions"><button id="transactionSave" type="submit">Save transaction</button><button id="transactionCancel" class="ghost" type="button" hidden>Cancel edit</button></div>
+                    </form>
+                  </details>
+                  <div id="transactionMessage" class="portfolio-book-status" role="status" aria-live="polite"></div>
+                  <div id="portfolioTransactionRows" class="portfolio-transaction-rows"></div>
+                </div>
+              </details>
+              <div id="portfolioCashSummary" class="portfolio-cash-summary"></div>
+            </div>
+              <details class="panel portfolio-book-disclosure">
+                <summary>Backup and restore</summary>
+                <div class="portfolio-book-content">
+                  <p id="portfolioBackupHelp" class="data-note">Export your portfolio to keep a copy. Choose a backup to review before restoring it.</p>
+                  <div class="portfolio-backup-controls">
+                    <button id="portfolioExport" class="ghost" type="button">Export backup</button>
+                    <label for="portfolioImport"><span>Choose a backup</span><input id="portfolioImport" type="file" accept=".json,application/json" aria-describedby="portfolioBackupHelp"></label>
+                  </div>
+                  <div id="portfolioBackupPreview" class="portfolio-backup-preview" role="status" aria-live="polite"></div>
+                  <button id="portfolioRestore" class="ghost" type="button" hidden>Restore this backup</button>
+                </div>
+              </details>
           </section>
 
           <section class="view-page" data-page="performance" aria-label="Performance" hidden>
@@ -171,6 +233,6 @@
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261008-prices"></script>
+  <script type="module" src="app.js?v=20261009-portfolio"></script>
   </body>
 </html>

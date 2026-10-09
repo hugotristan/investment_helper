@@ -3,6 +3,7 @@ import { calculateHoldings } from "../analysis/holdings.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
+import { getActivePortfolioBook, getPortfolioProjection } from "../portfolio-state.js";
 import { els } from "../ui/dom.js";
 
 export function buildPortfolioReview(results, marketContext) {
@@ -169,19 +170,20 @@ function renderHoldingCard(holding) {
       </div>
       <p class="muted-line">${escapeHtml(holding.ticker)} · ${escapeHtml(holding.currency)}</p>
       <div class="holding-values">${values}</div>
-      <p class="data-note">${manual ? "Legacy amount stays as entered. Edit to add shares and average purchase price." : Number.isFinite(holding.price)
+      <p class="data-note">${manual ? "Legacy amount stays as entered. Edit its opening position to add shares and average purchase price." : Number.isFinite(holding.price)
         ? `Price ${escapeHtml(currencyMoney(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
         : escapeHtml(holding.valuationError || "A qualified price in the purchase currency is unavailable.")}</p>
       <details class="secondary-details"><summary>Position checks · ${escapeHtml(holding.review.label)}</summary>
         <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
         ${item?.dataQuality?.eligible ? `<dl class="key-values"><div><dt>Score</dt><dd>${item.score}/100</dd></div><div><dt>1M</dt><dd>${formatPercent(item.oneMonth)}</dd></div><div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>` : ""}
       </details>
-      <button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>
+      ${getActivePortfolioBook() ? '<button type="button" class="ghost" data-portfolio-transactions>View transactions</button>' : `<button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>`}
     </article>
   `;
 }
 
 export function getPortfolioHoldings() {
+  if (getPortfolioProjection()) return getPortfolioProjection().holdings;
   if (Array.isArray(state.holdings)) return state.holdings;
   return parsePortfolioPositions(state.myPortfolioInput).map((holding, index) => ({
     ...holding, id: `legacy-${index}`, kind: "manual", currency: state.currency || "EUR"

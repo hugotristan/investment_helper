@@ -1,6 +1,6 @@
 # Investing tool
 
-A personal stock research app hosted on GitHub Pages, with a watchlist, holdings, and dated research picks saved in your browser.
+A personal stock research app hosted on GitHub Pages, with a watchlist, a manual portfolio ledger, and dated research picks saved in your browser.
 
 ## Run It
 
@@ -22,6 +22,7 @@ To run a local copy, serve the project directory over HTTP, then open the local 
 | `js/shared/` | Math, formatting, text, and symbol helpers |
 | `js/storage.js` | Browser-local settings and scan history |
 | `js/scan-state.js` | Latest scan results shared by the dashboard and screener |
+| `js/portfolio-state.js` | Committed portfolio ledger and its projected holdings |
 
 The same GitHub Pages workflow serves these modules directly. Saved browser settings continue to use the existing storage key.
 
@@ -99,9 +100,15 @@ The market-regime score combines qualified SPY, QQQ, IWM, VTI, TLT, HYG, LQD, GL
 
 Sources can explain and score candidates, but they cannot recommend a stock the app never scans. The default watchlist now includes a much wider opportunity universe instead of only SPY, QQQ, AAPL, MSFT, NVDA, TSLA, JPM, XOM, and UNH. Changing the watchlist or portfolio holdings automatically schedules a fresh scan.
 
-The personal portfolio starts empty. On Portfolio, select Add or edit holdings, enter a stock/ETF symbol, shares, average purchase price, and purchase currency, then select Save holding. New symbols are validated before saving. Qualified matching-currency quotes calculate current value, cost basis, unrealized gain, and allocation within each currency. Totals keep different currencies separate; gains exclude fees, dividends, taxes, and currency conversion. Missing or stale prices remain unavailable.
+The personal portfolio starts empty. On Portfolio, enter or correct any existing stock/ETF holdings, then choose a reporting currency and tracking start date under Start portfolio tracking. Existing holdings become opening positions; past trades, opening cash, and historical performance are not invented. Amount-only legacy entries stay as entered until you supply their shares and average purchase price in Opening positions. Your original localStorage snapshot and source text are retained for recovery.
 
-Existing text entries are preserved as manual amounts until edited into structured holdings; the app does not infer share counts or purchase prices. Holdings can be edited, removed, and restored with Undo. Saved holdings stay in the current browser's local storage and are not shared with other visitors or synced between devices. Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
+After setup, Record transaction saves purchases, sales, deposits, withdrawals, cash dividends, fees, and one opening cash balance per currency. New symbols must pass stock/ETF validation. Transactions update share quantities, weighted average cost (including purchase fees), and separate currency cash balances. Corrections or deletions cannot create a sale of more shares than were held on that date. Same-day entries use their recorded order; there is no short-selling or stock-split adjustment in this foundation. A negative recorded cash balance warns that funding history may be incomplete. Opening positions remain editable, subject to the same sale checks.
+
+Qualified matching-currency prices calculate current holding value, remaining cost basis, and unrealized gain. The reporting currency is saved for later reports; FX conversion, realized returns, monthly performance, taxes, and dividend-inclusive total returns are not yet calculated. Different currencies remain separate. The start date cannot change after transactions are recorded.
+
+The ledger uses browser-local IndexedDB; no database server, account, or broker connection is required. It is not shared with other visitors or synced between browsers/devices. Export backup downloads only the portfolio settings, opening positions, original source text, and transactions. Choose a JSON backup to preview it, then click Restore this backup to replace the tracked portfolio in that browser. Watchlists and research picks are separate. Export a backup before clearing browser/site data or moving to another browser. Local preview and GitHub Pages have separate browser storage.
+
+Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
 
 ## Recommendation Performance
 

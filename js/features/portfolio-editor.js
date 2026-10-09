@@ -12,6 +12,36 @@ let bound = false;
 let busy = false;
 let onChange = () => {};
 let lastRemoved = null;
+let adapter = null;
+let formRevision = null;
+
+export function configurePortfolioEditor(value) {
+  adapter = value;
+  lastRemoved = null;
+  clearForm();
+  renderHoldingEditor();
+  const summary = element("portfolioEditor")?.querySelector("summary strong");
+  if (summary) summary.textContent = adapter ? "Opening positions" : "Add or edit holdings";
+  const help = element("portfolioInputHelp");
+  if (help && adapter) help.textContent = "Positions held at your tracking start date. Later purchases and sales belong in Transactions. Changes must remain compatible with your saved sales.";
+}
+
+export function refreshPortfolioEditor() {
+  renderHoldingEditor();
+  // A blank form can adopt the new revision; a typed edit must stay protected.
+  if (adapter && ["holdingId", "holdingTicker", "holdingLabel", "holdingShares", "holdingCost"].every((id) => !element(id)?.value)) {
+    formRevision = adapter.revision();
+  }
+}
+
+function editableHoldings() { return adapter ? adapter.read() : getPortfolioHoldings(); }
+
+async function saveHoldings(holdings, revision) {
+  if (adapter) { await adapter.write(holdings, revision); return; }
+  const previous = state.holdings;
+  state.holdings = holdings;
+  try { persist(); } catch (error) { state.holdings = previous; throw error; }
+}
 
 export function initializePortfolio() {
   let migrationFailed = false;
@@ -50,6 +80,7 @@ async function saveHolding(event) {
   event.preventDefault();
   if (busy) return;
   const id = element("holdingId").value;
+  const expectedRevision = formRevision;
   const normalized = normalizeHolding({ id: id || crypto.randomUUID(), ticker: element("holdingTicker").value,
     label: element("holdingLabel").value, shares: element("holdingShares").value,
     averageCost: element("holdingCost").value, currency: element("holdingCurrency").value });
@@ -57,7 +88,7 @@ async function saveHolding(event) {
   const holding = normalized.holding;
   if (!currencies.has(holding.currency)) { setMessage("Choose one of the supported purchase currencies."); return; }
   if (isBlockedAssetTicker(holding.ticker)) { setMessage("Only stock and ETF holdings are supported."); return; }
-  if (id && !getPortfolioHoldings().some((row) => row.id === id)) { setMessage("That holding is no longer saved. Cancel the edit and start again."); return; }
+  if (id && !editableHoldings().some((row) => row.id === id)) { setMessage("That holding is no longer saved. Cancel the edit and start again."); return; }
   setBusy(true);
   setMessage(`Checking ${holding.ticker} against live stock and ETF data…`);
   try {
@@ -68,24 +99,23 @@ async function saveHolding(event) {
           : "The ticker could not be verified because market data is unavailable. Try again. No changes saved.");
       return;
     }
-    const previous = state.holdings;
-    const current = getPortfolioHoldings();
-    state.holdings = id ? current.map((row) => row.id === id ? holding : row) : current.concat(holding);
-    try { persist(); } catch (error) { state.holdings = previous; throw error; }
+    const current = editableHoldings();
+    await saveHoldings(id ? current.map((row) => row.id === id ? holding : row) : current.concat(holding), expectedRevision);
     clearForm();
     renderHoldingEditor();
     setMessage(`${holding.ticker} ${id ? "updated" : "added"}. Your holdings are saved in this browser.`);
     notifyChange();
-  } catch {
-    setMessage("Could not save this holding. Check market data and browser storage, then try again.");
+  } catch (error) {
+    setMessage(error.message || "Could not save this holding. Check market data and browser storage, then try again.");
   } finally {
     setBusy(false);
   }
 }
 
 function editHolding(id) {
-  const holding = getPortfolioHoldings().find((row) => row.id === id);
+  const holding = editableHoldings().find((row) => row.id === id);
   if (!holding) return;
+  formRevision = adapter?.revision() ?? null;
   element("holdingId").value = holding.id;
   element("holdingTicker").value = holding.ticker;
   element("holdingLabel").value = holding.label || "";
@@ -101,14 +131,15 @@ function editHolding(id) {
   element("holdingTicker").focus();
 }
 
-function removeHolding(id) {
-  const current = getPortfolioHoldings();
+async function removeHolding(id) {
+  const current = editableHoldings();
   const index = current.findIndex((row) => row.id === id);
   if (index < 0) return;
   const removed = current[index];
-  const previous = state.holdings;
-  state.holdings = current.filter((row) => row.id !== id);
-  try { persist(); } catch { state.holdings = previous; setMessage("Could not remove the holding from browser storage."); return; }
+  setBusy(true);
+  try { await saveHoldings(current.filter((row) => row.id !== id), adapter?.revision() ?? null); }
+  catch (error) { setMessage(error.message || "Could not remove the holding from browser storage."); return; }
+  finally { setBusy(false); }
   lastRemoved = { holding: removed, index };
   if (element("holdingId").value === id) clearForm();
   renderHoldingEditor();
@@ -116,15 +147,16 @@ function removeHolding(id) {
   notifyChange();
 }
 
-function undoRemoval() {
+async function undoRemoval() {
   if (!lastRemoved) return;
-  const previous = state.holdings;
-  const current = [...getPortfolioHoldings()];
+  const ticker = lastRemoved.holding.ticker;
+  const current = [...editableHoldings()];
   if (current.some((row) => row.id === lastRemoved.holding.id)) return;
   current.splice(Math.min(lastRemoved.index, current.length), 0, lastRemoved.holding);
-  state.holdings = current;
-  try { persist(); } catch { state.holdings = previous; setMessage("Could not restore the holding to browser storage."); return; }
-  const ticker = lastRemoved.holding.ticker;
+  setBusy(true);
+  try { await saveHoldings(current, adapter?.revision() ?? null); }
+  catch (error) { setMessage(error.message || "Could not restore the holding to browser storage."); return; }
+  finally { setBusy(false); }
   lastRemoved = null;
   renderHoldingEditor();
   setMessage(`${ticker} restored.`);
@@ -134,7 +166,7 @@ function undoRemoval() {
 function renderHoldingEditor() {
   const rows = element("holdingEditorRows");
   if (!rows) return;
-  const holdings = getPortfolioHoldings();
+  const holdings = editableHoldings();
   rows.innerHTML = holdings.length ? holdings.map((holding) => `<div class="holding-editor-row">
     <div class="holding-editor-name"><strong>${escapeHtml(holding.ticker)}</strong><span>${escapeHtml(holding.label)}</span></div>
     <div class="holding-editor-values"><span>${holding.kind === "manual" ? `Entered amount ${escapeHtml(number(holding.amount))}`
@@ -150,9 +182,10 @@ function clearForm() {
   if (!form) return;
   form.reset();
   element("holdingId").value = "";
+  formRevision = adapter?.revision() ?? null;
   element("holdingCurrency").value = currencies.has(state.currency) ? state.currency : "USD";
-  element("holdingSave").textContent = "Save holding";
-  element("holdingCancel").hidden = true;
+  element("holdingSave").textContent = adapter ? "Save opening position" : "Save holding";
+  element("holdingCancel").hidden = !adapter;
 }
 
 function setBusy(value) {

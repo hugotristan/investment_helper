@@ -8,6 +8,8 @@ import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
+import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js";
+import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
@@ -35,9 +37,10 @@ let cachedScanAt = null;
 
 init();
 
-function init() {
+async function init() {
   hydrateInputs();
   initializePerformance();
+  await initializePortfolioBook(portfolioChanged);
   bindEvents();
   syncActivePage();
   restoreCachedScan();
@@ -57,15 +60,13 @@ function hydrateInputs() {
 }
 
 function bindEvents() {
-  bindPortfolioEvents(() => {
-    renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
-    scheduleConfigScan();
-  });
+  bindPortfolioEvents(portfolioChanged);
   bindWatchlistEvents(scheduleConfigScan);
   bindOpportunityEvents(scheduleConfigScan);
   bindQuickSearch(runStockDetail);
 
   document.getElementById("openHoldingEditor").addEventListener("click", () => {
+    if (getActivePortfolioBook()) { openPortfolioTransactionEditor(); return; }
     document.getElementById("portfolioEditor").open = true;
     document.getElementById("holdingTicker").focus();
   });
@@ -102,6 +103,11 @@ function bindEvents() {
     if (event.key === "Enter") answerQuestion();
   });
   window.addEventListener("hashchange", syncActivePage);
+}
+
+function portfolioChanged() {
+  renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+  scheduleConfigScan();
 }
 
 async function runAnalysis(options = {}) {
