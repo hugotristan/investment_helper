@@ -2,6 +2,14 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Collapsible holdings by currency
+
+**What changed:** EUR and USD holdings can be opened or closed independently with the same +/− disclosure controls as Opening positions. Sections start open, and their current state survives price and portfolio refreshes. The top EUR portfolio totals remain visible.
+
+**How:** Native details/summary elements wrap each currency's summary and holding cards. The renderer reads each section's open state before replacing its contents. This affects display only and does not write portfolio data.
+
+**Validation:** All 283 tests pass. Existing currency renderer checks cover default-open sections, independent closed/open states after refresh, and unchanged monetary values and storage. Native disclosures provide keyboard interaction. Visual browser inspection was not performed.
+
 ## Portfolio totals in EUR
 
 **What changed:** Two flat figures at the top of Portfolio show Money put in and Total value in EUR. Money put in means deposits minus withdrawals, plus starting cash. Total value includes all qualified holding values and recorded cash. Existing stock gains and transaction data stay unchanged.

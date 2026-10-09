@@ -140,10 +140,13 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
   const currencyNote = portfolio.groups.some((group) => group.currency === "USD")
     ? `<p class="data-note">${rate ? `EUR in parentheses uses the ${escapeHtml(rate.date)} reference rate from the ECB. Costs and gains are converted USD figures, not your historical EUR costs or EUR investment return.`
       : "EUR equivalents are unavailable because a recent exchange rate could not be loaded. USD values remain visible."}</p>` : "";
+  const groupOpenStates = new Map(Array.from(els.portfolioReview.querySelectorAll?.(":scope > details[data-portfolio-currency]") || [],
+    (group) => [group.dataset.portfolioCurrency, group.open]));
   els.portfolioReview.innerHTML = `
     ${sourceWarning}
     ${currencyNote}
-    ${portfolio.groups.map((group) => `<section class="portfolio-currency-group"><h3>${escapeHtml(group.currency)} holdings</h3>
+    ${portfolio.groups.map((group) => `<details class="portfolio-currency-group" data-portfolio-currency="${escapeHtml(group.currency)}"${groupOpenStates.get(group.currency) === false ? "" : " open"}>
+      <summary class="control-summary"><strong>${escapeHtml(group.currency)} holdings</strong></summary>
       <div class="portfolio-summary">
         <article><span>${group.complete ? "Tracked value" : "Known tracked value"}</span><strong>${escapeHtml(money(group.total, group.currency))}</strong></article>
         <article><span>Cost basis</span><strong>${escapeHtml(money(group.costBasis, group.currency))}</strong></article>
@@ -151,7 +154,7 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
       </div>
       ${group.legacyCount ? `<p class="data-note">${group.legacyCount} legacy amount${group.legacyCount === 1 ? " is" : "s are"} included as entered. Group cost basis and gain / loss need share quantities and purchase prices for every holding.</p>` : ""}
       <div class="holding-grid">${group.holdings.map((holding) => renderHoldingCard(holding, money)).join("")}</div>
-    </section>`).join("")}
+    </details>`).join("")}
     <details class="secondary-details"><summary>Concentration checks</summary><div class="portfolio-notes">
       ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
     </div></details>

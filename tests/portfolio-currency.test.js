@@ -59,7 +59,7 @@ function browserFixture(t) {
 }
 
 function groupMarkup(html, currency) {
-  const match = html.match(new RegExp(`<section class="portfolio-currency-group"><h3>${currency} holdings</h3>([\\s\\S]*?)</section>`));
+  const match = html.match(new RegExp(`<details class="portfolio-currency-group" data-portfolio-currency="${currency}"(?: open)?>\\s*<summary class="control-summary"><strong>${currency} holdings</strong></summary>([\\s\\S]*?)(?=<details class="portfolio-currency-group"|<details class="secondary-details"><summary>Concentration checks)`));
   assert.ok(match, `${currency} group rendered`);
   return match[1];
 }
@@ -152,6 +152,16 @@ test("portfolio review converts every USD monetary line while preserving native 
   assert.doesNotMatch(euro, /\(€|EUR unavailable/);
   assert.match(html, /2026-10-09 reference rate/);
   assert.match(html, /not your historical EUR costs or EUR investment return/);
+  assert.match(html, /data-portfolio-currency="USD" open>/);
+  assert.match(html, /data-portfolio-currency="EUR" open>/);
+  els.portfolioReview.querySelectorAll = () => [
+    { dataset: { portfolioCurrency: "USD" }, open: false },
+    { dataset: { portfolioCurrency: "EUR" }, open: true }
+  ];
+  renderPortfolioReview(portfolio, "fixture", { now: NOW, exchangeRate: FX });
+  assert.match(els.portfolioReview.innerHTML, /data-portfolio-currency="USD">/);
+  assert.match(els.portfolioReview.innerHTML, /data-portfolio-currency="EUR" open>/);
+  assert.equal(labeledValue(groupMarkup(els.portfolioReview.innerHTML, "USD"), "Tracked value"), convertedMoney(500));
   assert.deepEqual({ holdings, results, portfolio, exchangeRate: FX, state, saved: [...browser.saved] }, before);
   assert.deepEqual(browser.writes, []);
   assert.deepEqual(portfolio.holdings.map(({ ticker, gain, gainPercent, status }) => ({ ticker, gain, gainPercent, status })), [
