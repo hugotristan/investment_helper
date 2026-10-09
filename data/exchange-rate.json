@@ -1,0 +1,1 @@
+{"schemaVersion":1,"available":true,"base":"USD","quote":"EUR","rate":0.89238,"date":"2026-10-09","source":"ECB reference rate via Frankfurter","sourceUrl":"https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur","retrievedAt":"2026-10-09T20:19:15.460Z"}

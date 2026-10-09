@@ -1,6 +1,8 @@
 import { broadFunds } from "../config/settings.js";
 import { calculateHoldings } from "../analysis/holdings.js";
+import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
+import { portfolioMoney } from "../shared/portfolio-money.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
 import { getActivePortfolioBook, getPortfolioProjection } from "../portfolio-state.js";
@@ -37,7 +39,7 @@ export function buildPortfolioReview(results, marketContext) {
     if (group.total && ownedTech / group.total >= 0.1) concentrationNotes.push(`${group.currency}: technology and semiconductor holdings can fall together.`);
   });
   if (marketContext?.score < 45) concentrationNotes.push(`Market regime is weak (${marketContext.label}), so new buys need a stricter setup.`);
-  if (!concentrationNotes.length) concentrationNotes.push("Values and weights are grouped by currency. No currency conversion is assumed.");
+  if (!concentrationNotes.length) concentrationNotes.push("Values and weights are grouped by their original currency.");
 
   return {
     holdings: enriched,
@@ -123,7 +125,7 @@ function portfolioHoldingReview(holding, marketContext) {
   };
 }
 
-export function renderPortfolioReview(portfolio, priceSource) {
+export function renderPortfolioReview(portfolio, priceSource, { now = Date.now(), exchangeRate = getExchangeRate({ now }) } = {}) {
   if (!portfolio.holdings.length) {
     els.portfolioReview.innerHTML = `<div class="empty-state">Add a holding to track its value and gain or loss.</div>`;
     return;
@@ -131,16 +133,22 @@ export function renderPortfolioReview(portfolio, priceSource) {
   const sourceWarning = priceSource === "sample"
     ? '<p class="data-note">Sample prices cannot value holdings or support position signals. Legacy amounts remain as entered.</p>'
     : '<p class="data-note">Values are grouped by currency. Manual amounts stay as entered.</p>';
+  const rate = normalizeExchangeRate(exchangeRate, { now });
+  const money = (value, currency, signed = false) => portfolioMoney(value, currency, { exchangeRate: rate, signed });
+  const currencyNote = portfolio.groups.some((group) => group.currency === "USD")
+    ? `<p class="data-note">${rate ? `EUR in parentheses uses the ${escapeHtml(rate.date)} reference rate from the ECB. Costs and gains are converted USD figures, not your historical EUR costs or EUR investment return.`
+      : "EUR equivalents are unavailable because a recent exchange rate could not be loaded. USD values remain visible."}</p>` : "";
   els.portfolioReview.innerHTML = `
     ${sourceWarning}
+    ${currencyNote}
     ${portfolio.groups.map((group) => `<section class="portfolio-currency-group"><h3>${escapeHtml(group.currency)} holdings</h3>
       <div class="portfolio-summary">
-        <article><span>${group.complete ? "Tracked value" : "Known tracked value"}</span><strong>${escapeHtml(currencyMoney(group.total, group.currency))}</strong></article>
-        <article><span>Cost basis</span><strong>${escapeHtml(currencyMoney(group.costBasis, group.currency))}</strong></article>
-        <article><span>Unrealized gain / loss</span><strong>${escapeHtml(gainMoney(group.gain, group.currency))}</strong></article>
+        <article><span>${group.complete ? "Tracked value" : "Known tracked value"}</span><strong>${escapeHtml(money(group.total, group.currency))}</strong></article>
+        <article><span>Cost basis</span><strong>${escapeHtml(money(group.costBasis, group.currency))}</strong></article>
+        <article><span>Unrealized gain / loss</span><strong>${escapeHtml(money(group.gain, group.currency, true))}</strong></article>
       </div>
       ${group.legacyCount ? `<p class="data-note">${group.legacyCount} legacy amount${group.legacyCount === 1 ? " is" : "s are"} included as entered. Group cost basis and gain / loss need share quantities and purchase prices for every holding.</p>` : ""}
-      <div class="holding-grid">${group.holdings.map(renderHoldingCard).join("")}</div>
+      <div class="holding-grid">${group.holdings.map((holding) => renderHoldingCard(holding, money)).join("")}</div>
     </section>`).join("")}
     <details class="secondary-details"><summary>Concentration checks</summary><div class="portfolio-notes">
       ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
@@ -148,17 +156,17 @@ export function renderPortfolioReview(portfolio, priceSource) {
   `;
 }
 
-function renderHoldingCard(holding) {
+function renderHoldingCard(holding, money) {
   const item = holding.analysis;
   const manual = holding.kind === "manual";
   const status = holding.status === "down" ? "In loss" : holding.status === "up" ? "In profit" : holding.status === "flat" ? "At cost" : "Gain / loss unavailable";
   const values = manual
-    ? `<div><span>Entered amount</span><strong>${escapeHtml(currencyMoney(holding.amount, holding.currency))}</strong></div>`
+    ? `<div><span>Entered amount</span><strong>${escapeHtml(money(holding.amount, holding.currency))}</strong></div>`
     : `<div><span>Shares</span><strong>${escapeHtml(quantity(holding.shares))}</strong></div>
-      <div><span>Average purchase</span><strong>${escapeHtml(currencyMoney(holding.averageCost, holding.currency))}</strong></div>
-      <div><span>Cost basis</span><strong>${escapeHtml(currencyMoney(holding.costBasis, holding.currency))}</strong></div>
-      <div><span>Current value</span><strong>${escapeHtml(currencyMoney(holding.currentValue, holding.currency))}</strong></div>
-      <div><span>Unrealized gain / loss</span><strong>${escapeHtml(gainMoney(holding.gain, holding.currency))}${Number.isFinite(holding.gainPercent) ? ` <small>${escapeHtml(formatPercent(holding.gainPercent))}</small>` : ""}</strong></div>`;
+      <div><span>Average purchase</span><strong>${escapeHtml(money(holding.averageCost, holding.currency))}</strong></div>
+      <div><span>Cost basis</span><strong>${escapeHtml(money(holding.costBasis, holding.currency))}</strong></div>
+      <div><span>Current value</span><strong>${escapeHtml(money(holding.currentValue, holding.currency))}</strong></div>
+      <div><span>Unrealized gain / loss</span><strong>${escapeHtml(money(holding.gain, holding.currency, true))}${Number.isFinite(holding.gainPercent) ? ` <small>${escapeHtml(formatPercent(holding.gainPercent))}</small>` : ""}</strong></div>`;
   return `
     <article class="holding-card ${holding.review.className}">
       <div class="holding-head">
@@ -171,7 +179,7 @@ function renderHoldingCard(holding) {
       <p class="muted-line">${escapeHtml(holding.ticker)} · ${escapeHtml(holding.currency)}</p>
       <div class="holding-values">${values}</div>
       <p class="data-note">${manual ? "Legacy amount stays as entered. Edit its opening position to add shares and average purchase price." : Number.isFinite(holding.price)
-        ? `Price ${escapeHtml(currencyMoney(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
+        ? `Price ${escapeHtml(money(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
         : escapeHtml(holding.valuationError || "A qualified price in the purchase currency is unavailable.")}</p>
       <details class="secondary-details"><summary>Position checks · ${escapeHtml(holding.review.label)}</summary>
         <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
@@ -188,16 +196,6 @@ export function getPortfolioHoldings() {
   return parsePortfolioPositions(state.myPortfolioInput).map((holding, index) => ({
     ...holding, id: `legacy-${index}`, kind: "manual", currency: state.currency || "EUR"
   }));
-}
-
-function currencyMoney(value, currency) {
-  if (!Number.isFinite(value)) return "Unavailable";
-  try { return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value); }
-  catch { return `${value.toFixed(2)} ${currency || ""}`.trim(); }
-}
-
-function gainMoney(value, currency) {
-  return Number.isFinite(value) ? `${value > 0 ? "+" : ""}${currencyMoney(value, currency)}` : "Unavailable";
 }
 
 function quantity(value) {

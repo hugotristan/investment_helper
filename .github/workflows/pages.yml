@@ -78,6 +78,27 @@ jobs:
           path: data/prices.json
           key: prices-${{ github.run_id }}
 
+      - name: Restore latest exchange rate snapshot
+        # Keep the last successful dated FX snapshot available during provider outages.
+        # The publisher never refreshes its date unless it receives a real newer rate.
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: data/exchange-rate.json
+          key: exchange-rate-${{ github.run_id }}
+          restore-keys: |
+            exchange-rate-
+
+      - name: Refresh EUR display exchange rate
+        run: node scripts/update-exchange-rate.mjs
+
+      - name: Preserve exchange rate snapshot
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: data/exchange-rate.json
+          key: exchange-rate-${{ github.run_id }}
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

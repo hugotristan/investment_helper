@@ -2,6 +2,14 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## EUR equivalents beside USD holdings
+
+**What changed:** USD holding amounts show their EUR equivalent in parentheses: average purchase, cost basis, current value, unrealized gain/loss, current share price, group totals, and entered legacy amounts. Shares, percentages, native gains, and saved transactions stay unchanged. A small note gives the reference-rate date and explains that converted costs/gains are not historical EUR costs or FX-adjusted EUR returns.
+
+**How:** A pure money formatter uses one validated USD-to-EUR rate for the entire holdings render. The publisher reads the ECB provider route from Frankfurter, writes a site-relative snapshot atomically, and retains recent successful data without redating it if the provider fails. Publishing and scheduled updates refresh the snapshot; the browser loads it with a short cache and rechecks its actual date before display. A release import map makes all portfolio consumers load the updated renderer consistently.
+
+**Validation:** All 265 tests pass. Formatter and renderer checks cover positive/negative/zero amounts, complete USD coverage, EUR and share/percentage preservation, legacy entries, unavailable prices, stale/unverified rates, numeric overflow, unchanged calculations and storage, provider retries/timeouts, original timestamps, and atomic publication. Visual browser inspection was not performed; responsive amount fields already allow wrapping.
+
 ## EUR cash for foreign trades
 
 **What changed:** Cash uses one account in the reporting currency, EUR by default. USD purchases retain their USD price, share quantity, and fee; the user enters the broker's final Total EUR paid (including fees). The cash total is deducted once. Sales use Net EUR received (after fees). The transaction list shows the native trade and actual cash settlement together. Older foreign transactions have a Complete cash amount action and leave the balance explicitly incomplete until edited.

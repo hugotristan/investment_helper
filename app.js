@@ -5,6 +5,7 @@ import { AUTO_REFRESH_DELAY_SECONDS, opportunityUniverse } from "./js/config/set
 import { applyQuoteSnapshot, loadMarketContext, loadQuoteSnapshots, loadTickerSeries } from "./js/data/market.js";
 import { loadNewsSources } from "./js/data/news.js";
 import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
+import { loadExchangeRate } from "./js/data/exchange-rate.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
@@ -121,6 +122,11 @@ function portfolioChanged() {
   scheduleConfigScan();
 }
 
+async function refreshPortfolioExchangeRate() {
+  await loadExchangeRate();
+  renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+}
+
 async function runAnalysis(options = {}) {
   if (isRunning) {
     if (options.reason === "config") pendingInputScan = true;
@@ -140,6 +146,7 @@ async function runAnalysis(options = {}) {
   scanStartedAt = Date.now();
   nextRunAt = null;
   pendingInputScan = false;
+  refreshPortfolioExchangeRate();
   updateRefreshTimer();
   setStatus("Updating…");
   setScanStage(`${cachedScanAt ? `Showing saved scan from ${new Date(cachedScanAt).toLocaleString()}. ` : ""}Refreshing prices and market context. Company research runs in the background.`);
