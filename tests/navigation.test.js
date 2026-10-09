@@ -11,7 +11,7 @@ function node(dataset = {}) {
     focus() { this.focused = true; } };
 }
 
-const routes = ["dashboard", "screener", "portfolio", "performance", "detail", "research", "signals", "ask", "sources"];
+const routes = ["dashboard", "screener", "portfolio", "portfolio-performance", "performance", "detail", "research", "signals", "ask", "sources"];
 const pages = routes.map((page) => node({ page }));
 const links = routes.map((pageLink) => node({ pageLink }));
 const nodes = new Map(["pageTitle", "navMore", "quickSearchForm", "quickSearchInput", "detailTickerInput"].map((id) => [id, node()]));
@@ -38,7 +38,9 @@ test("direct links show exactly one page and reveal secondary navigation when ne
     assert.deepEqual(pages.filter((page) => !page.hidden).map((page) => page.dataset.page), [route]);
     assert.deepEqual(links.filter((link) => link.attributes["aria-current"] === "page").map((link) => link.dataset.pageLink), [route]);
     assert.equal(pages.find((page) => page.dataset.page === route).classList.contains("active"), true);
-    if (["detail", "research", "signals", "ask", "sources"].includes(route)) assert.equal(nodes.get("navMore").open, true);
+    if (["performance", "detail", "research", "signals", "ask", "sources"].includes(route)) assert.equal(nodes.get("navMore").open, true);
+    if (route === "portfolio-performance") assert.equal(nodes.get("pageTitle").textContent, "Portfolio performance");
+    if (route === "performance") assert.equal(nodes.get("pageTitle").textContent, "Research picks");
   }
 });
 

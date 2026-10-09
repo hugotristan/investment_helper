@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261009-holdings-disclosures">
+    <link rel="stylesheet" href="styles.css?v=20261010-portfolio-performance">
   </head>
   <body>
     <div class="app-layout">
@@ -18,12 +18,13 @@
           <a href="#dashboard" data-page-link="dashboard"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span><span class="nav-label">Overview</span></a>
           <a href="#screener" data-page-link="screener"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 6h2M3 12h2M3 18h2M9 6h12M9 12h12M9 18h12"/></svg></span><span class="nav-label">Watchlist</span></a>
           <a href="#portfolio" data-page-link="portfolio"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18v14H3zM8 7V3h8v4M3 12h18M10 12v3h4v-3"/></svg></span><span class="nav-label">Portfolio</span></a>
-          <a href="#performance" data-page-link="performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/></svg></span><span class="nav-label">Performance</span></a>
+          <a href="#portfolio-performance" data-page-link="portfolio-performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/></svg></span><span class="nav-label">Performance</span></a>
         </nav>
         <details class="nav-more" id="navMore">
           <summary>More</summary>
           <nav class="page-nav secondary-nav" aria-label="Additional tools">
             <a href="#detail" data-page-link="detail">Stock details</a>
+            <a href="#performance" data-page-link="performance">Research picks</a>
             <a href="#research" data-page-link="research">Market &amp; research</a>
             <a href="#signals" data-page-link="signals">Signals</a>
             <a href="#ask" data-page-link="ask">Stock check</a>
@@ -220,7 +221,27 @@
               </details>
           </section>
 
-          <section class="view-page" data-page="performance" aria-label="Performance" hidden>
+          <section class="view-page" data-page="portfolio-performance" aria-label="Portfolio performance" hidden>
+            <section class="panel">
+              <div class="section-heading"><h2>Your portfolio</h2><a href="#portfolio">Transactions ↗</a></div>
+              <p id="portfolioPerformanceStatus" class="data-note" role="status" aria-live="polite">Loading recorded portfolio history.</p>
+              <div id="portfolioPerformanceSummary" class="portfolio-performance-summary"></div>
+              <div id="portfolioPerformanceReasons"></div>
+              <div id="portfolioPerformanceChart"></div>
+              <label class="portfolio-chart-control" for="portfolioChartDate"><span>Inspect a date</span><input id="portfolioChartDate" type="range" min="0" max="0" step="1" value="0" disabled></label>
+              <output id="portfolioChartReadout" for="portfolioChartDate" class="portfolio-chart-readout"></output>
+            </section>
+            <section class="panel"><div class="section-heading"><h2>Monthly performance</h2></div><div id="portfolioPerformanceMonths"></div></section>
+            <details class="panel portfolio-book-disclosure"><summary>Gains and costs</summary><div id="portfolioPerformanceHoldings" class="portfolio-book-content"></div></details>
+            <details class="panel portfolio-book-disclosure"><summary>How this is calculated</summary><div class="portfolio-book-content">
+              <p class="data-note">Monthly returns adjust for the size and timing of deposits and withdrawals using Modified Dietz, assuming end-of-day cash movements. The overall return links the monthly results. It is an approximation; large deposits or withdrawals can make it less accurate.</p>
+              <p class="data-note">Prices use daily closes; historical currency conversion uses the latest available ECB reference rate on or before each date, up to seven calendar days earlier. Recorded EUR trade settlements supply purchase cost and sale proceeds. Missing history and unresolved splits leave affected calculations unavailable.</p>
+              <p class="data-note">Dividends and fees affect your return when recorded. The SPY comparison is a price return in EUR and excludes benchmark dividends. Opening positions start performance at their market value on the tracking date; earlier performance and funding are not reconstructed. Net deposits are only the funding you recorded.</p>
+              <p class="data-note"><a href="https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/" target="_blank" rel="noopener noreferrer">Return calculation reference</a> · <a href="https://frankfurter.dev/" target="_blank" rel="noopener noreferrer">Historical exchange-rate source</a></p>
+            </div></details>
+          </section>
+
+          <section class="view-page" data-page="performance" aria-label="Research picks" hidden>
             <section class="panel performance-panel" aria-labelledby="performanceHeading">
               <div class="section-heading"><h2 id="performanceHeading">Recorded picks</h2><button id="exportRecommendations" class="ghost" type="button" disabled>Export</button></div>
               <div id="performanceSummary" class="performance-summary" aria-label="Pick performance summary"></div>
@@ -260,6 +281,8 @@
     <script type="importmap">
       {
         "imports": {
+          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261010-portfolio-performance",
+          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261010-portfolio-performance",
           "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261009-holdings-disclosures",
           "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261009-eur-cash",
           "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261009-eur-cash",
@@ -267,6 +290,6 @@
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261009-holdings-disclosures"></script>
+    <script type="module" src="app.js?v=20261010-portfolio-performance"></script>
   </body>
 </html>

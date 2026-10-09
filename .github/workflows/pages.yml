@@ -99,6 +99,25 @@ jobs:
           path: data/exchange-rate.json
           key: exchange-rate-${{ github.run_id }}
 
+      - name: Restore portfolio exchange rate history
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: data/portfolio-fx.json
+          key: portfolio-fx-${{ github.run_id }}
+          restore-keys: |
+            portfolio-fx-
+
+      - name: Refresh historical ECB exchange rates
+        run: node scripts/update-portfolio-fx.mjs
+
+      - name: Preserve portfolio exchange rate history
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: data/portfolio-fx.json
+          key: portfolio-fx-${{ github.run_id }}
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 

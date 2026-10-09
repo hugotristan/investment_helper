@@ -38,7 +38,7 @@ export function createYahooPriceFetcher({ fetchImpl = fetch, wait = sleep, timeo
     let lastFailure;
     for (const host of ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]) {
       const url = new URL(`https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}`);
-      url.search = new URLSearchParams({ range: "1y", interval: "1d", events: "splits" });
+      url.search = new URLSearchParams({ range: "5y", interval: "1d", events: "splits" });
       for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -88,9 +88,9 @@ function serializeQuote(quote, ticker, { currency = null, now = Date.now() } = {
 
 // Only completed daily bars are published. GeneratedAt describes the build;
 // historyAsOf and quoteTime always describe the provider's original prices.
-export function normalizePublishedPriceRecord(series, ticker, { quote = null, now = Date.now() } = {}) {
+export function normalizePublishedPriceRecord(series, ticker, { quote = null, now = Date.now(), requireQualified = true } = {}) {
   if (!series || series.ticker !== ticker || !validCurrency(series.currency) || !supportedType(series.instrumentType, ticker)
-    || /^sample\b/i.test(String(series.source || "")) || !series.source || !Array.isArray(series.prices)) return null;
+    || ![SOURCE, "Yahoo Finance chart"].includes(series.source) || !Array.isArray(series.prices) || series.prices.length > 1600) return null;
   const days = new Map();
   const today = day(now);
   for (const point of series.prices) {
@@ -101,19 +101,26 @@ export function normalizePublishedPriceRecord(series, ticker, { quote = null, no
       low: Number.isFinite(point.low) && point.low > 0 ? point.low : null,
       volume: Number.isFinite(point.volume) && point.volume >= 0 ? point.volume : null });
   }
-  const prices = [...days.values()].sort((a, b) => time(a.date) - time(b.date));
+  const allPrices = [...days.values()].sort((a, b) => time(a.date) - time(b.date));
+  // Trend scans only need the latest400 full daily bars. Performance history
+  // needs dated closes, so older bars omit unused OHLC/volume fields.
+  const prices = allPrices.map((point, index) => index < allPrices.length - 400 ? { date: point.date, close: point.close } : point);
+  const validSplit = (split) => Number.isFinite(time(split?.date)) && time(split.date) <= now
+    && Number.isFinite(split.numerator) && split.numerator > 0 && Number.isFinite(split.denominator) && split.denominator > 0;
+  const splitsComplete = series.splitsComplete !== false && Array.isArray(series.splits) && series.splits.every(validSplit);
   const record = { ticker, prices, historyAsOf: prices.at(-1)?.date || null,
     instrumentType: series.instrumentType, currency: series.currency,
-    splits: (series.splits || []).filter((split) => Number.isFinite(time(split?.date)) && time(split.date) <= now
-      && Number.isFinite(split.numerator) && split.numerator > 0 && Number.isFinite(split.denominator) && split.denominator > 0)
+    splitsComplete,
+    splits: (Array.isArray(series.splits) ? series.splits : []).filter(validSplit)
       .map((split) => ({ ...split, date: new Date(time(split.date)).toISOString() })), source: SOURCE,
     quote: serializeQuote(quote, ticker, { currency: series.currency, now }) };
-  return evaluateDataQuality(record, now).eligible ? record : null;
+  return prices.length && (!requireQualified || evaluateDataQuality(record, now).eligible) ? record : null;
 }
 
 function retainPriceRecord(previous, ticker, freshQuote, now) {
-  const prior = previous?.ticker === ticker ? previous : null;
-  const record = normalizePublishedPriceRecord(prior, ticker, { now });
+  const prior = previous?.ticker === ticker && previous?.source === SOURCE ? previous : null;
+  const record = normalizePublishedPriceRecord(prior, ticker, { now })
+    || prior?.source === SOURCE && normalizePublishedPriceRecord(prior, ticker, { now, requireQualified: false });
   const savedQuote = prior?.quote?.source === QUOTE_SOURCE ? prior.quote : null;
   const quote = serializeQuote(freshQuote, ticker, { currency: record?.currency, now })
     || serializeQuote(savedQuote, ticker, { currency: record?.currency, now });

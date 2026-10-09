@@ -12,6 +12,7 @@ import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfoli
 import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js?v=20261009-eur-cash";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
+import { initializePortfolioPerformance, refreshPortfolioPerformance } from "./js/features/portfolio-performance.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, renderWatchlist } from "./js/features/watchlist.js";
@@ -43,6 +44,7 @@ async function init() {
   hydrateInputs();
   initializePerformance();
   await initializePortfolioBook(portfolioChanged);
+  initializePortfolioPerformance();
   initializeTickerSuggestions();
   bindEvents();
   syncActivePage();
@@ -120,6 +122,7 @@ function bindEvents() {
 
 function portfolioChanged() {
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+  refreshPortfolioPerformance();
   scheduleConfigScan();
 }
 
@@ -148,6 +151,7 @@ async function runAnalysis(options = {}) {
   nextRunAt = null;
   pendingInputScan = false;
   refreshPortfolioExchangeRate();
+  refreshPortfolioPerformance();
   updateRefreshTimer();
   setStatus("Updating…");
   setScanStage(`${cachedScanAt ? `Showing saved scan from ${new Date(cachedScanAt).toLocaleString()}. ` : ""}Refreshing prices and market context. Company research runs in the background.`);

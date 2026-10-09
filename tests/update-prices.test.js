@@ -75,6 +75,33 @@ test("partial failures retain qualified previous history and quote dates without
   assert.notEqual(snapshot.generatedAt, previous.generatedAt);
 });
 
+test("publisher preserves full five-year price coverage within a bounded1600-point limit", async () => {
+  const snapshot = await generate({ fetchChart: async (ticker) => fixture(ticker, { count: 1250 }) });
+  assert.equal(snapshot.byTicker.AAPL.prices.length, 1250);
+  assert.deepEqual(Object.keys(snapshot.byTicker.AAPL.prices[0]), ["date", "close"]);
+  assert.equal(snapshot.byTicker.AAPL.prices[0].close, 100);
+  assert.equal(snapshot.byTicker.AAPL.prices.at(-400).volume, 1000000);
+  assert.equal(snapshot.byTicker.AAPL.prices.at(-400).high, 951);
+  const oversized = parseYahooChart(fixture("AAPL", { count: 1601 }), "AAPL");
+  assert.equal(normalizePublishedPriceRecord(oversized, "AAPL", { now: NOW }), null);
+  assert.equal(normalizePublishedPriceRecord({ ...oversized, prices: oversized.prices.slice(-250), source: "estimated" }, "AAPL", { now: NOW }), null);
+  const malformedSplit = { ...parseYahooChart(fixture("AAPL"), "AAPL"), splits: [{ date: "2026-09-01T13:30:00Z", numerator: 2, denominator: 0 }] };
+  const normalized = normalizePublishedPriceRecord(malformedSplit, "AAPL", { now: NOW });
+  assert.equal(normalized.splitsComplete, false);
+  assert.deepEqual(normalized.splits, []);
+});
+
+test("corrupt provider split events remain explicitly unknown after parsing and publishing", () => {
+  for (const splits of [{ badDate: { date: "wrong", numerator: 2, denominator: 1 } },
+    { badRatio: { date: NOW / 1000 - DAY / 1000, numerator: 2, denominator: 0 } }, null, []]) {
+    const input = fixture("AAPL");
+    input.chart.result[0].events.splits = splits;
+    const series = parseYahooChart(input, "AAPL");
+    assert.equal(series.splitsComplete, false);
+    assert.equal(normalizePublishedPriceRecord(series, "AAPL", { now: NOW }).splitsComplete, false);
+  }
+});
+
 test("a separately valid fresh quote can accompany retained history when current history is too short", async () => {
   const previous = await generate({ now: () => NOW - DAY, fetchChart: async (ticker) => fixture(ticker, { now: NOW - DAY }) });
   const snapshot = await generate({ previous, fetchChart: async (ticker) => fixture(ticker, { count: ticker === "AAPL" ? 100 : 250 }) });
@@ -83,22 +110,23 @@ test("a separately valid fresh quote can accompany retained history when current
   assert.match(snapshot.failures.AAPL, /200 recent completed/);
 });
 
-test("stale history cannot become current via generatedAt; independently recent quotes retain original times", async () => {
+test("stale history retains original dated portfolio coverage and cannot become a current scan via generatedAt", async () => {
   const previous = await generate({ now: () => NOW - 10 * DAY, fetchChart: async (ticker) => fixture(ticker, { now: NOW - 10 * DAY }) });
   previous.byTicker.AAPL.quote.quoteTime = new Date(NOW - DAY).toISOString();
   const snapshot = await generate({ previous, fetchChart: async (ticker) => {
     if (ticker === "AAPL") throw new YahooPriceFetchError("Provider unavailable");
     return fixture(ticker);
   } });
-  assert.deepEqual(snapshot.byTicker.AAPL.prices, []);
-  assert.equal(snapshot.byTicker.AAPL.historyAsOf, null);
+  assert.deepEqual(snapshot.byTicker.AAPL.prices, previous.byTicker.AAPL.prices);
+  assert.equal(snapshot.byTicker.AAPL.historyAsOf, previous.byTicker.AAPL.historyAsOf);
   assert.equal(snapshot.byTicker.AAPL.quote.quoteTime, new Date(NOW - DAY).toISOString());
   previous.byTicker.AAPL.quote.quoteTime = new Date(NOW - 8 * DAY).toISOString();
   const expired = await generate({ previous, fetchChart: async (ticker) => {
     if (ticker === "AAPL") throw new YahooPriceFetchError("Provider unavailable");
     return fixture(ticker);
   } });
-  assert.equal(expired.byTicker.AAPL, undefined);
+  assert.deepEqual(expired.byTicker.AAPL.prices, previous.byTicker.AAPL.prices);
+  assert.equal(expired.byTicker.AAPL.quote, null);
   assert.ok(expired.failures.AAPL);
 });
 
@@ -166,7 +194,7 @@ test("429 and 5xx retry once, honor bounded Retry-After, and request the specifi
     assert.equal(calls.length, 2);
     assert.deepEqual(waits, [1000]);
     assert.equal(calls[0].host, "query1.finance.yahoo.com");
-    assert.equal(calls[0].searchParams.get("range"), "1y");
+    assert.equal(calls[0].searchParams.get("range"), "5y");
     assert.equal(calls[0].searchParams.get("interval"), "1d");
     assert.equal(calls[0].searchParams.get("events"), "splits");
   }

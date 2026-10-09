@@ -37,18 +37,30 @@ function recordFor(snapshot, ticker) {
   return snapshot?.schemaVersion === 1 && Object.hasOwn(snapshot.byTicker || {}, ticker) ? snapshot.byTicker[ticker] : null;
 }
 
-export function readSnapshotSeries(snapshot, ticker, { now = Date.now() } = {}) {
+export function readSnapshotHistory(snapshot, ticker, { now = Date.now() } = {}) {
   const record = recordFor(snapshot, ticker);
-  if (!record || record.ticker !== ticker || /^sample\b/i.test(record.source || "")
-    || !record.source || !Array.isArray(record.prices) || record.prices.length > 400
-    || !/^[A-Za-z]{3}$/.test(record.currency || "")
+  if (!record || record.ticker !== ticker || record.source !== "Yahoo Finance published snapshot"
+    || !Array.isArray(record.prices) || record.prices.length > 1600
+    || !/^(?:[A-Z]{3}|GBp)$/.test(record.currency || "")
     || !["EQUITY", "ETF", "INDEX"].includes(String(record.instrumentType).toUpperCase())) return null;
   const prices = validHistoryPoints(record).map((point) => ({ ...point, date: new Date(point.date) }));
   const lastTime = prices.at(-1)?.date.getTime();
-  if (!Number.isFinite(lastTime) || lastTime > now) return null;
-  const series = { ticker, prices, historyAsOf: new Date(lastTime).toISOString(),
+  if (!Number.isFinite(lastTime) || lastTime > now || !Number.isFinite(new Date(now).getTime())) return null;
+  const splitsComplete = record.splitsComplete !== false && Array.isArray(record.splits) && record.splits.length <= 100
+    && record.splits.every((split) => Number.isFinite(Date.parse(split?.date)) && Date.parse(split.date) <= now
+      && Number.isFinite(split.numerator) && split.numerator > 0 && Number.isFinite(split.denominator) && split.denominator > 0);
+  return { ticker, prices, historyAsOf: new Date(lastTime).toISOString(),
     instrumentType: record.instrumentType, currency: record.currency,
-    splits: Array.isArray(record.splits) ? record.splits : [], source: "Yahoo Finance published snapshot" };
+    splits: splitsComplete ? record.splits.map((split) => ({ ...split })) : [], splitsComplete,
+    source: "Yahoo Finance published snapshot" };
+}
+
+export function readSnapshotSeries(snapshot, ticker, { now = Date.now() } = {}) {
+  const history = readSnapshotHistory(snapshot, ticker, { now });
+  if (!history) return null;
+  // Scan-cache records deliberately stay small; portfolio history uses all
+  // published completed closes through readSnapshotHistory instead.
+  const series = { ...history, prices: history.prices.slice(-400) };
   return evaluateDataQuality(series, now).eligible ? series : null;
 }
 

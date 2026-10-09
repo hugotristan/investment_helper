@@ -26,9 +26,16 @@ export function parseYahooChart(json, ticker) {
   }
   const prices = [...days.values()].sort((a, b) => a.date - b.date);
   if (!prices.length) return null;
+  const rawSplits = result.events?.splits;
+  const splitEvents = rawSplits && typeof rawSplits === "object" && !Array.isArray(rawSplits) ? Object.values(rawSplits) : [];
+  const validSplit = (event) => Number.isFinite(event?.date) && Number.isFinite(new Date(event.date * 1000).getTime())
+    && Number.isFinite(event.numerator) && event.numerator > 0 && Number.isFinite(event.denominator) && event.denominator > 0;
+  const splitsComplete = (rawSplits === undefined || rawSplits !== null && typeof rawSplits === "object" && !Array.isArray(rawSplits))
+    && splitEvents.every(validSplit);
   return { ticker: String(ticker).toUpperCase(), prices, historyAsOf: prices.at(-1).date.toISOString(),
     instrumentType: result.meta.instrumentType, currency: result.meta.currency,
-    splits: Object.values(result.events?.splits || {}).filter((event) => Number.isFinite(event.date))
+    splitsComplete,
+    splits: splitEvents.filter(validSplit)
       .map((event) => ({ date: new Date(event.date * 1000).toISOString(), numerator: event.numerator,
         denominator: event.denominator, splitRatio: event.splitRatio })), source: "Yahoo Finance chart" };
 }

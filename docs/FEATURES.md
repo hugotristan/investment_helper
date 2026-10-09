@@ -2,6 +2,16 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Personal portfolio calculations and performance
+
+**What changed:** The main Performance page shows your own EUR portfolio value, growth since the tracking start, approximate cash-flow-adjusted returns, and a matched SPY EUR price benchmark. It includes a daily value/net-funding chart with a date slider, monthly results, and collapsed EUR realized/unrealized gains, income, fees, and individual investments including sold positions. Only the latest 12 months start visible. The recommendation journal is separate under More → Research picks.
+
+**How:** A read-only pure calculator replays the validated ledger. Actual EUR settlements define weighted purchase cost and net sale proceeds without a second fee debit. Dated historical ECB rates value foreign holdings/cash; real Yahoo daily closes provide up to five years of prices for 97 covered symbols. Monthly Modified Dietz uses end-of-day funding weights and geometrically links complete months. The first funded date anchors the benchmark; completely inactive months are visible and excluded, while missing invested periods never reset the return. Opening snapshots separate tracking growth from cost-basis gains. Pages atomically publishes/caches historical FX, preserves old observations during outages, and retains full dated price history. Older bars store only dates/closes, reducing the price payload 35% to about 10 MB; regular scans remain bounded to 400 full bars.
+
+**Limits:** Returns are approximate; SPY excludes dividends while the portfolio includes recorded income. Current-day UTC bars are excluded, so this report can differ from live quotes. Seven-day historical carry handles non-trading days without future data. Incomplete cash, missing history/FX, amount-only opening positions, and unrecorded splits remain unavailable. Foreign opening costs and fee subtotals are marked as estimates. No personal records, backup format, or native holding profit formula change. Older-than-five-year and non-covered ticker history may be unavailable.
+
+**Validation:** All 329 tests pass, including 26 model checks and new history, publisher, renderer, chart-gap, and navigation checks. Independent accounting examples verify actual EUR cost basis, partial/full sales, dividends/fees, and Modified Dietz against the GIPS worked example. Missing funding, stale/future data, splits, zero-capital periods, benchmark boundaries, calendar/UTC boundaries, overflows, and input/storage preservation are covered. Real source updates returned 97 five-year price histories with zero provider failures and six ECB currency histories with 1,287 dated observations each. Synthetic portfolio rendering was visually checked at narrow and desktop widths; the real app's empty-portfolio route started successfully without console errors. User portfolio data was not read or modified during verification.
+
 ## Collapsible holdings by currency
 
 **What changed:** EUR and USD holdings can be opened or closed independently with the same +/− disclosure controls as Opening positions. Sections start open, and their current state survives price and portfolio refreshes. The top EUR portfolio totals remain visible.
