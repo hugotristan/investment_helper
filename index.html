@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261009-eur-display">
+    <link rel="stylesheet" href="styles.css?v=20261009-portfolio-totals">
   </head>
   <body>
     <div class="app-layout">
@@ -110,6 +110,10 @@
           </section>
 
           <section class="view-page" data-page="portfolio" aria-label="Portfolio" hidden>
+            <div id="portfolioTotals" class="portfolio-totals" aria-label="Portfolio totals">
+              <article><span>Money put in</span><strong>Loading…</strong></article>
+              <article><span>Total value</span><strong>Loading…</strong></article>
+            </div>
             <section class="panel portfolio-setup" id="portfolioSetup" aria-labelledby="portfolioSetupHeading">
               <div class="section-heading"><h2 id="portfolioSetupHeading">Start portfolio tracking</h2></div>
               <p id="portfolioSetupHelp" class="data-note">Keep saved holdings uses an opening snapshot on the selected date. Enter past transactions starts with no opening positions so you can record the purchases. Your original saved holdings remain in the browser copy.</p>
@@ -256,13 +260,13 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261009-eur-display",
+          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261009-portfolio-totals",
           "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261009-eur-cash",
           "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261009-eur-cash",
           "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261009-eur-cash"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261009-eur-display"></script>
+    <script type="module" src="app.js?v=20261009-portfolio-totals"></script>
   </body>
 </html>

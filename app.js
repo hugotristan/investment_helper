@@ -47,6 +47,7 @@ async function init() {
   bindEvents();
   syncActivePage();
   restoreCachedScan();
+  renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
   startRefreshTicker();
   runAnalysis();
 }

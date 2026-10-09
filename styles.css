@@ -409,6 +409,11 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .holding-values strong, .portfolio-summary strong, .fundamental-metric strong, .fundamentals-valuation strong { font-family: "JetBrains Mono", Consolas, monospace; }
 
 /* Portfolio tracking keeps setup short and its ledger controls expandable. */
+.portfolio-totals { display: grid; min-width: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 32px; }
+.portfolio-totals > article { min-width: 0; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.portfolio-totals > article > span { display: block; color: var(--muted-foreground); font-size: .8rem; }
+.portfolio-totals > article > strong { display: block; min-width: 0; margin-top: 8px; font-family: "JetBrains Mono", Consolas, monospace; font-size: clamp(1.35rem, 2.4vw, 1.85rem); font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.45; overflow-wrap: anywhere; }
+.portfolio-totals > .portfolio-total-note, .portfolio-totals > .data-note { grid-column: 1 / -1; margin: 0; color: var(--muted-foreground); font-size: .8rem; overflow-wrap: anywhere; }
 .portfolio-setup > .data-note { max-width: 760px; margin-top: 0; }
 .portfolio-book-form, .portfolio-transaction-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 18px 16px; }
 .portfolio-transaction-form { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 22px; }
@@ -580,6 +585,8 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
   .fundamentals-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {
+  .portfolio-totals { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .portfolio-totals > .portfolio-total-note, .portfolio-totals > .data-note { margin-top: 14px; }
   .portfolio-book-form, .portfolio-transaction-form { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .portfolio-book-controls { gap: 20px; }
   .portfolio-book-content { padding-top: 20px; }

@@ -1,5 +1,6 @@
 import { broadFunds } from "../config/settings.js";
 import { calculateHoldings } from "../analysis/holdings.js";
+import { calculatePortfolioTotals } from "../analysis/portfolio-totals.js";
 import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -126,6 +127,8 @@ function portfolioHoldingReview(holding, marketContext) {
 }
 
 export function renderPortfolioReview(portfolio, priceSource, { now = Date.now(), exchangeRate = getExchangeRate({ now }) } = {}) {
+  const rate = normalizeExchangeRate(exchangeRate, { now });
+  renderPortfolioTotals(portfolio.holdings, rate, now);
   if (!portfolio.holdings.length) {
     els.portfolioReview.innerHTML = `<div class="empty-state">Add a holding to track its value and gain or loss.</div>`;
     return;
@@ -133,7 +136,6 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
   const sourceWarning = priceSource === "sample"
     ? '<p class="data-note">Sample prices cannot value holdings or support position signals. Legacy amounts remain as entered.</p>'
     : '<p class="data-note">Values are grouped by currency. Manual amounts stay as entered.</p>';
-  const rate = normalizeExchangeRate(exchangeRate, { now });
   const money = (value, currency, signed = false) => portfolioMoney(value, currency, { exchangeRate: rate, signed });
   const currencyNote = portfolio.groups.some((group) => group.currency === "USD")
     ? `<p class="data-note">${rate ? `EUR in parentheses uses the ${escapeHtml(rate.date)} reference rate from the ECB. Costs and gains are converted USD figures, not your historical EUR costs or EUR investment return.`
@@ -154,6 +156,17 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
       ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
     </div></details>
   `;
+}
+
+function renderPortfolioTotals(holdings, exchangeRate, now) {
+  const target = globalThis.document?.getElementById("portfolioTotals");
+  if (!target) return;
+  const totals = calculatePortfolioTotals({ holdings, book: getActivePortfolioBook(),
+    projection: getPortfolioProjection(), exchangeRate, now });
+  target.innerHTML = `<article><span>Money put in</span><strong>${escapeHtml(portfolioMoney(totals.contributed, "EUR"))}</strong></article>
+    <article><span>Total value</span><strong>${escapeHtml(portfolioMoney(totals.totalValue, "EUR"))}</strong></article>
+    <p class="portfolio-total-note">Deposits minus withdrawals, plus starting cash. Total value includes holdings and cash.</p>
+    ${totals.reasons.length ? `<p class="portfolio-total-note">${totals.reasons.slice(0, 2).map(escapeHtml).join(" ")}</p>` : ""}`;
 }
 
 function renderHoldingCard(holding, money) {

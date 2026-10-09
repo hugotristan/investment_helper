@@ -2,6 +2,14 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Portfolio totals in EUR
+
+**What changed:** Two flat figures at the top of Portfolio show Money put in and Total value in EUR. Money put in means deposits minus withdrawals, plus starting cash. Total value includes all qualified holding values and recorded cash. Existing stock gains and transaction data stay unchanged.
+
+**How:** A pure totals calculator separates external funding from buys, sales, dividends, and fees. It uses actual recorded EUR funding amounts, the current qualified USD-to-EUR rate for current USD assets, and the authoritative cash projection once. Opening positions do not invent earlier funding; missing valuation/cash/FX data leaves the full number unavailable. The saved portfolio renders immediately during startup, before network refreshes; the summary also renders before the empty-holdings message so cash-only portfolios work. The two figures wrap to one column on mobile.
+
+**Validation:** All 283 tests pass. Model and renderer checks cover mixed EUR/USD holdings and cash, funding without purchase double-counting, withdrawals/dividends/fees, opening-history gaps, stale/missing rates and quotes, legacy values, incomplete cash, cash-only and sold-out portfolios, signed contributions, negative funding balances, floating-point pennies, numeric overflow, and unchanged inputs/storage. Visual browser inspection was not performed.
+
 ## EUR equivalents beside USD holdings
 
 **What changed:** USD holding amounts show their EUR equivalent in parentheses: average purchase, cost basis, current value, unrealized gain/loss, current share price, group totals, and entered legacy amounts. Shares, percentages, native gains, and saved transactions stay unchanged. A small note gives the reference-rate date and explains that converted costs/gains are not historical EUR costs or FX-adjusted EUR returns.
