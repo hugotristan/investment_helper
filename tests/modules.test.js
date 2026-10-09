@@ -139,7 +139,9 @@ test("all native module imports resolve without circular dependencies", async ()
   for (const [file, imports] of graph) {
     const source = await readFile(new URL(file), "utf8");
     for (const match of source.matchAll(/^import .* from "([^"]+)";/gm)) {
-      const target = new URL(match[1], file).href;
+      const targetUrl = new URL(match[1], file);
+      targetUrl.search = ""; // Release query strings select fresh browser assets, not different source files.
+      const target = targetUrl.href;
       assert(graph.has(target), `Missing module: ${target}`);
       imports.push(target);
     }

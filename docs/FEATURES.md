@@ -2,6 +2,14 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## Ticker suggestions
+
+**What changed:** Portfolio ticker inputs, stock detail, the header search, and watchlist additions suggest matching stocks/ETFs from the first letter or company name. Up to eight matches show their symbol and name. Arrow keys/Enter, mouse, and touch select a symbol without submitting the form. Watchlist selection preserves any symbols before the current comma/semicolon.
+
+**How:** A shared catalog combines configured symbols/aliases, bundled SEC issuer names, and published instrument names from same-origin files. Matches rank exact/prefix results before substring results; the catalog is a limited suggestion list, not proof that any typed symbol is valid. Existing save-time validation remains in place. The combobox uses accessible listbox options, safe text rendering, and response checks that prevent delayed catalog loads from reopening dismissed lists or replacing newer input. The updated portfolio module has a release query so browsers load the historical-date fix promptly.
+
+**Validation:** All 227 tests pass. Search/interaction tests cover one-letter and company-name matching, determinism/limits, unavailable catalogs, invalid/crypto/index exclusion, keyboard and pointer selection without submission, disabled fields, safe labels, duplicate binding, dismissal, delayed responses, and multiple watchlist symbols. The module import check resolves release queries to their source files. HTML control structure and dropdown placement rules were checked; native visual inspection remains unavailable.
+
 ## Past portfolio transactions
 
 **What changed:** Transaction dates can be in the past. An empty opening portfolio automatically extends its tracking start to the earliest transaction. Setup offers an empty starting point for full history; an existing portfolio can switch through Reporting settings → Enter my full transaction history, with an exported recovery backup and explicit confirmation. Existing transactions are kept.

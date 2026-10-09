@@ -33,6 +33,7 @@ See [the feature change log](docs/FEATURES.md) for the behavior, implementation,
 ## What It Does
 
 - Runs immediately when the page opens.
+- Suggests stock/ETF tickers and names from the first typed letter in portfolio forms, stock detail, the header search, and watchlist additions. Select with the mouse/touch or arrow keys plus Enter. Suggestions use the configured catalog and bundled issuer names; other symbols can still be typed and are validated when saved.
 - Opens to an index-performance chart, a graph of six saved watchlist tickers' one-day moves, and up to three stocks to review. Prices, dates, and concrete reasons remain available; supporting evidence and risks are expandable.
 - Uses a soft grey canvas, slightly lighter square panels, a fixed desktop sidebar, and compact navigation icons. The four main pages are Overview, Watchlist, Portfolio, and Performance. Additional research tools and source diagnostics are under More.
 - Compares SPY and QQQ percentage changes from the same displayed daily-close baseline over one month, three months, or one year. Missing or unqualified history has an explicit unavailable state.

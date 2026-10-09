@@ -8,7 +8,7 @@ import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
-import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js";
+import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js?v=20261009-history";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { answerQuestion } from "./js/features/questions.js";
@@ -21,6 +21,7 @@ import { persist, saveLearningSnapshot, state } from "./js/storage.js";
 import { renderAll } from "./js/ui/dashboard.js";
 import { els, setStatus } from "./js/ui/dom.js";
 import { bindQuickSearch, syncActivePage } from "./js/ui/navigation.js";
+import { bindTickerAutocomplete } from "./js/ui/ticker-autocomplete.js";
 import { renderDashboardOverview } from "./js/ui/overview.js";
 import { bindOpportunityEvents } from "./js/features/opportunities.js";
 import { scanState } from "./js/scan-state.js";
@@ -41,11 +42,21 @@ async function init() {
   hydrateInputs();
   initializePerformance();
   await initializePortfolioBook(portfolioChanged);
+  initializeTickerSuggestions();
   bindEvents();
   syncActivePage();
   restoreCachedScan();
   startRefreshTicker();
   runAnalysis();
+}
+
+function initializeTickerSuggestions() {
+  for (const id of ["holdingTicker", "transactionTicker", "detailTickerInput", "quickSearchInput", "watchlistAddInput"]) {
+    bindTickerAutocomplete(document.getElementById(id), { multiple: id === "watchlistAddInput", onSelect: id === "holdingTicker" ? (item) => {
+      const label = document.getElementById("holdingLabel");
+      if (!label.value.trim()) label.value = item.label;
+    } : undefined });
+  }
 }
 
 function hydrateInputs() {
@@ -81,7 +92,7 @@ function bindEvents() {
 
   els.detailButton.addEventListener("click", () => runStockDetail());
   els.detailTickerInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") runStockDetail();
+    if (event.key === "Enter" && !event.defaultPrevented) runStockDetail();
   });
 
   document.addEventListener("click", (event) => {

@@ -37,6 +37,12 @@ input, select { min-height: 42px; padding: 0 12px; }
 textarea { min-height: 130px; padding: 12px; resize: vertical; line-height: 1.65; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: .85; }
+.ticker-autocomplete { position: relative; }
+.ticker-suggestions { position: absolute; z-index: 25; top: 100%; inset-inline: 0; display: grid; max-height: 280px; overflow-y: auto; margin: 4px 0 0; padding: 4px 0; list-style: none; border: 1px solid var(--border-strong); background: var(--input); box-shadow: 0 8px 20px #17171720; }
+.ticker-suggestion { display: grid; grid-template-columns: minmax(45px, auto) minmax(0, 1fr); align-items: start; gap: 12px; padding: 9px 12px; color: var(--foreground); cursor: pointer; font-size: .8rem; line-height: 1.4; }
+.ticker-suggestion:hover, .ticker-suggestion.is-active { background: var(--muted-strong); }
+.ticker-suggestion-symbol { font-weight: 600; }
+.ticker-suggestion-label { overflow-wrap: anywhere; color: var(--muted-foreground); }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 h1, h2, h3, h4, p { margin-top: 0; }
 h1, h2, h3, h4 { color: var(--foreground); font-weight: 500; line-height: 1.4; letter-spacing: -.02em; }
