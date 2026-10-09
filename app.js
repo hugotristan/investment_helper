@@ -8,7 +8,7 @@ import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
-import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js?v=20261009-history";
+import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js?v=20261009-eur-cash";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { answerQuestion } from "./js/features/questions.js";

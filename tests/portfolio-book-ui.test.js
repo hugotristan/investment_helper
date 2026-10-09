@@ -5,11 +5,11 @@ import { serializePortfolioBackup } from "../js/data/portfolio-book-store.js";
 
 const nodes = new Map();
 function node(id) {
-  if (!nodes.has(id)) nodes.set(id, { value: "", textContent: "", innerHTML: "", hidden: false, disabled: false,
+  if (!nodes.has(id)) nodes.set(id, { get value() { return this._value || ""; }, set value(value) { this._value = String(value); }, textContent: "", innerHTML: "", hidden: false, disabled: false,
     open: false, dataset: {}, listeners: {}, addEventListener(type, callback) { this.listeners[type] = callback; }, setAttribute() {}, focus() {}, querySelector() { return null; },
     querySelectorAll() { return []; }, reset() {
       if (id === "transactionForm") {
-        for (const field of ["Id", "Ticker", "Quantity", "Price", "Amount", "Note"]) node(`transaction${field}`).value = "";
+        for (const field of ["Id", "Ticker", "Quantity", "Price", "Amount", "Note", "CashAmount"]) node(`transaction${field}`).value = "";
         node("transactionType").value = "buy";
         node("transactionFee").value = "0";
       }
@@ -67,9 +67,15 @@ function fixture(initial = null, options = {}) {
 
 function fill(controller, values) {
   controller.openTransactionEditor(values.id || null);
-  for (const [key, value] of Object.entries({ type: "buy", date: "2026-10-09", ticker: "AAPL", currency: "USD", quantity: "2", price: "150", fee: "1", ...values })) {
+  const fields = { type: "buy", date: "2026-10-09", ticker: "AAPL", currency: "USD", quantity: "2", price: "150", fee: "1", ...values };
+  fields.cashAmount ??= fields.currency === "USD" ? String(["buy", "sell"].includes(fields.type)
+    ? Number(fields.quantity) * Number(fields.price) + (fields.type === "buy" ? Number(fields.fee) : -Number(fields.fee)) : fields.amount) : "";
+  for (const [key, value] of Object.entries(fields)) {
     node(`transaction${key[0].toUpperCase()}${key.slice(1)}`).value = value;
   }
+  node("transactionType").listeners.change();
+  node("transactionCashAmount").value = fields.cashAmount;
+  node("transactionCashAmount").listeners.input();
 }
 
 test("setup preserves current holdings and legacy source without changing localStorage snapshot", async () => {
@@ -111,7 +117,7 @@ test("trades update ledger holdings only after the storage commit", async () => 
   assert.equal(await pending, true);
   assert.equal(getPortfolioHoldings()[0].shares, 12);
   assert.equal(getPortfolioHoldings()[0].averageCost, 1301 / 12);
-  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "USD", amount: -301 }]);
+  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "EUR", amount: -301 }]);
   assert.match(node("portfolioCashSummary").innerHTML, /negative/);
 });
 
@@ -142,11 +148,11 @@ test("cash and dividend forms ignore stale hidden trade fields", async () => {
   await f.controller.initialize();
   fill(f.controller, { type: "deposit", amount: "1000" });
   assert.equal(await f.controller.saveTransaction(), true);
-  assert.deepEqual(f.stored.transactions[0], { id: "tx-1", type: "deposit", date: "2026-10-09", currency: "USD", note: "", amount: 1000 });
+  assert.deepEqual(f.stored.transactions[0], { id: "tx-1", type: "deposit", date: "2026-10-09", currency: "USD", note: "", amount: 1000, cashCurrency: "EUR", cashAmount: 1000 });
   fill(f.controller, { type: "dividend", amount: "10" });
   assert.equal(await f.controller.saveTransaction(), true);
   assert.equal(f.stored.transactions[1].ticker, "AAPL");
-  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "USD", amount: 1010 }]);
+  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "EUR", amount: 1010 }]);
 });
 
 test("overselling and deleting a purchase required by a later sale fail atomically", async () => {
@@ -270,9 +276,11 @@ test("start dates remain editable after transactions, with explicit review of op
   assert.equal(f.stored.settings.startDate, "2026-10-02");
   assert.equal(f.stored.transactions[0].date, "2026-10-09");
   node("portfolioBaseCurrency").value = "USD";
-  assert.equal(await f.controller.saveSettings(), true);
-  assert.equal(f.stored.settings.baseCurrency, "USD");
+  assert.equal(await f.controller.saveSettings(), false);
+  assert.equal(f.stored.settings.baseCurrency, "EUR");
+  assert.match(node("portfolioBookStatus").textContent, /require converting/);
   assert.equal(f.stored.transactions[0].currency, "USD");
+  assert.equal(f.stored.transactions[0].cashCurrency, "EUR");
 });
 
 test("history setup starts empty and preserves the previous browser snapshot", async () => {
@@ -301,7 +309,7 @@ test("past transactions automatically extend an empty opening portfolio to the e
   assert.equal(await f.controller.saveTransaction(), true);
   assert.equal(f.stored.settings.startDate, "2021-05-01");
   assert.equal(f.stored.transactions[0].date, "2021-05-03");
-  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "USD", amount: 699 }]);
+  assert.deepEqual(projectPortfolioBook(f.stored).cash, [{ currency: "EUR", amount: 699 }]);
 });
 
 test("backdating cannot silently double-count today's opening holdings", async () => {
@@ -417,4 +425,153 @@ test("the existing holding editor saves opening positions after a transaction, w
   await click({ undoHolding: "" });
   assert.equal(f.stored.openingHoldings.length, 2);
   assert.equal(f.stored.openingHoldings.find((h) => h.ticker === "MSFT").id, added.id);
+});
+
+test("EUR funding and EUR/USD purchases share one cash balance with no double fee", async () => {
+  const f = fixture(createPortfolioBook({ holdings: [], startDate: "2026-10-01", now: timestamp }));
+  await f.controller.initialize();
+  fill(f.controller, { type: "deposit", currency: "EUR", amount: "10000" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { ticker: "SWRD", currency: "EUR", quantity: "10", price: "500", fee: "0" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { ticker: "MSFT", quantity: "10", price: "200", fee: "5", cashAmount: "1800" });
+  assert.match(node("transactionFxPreview").textContent, /1,800/);
+  assert.equal(await f.controller.saveTransaction(), true);
+  const projection = projectPortfolioBook(f.stored);
+  assert.deepEqual(projection.cash, [{ currency: "EUR", amount: 3200 }]);
+  assert.equal(projection.reportingCash.complete, true);
+  const msft = projection.holdings.find((h) => h.ticker === "MSFT");
+  assert.equal(msft.currency, "USD");
+  assert.equal(msft.averageCost, 200.5);
+  assert.deepEqual(f.stored.transactions.map((t) => [t.cashCurrency, t.cashAmount]), [["EUR", 10000], ["EUR", 5000], ["EUR", 1800]]);
+  assert.match(node("portfolioTransactionRows").innerHTML, /fees included/);
+  assert(!node("portfolioCashSummary").innerHTML.includes("USD"));
+});
+
+test("the actual EUR300 MSFT charge is authoritative and survives edits/deletion", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { type: "deposit", currency: "EUR", amount: "1000" });
+  await f.controller.saveTransaction();
+  fill(f.controller, { ticker: "MSFT", quantity: "1", price: "325", fee: "1", cashAmount: "300" });
+  assert.equal(node("transactionCashAmount").required, true);
+  assert.equal(node("transactionCurrencyLabel").textContent, "Price currency");
+  assert.equal(node("transactionFeeLabel").textContent, "Fee in USD");
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 700);
+  assert.equal(getPortfolioHoldings().find((h) => h.ticker === "MSFT").averageCost, 326);
+  f.controller.openTransactionEditor("tx-2");
+  assert.equal(node("transactionCashAmount").value, "300");
+  assert.equal(node("transactionFee").value, "1");
+  node("transactionCashAmount").value = "350";
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 650);
+  assert.equal(f.stored.transactions.length, 2);
+  await f.controller.removeTransaction("tx-2");
+  assert.equal(await f.controller.removeTransaction("tx-2"), true);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 1000);
+});
+
+test("foreign cash totals are required and invalid totals never reach storage", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  for (const cashAmount of ["", "-300", "Infinity", "three hundred"]) {
+    fill(f.controller, { cashAmount });
+    assert.equal(await f.controller.saveTransaction(), false);
+    assert.equal(f.writes, 0);
+    assert.equal(f.controller.book.transactions.length, 0);
+    assert.equal(node("transactionCashAmount").value, cashAmount);
+  }
+  assert.equal(f.checked.length, 0);
+});
+
+test("legacy USD entries need actual EUR totals and can be completed through Edit", async () => {
+  const original = book();
+  original.transactions = [
+    { id: "funding", type: "deposit", date: "2026-10-01", currency: "EUR", amount: 1000 },
+    { id: "old-msft", type: "buy", date: "2026-10-02", currency: "USD", ticker: "MSFT", quantity: 1, price: 325, amount: 325, fee: 1 }
+  ];
+  const f = fixture(original);
+  await f.controller.initialize();
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, null);
+  assert.match(node("portfolioCashSummary").innerHTML, /Known EUR cash/);
+  assert.match(node("portfolioCashSummary").innerHTML, /1 transaction needs EUR/);
+  assert(!node("portfolioCashSummary").innerHTML.includes("cash is negative"));
+  assert.match(node("portfolioTransactionRows").innerHTML, /EUR cash amount needed/);
+  const button = { dataset: { editTransaction: "old-msft" } };
+  documentClicks.forEach((callback) => callback({ target: { closest: () => button } }));
+  assert.equal(node("transactionId").value, "old-msft");
+  assert.equal(node("transactionCashAmount").value, "");
+  assert.equal(await f.controller.saveTransaction(), false);
+  node("transactionCashAmount").value = "300";
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.transactions.length, 2);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 700);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.complete, true);
+  assert.match(node("portfolioCashSummary").innerHTML, /Recorded cash/);
+});
+
+test("native EUR totals are computed or overridden; currency/type changes clear stale totals", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { ticker: "SWRD", currency: "EUR", price: "100", fee: "2", cashAmount: "" });
+  assert.equal(node("transactionCashAmount").required, false);
+  assert.equal(node("transactionCashAmount").placeholder, "202");
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.transactions[0].cashAmount, 202);
+  fill(f.controller, { ticker: "SWRD", currency: "EUR", price: "100", fee: "2", cashAmount: "201.99" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.transactions[1].cashAmount, 201.99);
+  fill(f.controller, { cashAmount: "300" });
+  node("transactionCurrency").value = "EUR";
+  node("transactionCurrency").listeners.change();
+  assert.equal(node("transactionCashAmount").value, "");
+  assert.equal(node("transactionCashAmount").required, false);
+  node("transactionCashAmount").value = "999";
+  node("transactionType").value = "deposit";
+  node("transactionType").listeners.change();
+  assert.equal(node("transactionCashField").hidden, true);
+  assert.equal(node("transactionCashAmount").disabled, true);
+  node("transactionAmount").value = "100";
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.equal(f.stored.transactions[2].cashAmount, 100);
+});
+
+test("foreign sale/dividend/fee and native withdrawal use final cash directions", async () => {
+  const f = fixture(book());
+  await f.controller.initialize();
+  fill(f.controller, { type: "sell", quantity: "1", price: "150", fee: "2", cashAmount: "135" });
+  assert.equal(node("transactionCashLabel").textContent, "Net EUR received (after fees)");
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { type: "dividend", amount: "10", cashAmount: "9" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { type: "fee", amount: "2", cashAmount: "1.80" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { type: "withdrawal", currency: "EUR", amount: "50" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert(Math.abs(projectPortfolioBook(f.stored).reportingCash.amount - 92.2) < 1e-9);
+  fill(f.controller, { type: "sell", quantity: "1", price: "1", fee: "2", cashAmount: "1" });
+  assert.equal(await f.controller.saveTransaction(), false);
+  assert.match(node("transactionMessage").textContent, /fees greater than/);
+  assert.equal(f.stored.transactions.length, 4);
+});
+
+test("editing notes preserves restored same-currency net cash overrides", async () => {
+  const original = book();
+  original.transactions = [
+    { id: "funding", type: "deposit", date: "2026-10-01", currency: "EUR", amount: 100, cashCurrency: "EUR", cashAmount: 100 },
+    { id: "withdrawal", type: "withdrawal", date: "2026-10-02", currency: "EUR", amount: 25, cashCurrency: "EUR", cashAmount: 22 },
+    { id: "dividend", type: "dividend", ticker: "AAPL", date: "2026-10-02", currency: "EUR", amount: 100, cashCurrency: "EUR", cashAmount: 85 }
+  ];
+  const f = fixture(original);
+  await f.controller.initialize();
+  for (const id of ["withdrawal", "dividend"]) {
+    f.controller.openTransactionEditor(id);
+    assert.equal(node("transactionCashField").hidden, false);
+    node("transactionNote").value = "Broker statement checked";
+    assert.equal(await f.controller.saveTransaction(), true);
+    assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 163);
+  }
+  assert.equal(f.stored.transactions[1].cashAmount, 22);
+  assert.equal(f.stored.transactions[2].cashAmount, 85);
 });

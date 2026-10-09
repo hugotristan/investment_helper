@@ -423,6 +423,10 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .portfolio-form-wide { grid-column: 1 / -1; }
 .portfolio-transaction-form textarea { min-height: 88px; }
 .portfolio-transaction-form .data-note { margin: 0; }
+.portfolio-cash-field { display: grid; min-width: 0; gap: 12px; padding-top: 18px; border-top: 1px solid var(--border); }
+.portfolio-cash-field > label { min-width: 0; max-width: 360px; }
+.portfolio-cash-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.portfolio-cash-actions > .portfolio-book-status { flex: 1 1 250px; margin: 0; }
 .portfolio-book-controls { display: grid; min-width: 0; gap: 24px; }
 .portfolio-book-disclosure > summary { min-height: 32px; color: var(--foreground); font-size: .95rem; }
 .portfolio-transaction-count { margin-left: 8px; color: var(--muted-foreground); font-size: .78rem; }

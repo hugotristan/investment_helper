@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261009-tickers">
+    <link rel="stylesheet" href="styles.css?v=20261009-eur-cash">
   </head>
   <body>
     <div class="app-layout">
@@ -154,7 +154,7 @@
                     <label id="portfolioStartConfirmation" class="portfolio-checkbox portfolio-form-wide" for="portfolioStartConfirmed" hidden><input id="portfolioStartConfirmed" type="checkbox"><span>My opening positions represent holdings on the new start date.</span></label>
                     <div class="portfolio-book-actions"><button id="portfolioSettingsSave" type="submit">Save settings</button></div>
                   </form>
-                  <p id="portfolioSettingsHelp" class="data-note">Amounts stay in their original currencies. Use the date when the opening positions represent your holdings.</p>
+                  <p id="portfolioSettingsHelp" class="data-note">The cash account uses the reporting currency. Trade prices stay in their original currencies. Changing the reporting currency does not convert earlier saved settlements. Use the date when opening positions represent your holdings.</p>
                   <details class="secondary-details portfolio-history-disclosure">
                     <summary>Enter my full transaction history</summary>
                     <div class="portfolio-book-content">
@@ -179,12 +179,17 @@
                       <input id="transactionId" type="hidden">
                       <label for="transactionType"><span>Type</span><select id="transactionType" required><option value="buy">Buy</option><option value="sell">Sell</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="dividend">Dividend</option><option value="fee">Fee</option><option value="opening_cash">Opening cash</option></select></label>
                       <label for="transactionDate"><span>Date</span><input id="transactionDate" type="date" aria-describedby="transactionDateHelp" required></label>
-                      <label for="transactionCurrency"><span>Currency</span><select id="transactionCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
+                      <label for="transactionCurrency"><span id="transactionCurrencyLabel">Currency</span><select id="transactionCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
                       <label id="transactionTickerField" for="transactionTicker"><span>Ticker</span><input id="transactionTicker" type="text" placeholder="AAPL" autocomplete="off" spellcheck="false" required></label>
                       <label id="transactionQuantityField" for="transactionQuantity"><span>Shares</span><input id="transactionQuantity" type="number" min="0.00000001" step="any" inputmode="decimal" required></label>
                       <label id="transactionPriceField" for="transactionPrice"><span>Price per share</span><input id="transactionPrice" type="number" min="0" step="any" inputmode="decimal" required></label>
                       <label id="transactionAmountField" for="transactionAmount" hidden><span>Amount</span><input id="transactionAmount" type="number" min="0" step="any" inputmode="decimal"></label>
-                      <label id="transactionFeeField" for="transactionFee"><span>Fee <small>optional</small></span><input id="transactionFee" type="number" min="0" step="any" inputmode="decimal" value="0"></label>
+                      <label id="transactionFeeField" for="transactionFee"><span><span id="transactionFeeLabel">Fee</span> <small>optional</small></span><input id="transactionFee" type="number" min="0" step="any" inputmode="decimal" value="0"></label>
+                      <div id="transactionCashField" class="portfolio-cash-field portfolio-form-wide" hidden>
+                        <label for="transactionCashAmount"><span id="transactionCashLabel">Total EUR paid (including fees)</span><input id="transactionCashAmount" type="number" min="0" step="any" inputmode="decimal" aria-describedby="transactionCashHelp transactionFxPreview"></label>
+                      <p id="transactionCashHelp" class="data-note">Enter the final EUR debit, including USD fees and conversion costs. Fees are not deducted again. The trade price stays in its original currency.</p>
+                        <div class="portfolio-cash-actions"><p id="transactionFxPreview" class="portfolio-book-status" role="status" aria-live="polite"></p></div>
+                      </div>
                       <label class="portfolio-form-wide" for="transactionNote"><span>Note <small>optional</small></span><textarea id="transactionNote" rows="3" maxlength="500"></textarea></label>
                       <p id="transactionDateHelp" class="data-note portfolio-form-wide">Enter the actual date, including past dates.</p>
                       <p id="transactionHelp" class="data-note portfolio-form-wide">Record deposits and withdrawals separately from trades.</p>
@@ -248,6 +253,15 @@
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script type="module" src="app.js?v=20261009-tickers"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261009-eur-cash",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261009-eur-cash",
+          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261009-eur-cash"
+        }
+      }
+    </script>
+    <script type="module" src="app.js?v=20261009-eur-cash"></script>
   </body>
 </html>

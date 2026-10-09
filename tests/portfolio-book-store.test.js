@@ -15,6 +15,21 @@ function book() {
   ], legacyPortfolioInput: "SWRD | Legacy fund | 300 | down", baseCurrency: "EUR", startDate: "2026-10-01", now: NOW - 86400000 });
 }
 
+function settlementBook() {
+  const original = book();
+  original.transactions = [
+    { id: "eur-deposit", type: "deposit", date: "2026-10-01", currency: "EUR", amount: 10000, cashCurrency: "EUR", cashAmount: 10000 },
+    { id: "usd-buy", type: "buy", date: "2026-10-03", currency: "USD", ticker: "AAPL", quantity: 10, price: 200, fee: 2, cashCurrency: "EUR", cashAmount: 1800, note: "Broker's actual EUR total includes fees" },
+    { id: "usd-sale", type: "sell", date: "2026-10-04", currency: "USD", ticker: "AAPL", quantity: 1, price: 250, fee: 2, cashCurrency: "EUR", cashAmount: 225 },
+    { id: "legacy-dividend", type: "dividend", date: "2026-10-05", currency: "USD", ticker: "AAPL", amount: 10 }
+  ].map((input) => {
+    const result = normalizeTransaction(input, { startDate: original.settings.startDate, now: NOW, baseCurrency: original.settings.baseCurrency });
+    assert.equal(result.ok, true, result.error);
+    return result.transaction;
+  });
+  return original;
+}
+
 // This fake has one database and serial transactions on its one object store.
 // Request success stages a put; only commit changes the persisted Map. Tests can
 // hold a successful request open or abort it before the transaction completes.
@@ -298,4 +313,87 @@ test("backup limits use UTF-8 bytes and reject oversized ledgers before import",
   const oversized = JSON.stringify({ ...envelope, portfolio: { ...book(), transactions: Array(MAX_PORTFOLIO_TRANSACTIONS + 1).fill({}) } });
   assert.match(parsePortfolioBackup(oversized, { now: NOW }).error, /10,000 transactions/);
   assert.equal(parsePortfolioBackup("x".repeat(MAX_PORTFOLIO_BACKUP_BYTES + 1)).ok, false);
+});
+
+test("v1 backup export and import preserve actual settlement totals alongside native trades and legacy flows", () => {
+  const original = settlementBook();
+  const serialized = serializePortfolioBackup(original, { now: NOW });
+  const envelope = JSON.parse(serialized);
+  assert.equal(envelope.backupVersion, 1);
+  assert.equal(envelope.portfolio.schemaVersion, 1);
+  const parsed = parsePortfolioBackup(serialized, { now: NOW });
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.book, original);
+  assert.equal(parsed.book.transactions[1].cashCurrency, "EUR");
+  assert.equal(parsed.book.transactions[1].cashAmount, 1800);
+  assert.equal(parsed.book.transactions[1].currency, "USD");
+  assert.equal(parsed.book.transactions[1].amount, 2000);
+  assert.equal(parsed.book.transactions[1].fee, 2);
+  assert.equal(parsed.book.transactions[2].cashAmount, 225);
+  assert.equal(Object.hasOwn(parsed.book.transactions[3], "cashCurrency"), false);
+  assert.equal(Object.hasOwn(parsed.book.transactions[3], "cashAmount"), false);
+  original.transactions[1].cashAmount = 999;
+  assert.equal(parsed.book.transactions[1].cashAmount, 1800);
+  assert.equal(parsed.book.legacyPortfolioInput, "SWRD | Legacy fund | 300 | down");
+});
+
+test("IndexedDB commits and reloads settlement pairs without losing native fields or adding conversions to legacy flows", async () => {
+  const idb = fakeIndexedDB();
+  const store = createPortfolioBookStore({ indexedDB: idb, now: NOW });
+  const original = settlementBook();
+  const expected = clone(original);
+  const saving = store.write(original, { expectedUpdatedAt: null });
+  original.transactions[1].cashAmount = 1;
+  const saved = await saving;
+  assert.deepEqual(saved, expected);
+  assert.deepEqual(idb.values.get(PORTFOLIO_BOOK_KEY), expected);
+  const reloadedStore = createPortfolioBookStore({ indexedDB: idb, now: NOW });
+  const reloaded = await reloadedStore.read();
+  assert.deepEqual(reloaded, expected);
+  assert.equal(reloaded.transactions[1].cashAmount, 1800);
+  assert.equal(reloaded.transactions[1].amount, 2000);
+  assert.equal(reloaded.transactions[1].currency, "USD");
+  assert.equal(Object.hasOwn(reloaded.transactions[3], "cashAmount"), false);
+  reloaded.transactions[1].cashCurrency = "USD";
+  assert.equal((await reloadedStore.read()).transactions[1].cashCurrency, "EUR");
+  assert.equal(idb.values.size, 1);
+});
+
+test("existing v1 IndexedDB books and backups with no settlement fields remain readable", async () => {
+  const legacy = book();
+  const result = normalizeTransaction({ id: "old-sale", type: "sell", date: "2026-10-04", currency: "USD", ticker: "AAPL", quantity: 1, price: 10, fee: 20 }, { startDate: legacy.settings.startDate, now: NOW });
+  assert.equal(result.ok, true, result.error);
+  legacy.transactions = [result.transaction];
+  const store = createPortfolioBookStore({ indexedDB: fakeIndexedDB({ initial: legacy }), now: NOW });
+  assert.deepEqual(await store.read(), legacy);
+  const parsed = parsePortfolioBackup(serializePortfolioBackup(legacy, { now: NOW }), { now: NOW });
+  assert.deepEqual(parsed, { ok: true, book: legacy, error: null });
+  assert.equal(Object.hasOwn(parsed.book.transactions[0], "cashCurrency"), false);
+  assert.equal(Object.hasOwn(parsed.book.transactions[0], "cashAmount"), false);
+});
+
+test("backup and IndexedDB boundaries reject incomplete or mismatched settlement pairs without replacing saved data", async () => {
+  const original = settlementBook();
+  const envelope = JSON.parse(serializePortfolioBackup(original, { now: NOW }));
+  for (const mutate of [
+    (entry) => { delete entry.cashAmount; },
+    (entry) => { delete entry.cashCurrency; },
+    (entry) => { entry.cashCurrency = "USD"; }
+  ]) {
+    const invalid = clone(original); mutate(invalid.transactions[1]);
+    assert.throws(() => serializePortfolioBackup(invalid, { now: NOW }), /supplied together|reporting currency/);
+    const parsed = parsePortfolioBackup(JSON.stringify({ ...envelope, portfolio: invalid }), { now: NOW });
+    assert.equal(parsed.ok, false);
+    assert.equal(parsed.book, null);
+    assert.match(parsed.error, /supplied together|reporting currency/);
+    const idb = fakeIndexedDB({ initial: original });
+    const store = createPortfolioBookStore({ indexedDB: idb, now: NOW });
+    await assert.rejects(store.write(invalid, { expectedUpdatedAt: original.updatedAt }), { code: "INVALID_BOOK" });
+    assert.deepEqual(idb.values.get(PORTFOLIO_BOOK_KEY), original);
+    assert.deepEqual(await store.read(), original);
+    const invalidDisk = fakeIndexedDB({ initial: invalid });
+    const reading = createPortfolioBookStore({ indexedDB: invalidDisk, now: NOW });
+    await assert.rejects(reading.read(), { code: "INVALID_BOOK" });
+    assert.deepEqual(invalidDisk.values.get(PORTFOLIO_BOOK_KEY), invalid);
+  }
 });

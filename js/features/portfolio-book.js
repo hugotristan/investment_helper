@@ -8,6 +8,7 @@ import { configurePortfolioEditor, refreshPortfolioEditor } from "./portfolio-ed
 import { getPortfolioHoldings } from "./portfolio.js";
 
 const labels = { buy: "Purchase", sell: "Sale", deposit: "Deposit", withdrawal: "Withdrawal", dividend: "Dividend", fee: "Fee", opening_cash: "Opening cash" };
+const debits = new Set(["buy", "withdrawal", "fee"]);
 
 export function createPortfolioBookController({ store = portfolioBookStore, document: doc = globalThis.document,
   now = () => Date.now(), uuid = () => crypto.randomUUID(), validateTicker = validateWatchlistTicker,
@@ -135,9 +136,21 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
         ...(trade || type === "dividend" ? { ticker: el("transactionTicker").value } : {}),
         ...(trade ? { quantity: el("transactionQuantity").value, price: el("transactionPrice").value, fee: el("transactionFee").value || 0 }
           : { amount: el("transactionAmount").value }), note: el("transactionNote").value },
-      { startDate, now: now() });
+      { startDate, now: now(), baseCurrency: book.settings.baseCurrency });
       if (!normalized.ok) throw new TypeError(normalized.error);
-      const transaction = normalized.transaction;
+      const native = normalized.transaction;
+      const foreign = native.currency !== book.settings.baseCurrency;
+      const previous = book.transactions.find((t) => t.id === id);
+      const separateCash = trade || type === "dividend" || (previous?.cashCurrency && previous.cashAmount !== previous.amount);
+      const enteredCash = el("transactionCashAmount").value.trim();
+      if (foreign && !enteredCash) throw new TypeError(`Enter the actual ${book.settings.baseCurrency} cash amount from your broker, including fees. No exchange rate is assumed.`);
+      const nativeCash = trade ? native.amount + (type === "buy" ? native.fee : -native.fee) : native.amount;
+      if (nativeCash < 0) throw new TypeError("A sale with fees greater than its proceeds cannot be recorded as net cash received. Record the separately charged fee as a Fee transaction.");
+      const settled = normalizeTransaction({ ...native, cashCurrency: book.settings.baseCurrency,
+        cashAmount: foreign || (separateCash && enteredCash) ? enteredCash : nativeCash },
+      { startDate, now: now(), baseCurrency: book.settings.baseCurrency });
+      if (!settled.ok) throw new TypeError(settled.error);
+      const transaction = settled.transaction;
       message("transactionMessage", transaction.ticker ? `Checking ${transaction.ticker}…` : "Saving…");
       if (transaction.ticker) await verifyTicker(transaction.ticker, book);
       const transactions = id ? book.transactions.map((t) => t.id === id ? transaction : t) : [...book.transactions, transaction];
@@ -173,6 +186,9 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const book = getActivePortfolioBook();
       if (!book || settingsRevision !== book.updatedAt) throw new TypeError("Portfolio settings changed. Reload before saving.");
       const settings = { baseCurrency: el("portfolioBaseCurrency").value, startDate: el("portfolioStartDate").value };
+      if (settings.baseCurrency !== book.settings.baseCurrency && book.transactions.some((t) => t.cashCurrency)) {
+        throw new TypeError(`Saved cash amounts are recorded in ${book.settings.baseCurrency}. Changing the cash currency would require converting those records; no amounts were changed.`);
+      }
       if (settings.startDate !== book.settings.startDate) {
         checkOpeningCashDate(book, settings.startDate);
         if (book.openingHoldings.length && !el("portfolioStartConfirmed").checked) {
@@ -181,7 +197,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       }
       await commit(changed(book, { settings }), book.updatedAt);
       clearTransaction();
-      message("portfolioBookStatus", "Reporting settings saved. Amounts remain in their recorded currencies.");
+      message("portfolioBookStatus", "Settings saved. Trade prices and cash amounts keep their recorded currencies.");
     });
   }
 
@@ -278,6 +294,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     el("transactionDate").value = today();
     el("transactionDate").max = today();
     el("transactionCurrency").value = getActivePortfolioBook()?.settings.baseCurrency || "EUR";
+    el("transactionCashAmount").value = "";
     el("transactionSave").textContent = "Save transaction";
     el("transactionCancel").hidden = false;
     formRevision = getActivePortfolioBook()?.updatedAt ?? null;
@@ -294,14 +311,54 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       el(`transaction${field}`).required = required;
     }
     const opening = type === "opening_cash";
+    const cashCurrency = getActivePortfolioBook()?.settings.baseCurrency || "EUR";
+    const foreign = el("transactionCurrency").value !== cashCurrency;
+    const previous = getActivePortfolioBook()?.transactions.find((t) => t.id === el("transactionId").value);
+    const cashVisible = trade || foreign || type === "dividend" || Boolean(previous?.cashCurrency && previous.cashAmount !== previous.amount);
+    el("transactionCashField").hidden = !cashVisible;
+    el("transactionCashAmount").disabled = !cashVisible;
+    el("transactionCashAmount").required = foreign;
+    const paid = debits.has(type);
+    message("transactionCashLabel", type === "buy" ? `Total ${cashCurrency} paid (including fees)`
+      : type === "sell" ? `Net ${cashCurrency} received (after fees)`
+        : `${cashCurrency} cash ${paid ? "paid" : "received"}`);
+    message("transactionCashHelp", foreign
+      ? `Enter the final ${cashCurrency} amount ${paid ? "debited" : "credited"} by your broker, including any fees and conversion costs.${trade ? ` The ${el("transactionCurrency").value} fee is not deducted again.` : ""}`
+      : `Leave blank to use ${trade ? `shares × price ${paid ? "plus" : "minus"} the fee` : "the recorded amount"}, or enter the final ${cashCurrency} amount ${paid ? "paid" : "received"}. Fees are included in that total.`);
+    message("transactionCurrencyLabel", trade ? "Price currency" : "Currency");
+    message("transactionFeeLabel", `Fee in ${el("transactionCurrency").value}`);
     el("transactionAmount").min = opening ? "0" : "0.00000001";
     el("transactionDate").disabled = opening;
     if (opening) el("transactionDate").value = getActivePortfolioBook()?.settings.startDate || today();
     updateDateHelp();
-    el("transactionHelp").textContent = trade ? "Enter the execution price in the selected currency. An optional fee is recorded in the same currency."
+    el("transactionHelp").textContent = trade ? "Enter the stock’s execution price and fee in their original currency. Cash is recorded separately using your broker’s final total."
       : opening ? "Cash already held on your tracking start date. Record one opening balance per currency."
         : type === "dividend" ? "Enter the cash dividend you received. Record any separately charged tax or fee as a Fee transaction."
           : "Enter the cash amount and its currency. Deposits and withdrawals describe money entering or leaving your portfolio.";
+    updateCashPreview();
+  }
+
+  function updateCashPreview() {
+    const book = getActivePortfolioBook();
+    if (!book) return;
+    const type = el("transactionType").value;
+    const trade = ["buy", "sell"].includes(type);
+    const currency = el("transactionCurrency").value;
+    const base = book.settings.baseCurrency;
+    const readAmount = (id) => {
+      const value = el(id).value.trim();
+      return /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) ? Number(value) : NaN;
+    };
+    const fee = el("transactionFee").value.trim() ? readAmount("transactionFee") : 0;
+    const native = trade ? readAmount("transactionQuantity") * readAmount("transactionPrice") + (type === "buy" ? fee : -fee)
+      : readAmount("transactionAmount");
+    const entered = el("transactionCashAmount").value.trim();
+    const cash = !el("transactionCashField").hidden && entered ? readAmount("transactionCashAmount") : currency === base ? native : NaN;
+    el("transactionCashAmount").placeholder = currency === base && Number.isFinite(native) && native >= 0 ? String(native) : "";
+    const direction = debits.has(type) ? "paid" : "received";
+    message("transactionFxPreview", Number.isFinite(cash) && cash >= 0
+      ? `${money(cash, base)} ${direction} ${debits.has(type) ? "from" : "into"} your ${base} cash balance.${trade && Number.isFinite(native) && native >= 0 ? ` Trade total ${type === "buy" ? "including" : "after"} fees: ${money(native, currency)}.` : ""}`
+      : currency !== base ? `Enter the ${base} cash total to complete this transaction.` : "");
   }
 
   function updateDateHelp() {
@@ -326,7 +383,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     if (id) {
       const transaction = getActivePortfolioBook().transactions.find((t) => t.id === id);
       if (!transaction) return;
-      for (const [field, key] of [["Id", "id"], ["Type", "type"], ["Date", "date"], ["Currency", "currency"], ["Ticker", "ticker"], ["Quantity", "quantity"], ["Price", "price"], ["Amount", "amount"], ["Fee", "fee"], ["Note", "note"]]) el(`transaction${field}`).value = transaction[key] ?? "";
+      for (const [field, key] of [["Id", "id"], ["Type", "type"], ["Date", "date"], ["Currency", "currency"], ["Ticker", "ticker"], ["Quantity", "quantity"], ["Price", "price"], ["Amount", "amount"], ["Fee", "fee"], ["Note", "note"], ["CashAmount", "cashAmount"]]) el(`transaction${field}`).value = transaction[key] ?? "";
       el("transactionSave").textContent = "Save changes";
       el("transactionCancel").hidden = false;
       syncTransactionFields();
@@ -346,13 +403,18 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     el("portfolioTransactionRows").innerHTML = rows.length ? rows.map(({ transaction: t }) => `<div class="portfolio-transaction-row">
       <div><strong>${escapeHtml(labels[t.type])}${t.ticker ? ` · ${escapeHtml(t.ticker)}` : ""}</strong>
       <p>${escapeHtml(t.date)} · ${escapeHtml(money(t.amount, t.currency))}${t.quantity !== undefined ? ` · ${escapeHtml(String(t.quantity))} shares at ${escapeHtml(money(t.price, t.currency))}` : ""}${t.fee ? ` · fee ${escapeHtml(money(t.fee, t.currency))}` : ""}</p>
+      <p class="data-note">${t.cashCurrency ? `${escapeHtml(money(t.cashAmount, t.cashCurrency))} cash ${debits.has(t.type) ? "paid" : "received"}${["buy", "sell"].includes(t.type) ? " · fees included" : ""}`
+        : t.currency !== book.settings.baseCurrency ? `${escapeHtml(book.settings.baseCurrency)} cash amount needed · select Edit`
+          : `${escapeHtml(money(["buy", "sell"].includes(t.type) ? t.amount + (t.type === "buy" ? t.fee : -t.fee) : t.amount, t.currency))} cash ${debits.has(t.type) ? "paid" : "received"}`}</p>
       ${t.note ? `<small>${escapeHtml(t.note)}</small>` : ""}</div><div class="portfolio-transaction-actions">
       <button type="button" class="ghost" data-edit-transaction="${escapeHtml(t.id)}">Edit</button>
       <button type="button" class="ghost" data-delete-transaction="${escapeHtml(t.id)}">${confirmDelete?.id === t.id && confirmDelete.revision === book.updatedAt ? "Confirm delete" : "Delete"}</button></div></div>`).join("")
       : '<p class="empty-state">No transactions recorded. Existing holdings are opening positions.</p>';
     const projection = getPortfolioProjection();
-    el("portfolioCashSummary").hidden = !projection.cash.length && !projection.warnings.length;
-    el("portfolioCashSummary").innerHTML = `<h3>Recorded cash</h3>${projection.cash.map(({ currency, amount }) => `<p>${escapeHtml(money(amount, currency))}</p>`).join("")}
+    const cash = projection.reportingCash;
+    el("portfolioCashSummary").hidden = !book.transactions.length && !projection.warnings.length;
+    el("portfolioCashSummary").innerHTML = `<h3>${cash.complete ? "Recorded cash" : `Known ${escapeHtml(cash.currency)} cash`}</h3><p>${escapeHtml(money(cash.complete ? cash.amount : cash.knownAmount, cash.currency))}</p>
+      ${!cash.complete ? `<p class="data-note">${cash.missingTransactionIds.length} transaction${cash.missingTransactionIds.length === 1 ? " needs" : "s need"} ${escapeHtml(cash.currency)} cash amounts. Edit those entries below to complete the balance.</p><button type="button" class="ghost" data-edit-transaction="${escapeHtml(cash.missingTransactionIds[0])}">Complete cash amount</button>` : ""}
       ${projection.warnings.map((warning) => `<p class="data-note">${escapeHtml(warning)}</p>`).join("")}`;
   }
 
@@ -412,7 +474,9 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     el("portfolioStartDate").addEventListener("change", updateStartConfirmation);
     el("transactionDate").addEventListener("input", updateDateHelp);
     el("transactionDate").addEventListener("change", updateDateHelp);
-    el("transactionType").addEventListener("change", syncTransactionFields);
+    el("transactionType").addEventListener("change", () => { el("transactionCashAmount").value = ""; syncTransactionFields(); });
+    el("transactionCurrency").addEventListener("change", () => { el("transactionCashAmount").value = ""; syncTransactionFields(); });
+    for (const field of ["Quantity", "Price", "Fee", "Amount", "CashAmount"]) el(`transaction${field}`).addEventListener("input", updateCashPreview);
     el("openTransactionEditor").addEventListener("click", () => openTransactionEditor());
     el("transactionCancel").addEventListener("click", () => { clearTransaction(); el("portfolioTransactionEditor").open = false; message("transactionMessage", "Edit cancelled."); });
     el("portfolioImport").addEventListener("change", () => importBackup(el("portfolioImport").files?.[0]));

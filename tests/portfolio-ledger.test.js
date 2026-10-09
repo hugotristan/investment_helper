@@ -70,7 +70,8 @@ test("buy fees enter weighted basis; a sale preserves remaining average and cash
   assert.equal(projection.holdings[0].shares, 3);
   assert.equal(projection.holdings[0].averageCost, 111);
   assert.deepEqual(projection.cash, [{ currency: "USD", amount: -107 }]);
-  assert.match(projection.warnings[0], /Funding history may be incomplete/);
+  assert.match(projection.warnings[0], /actual converted cash amounts/);
+  assert.deepEqual(projection.reportingCash, { currency: "EUR", amount: null, knownAmount: 0, complete: false, missingTransactionIds: ["buy", "sell"] });
   assert.equal(Object.hasOwn(projection, "return"), false);
 });
 
@@ -225,4 +226,183 @@ test("revision timestamps allow one second of monotonic clock skew without weake
   input.updatedAt = now;
   input.transactions = [trade({ date: "2026-10-10" })];
   assert.equal(validatePortfolioBook(input, { now }).ok, false);
+});
+
+test("reporting cash follows actual settlement while native positions keep their own currencies and basis", () => {
+  const input = validated(book([], [
+    cashEntry({ id: "eur-deposit", currency: "EUR", amount: 10000 }),
+    trade({ id: "eur-buy", currency: "EUR", quantity: 50, price: 100, cashCurrency: "EUR", cashAmount: 5000 }),
+    trade({ id: "usd-buy", quantity: 10, price: 200, cashCurrency: "EUR", cashAmount: 1800 })
+  ]));
+  const projection = projectPortfolioBook(input);
+  assert.deepEqual(projection.cash, [{ currency: "EUR", amount: 3200 }]);
+  assert.deepEqual(projection.reportingCash, { currency: "EUR", amount: 3200, knownAmount: 3200, complete: true, missingTransactionIds: [] });
+  assert.deepEqual(projection.holdings.map(({ currency, shares, averageCost }) => ({ currency, shares, averageCost })), [
+    { currency: "EUR", shares: 50, averageCost: 100 }, { currency: "USD", shares: 10, averageCost: 200 }
+  ]);
+  assert.deepEqual(projection.warnings, []);
+  assert.equal(input.transactions[2].amount, 2000);
+  assert.equal(input.transactions[2].cashAmount, 1800);
+});
+
+test("settled totals govern every cashflow direction without counting fees twice", () => {
+  const input = validated(book([], [
+    cashEntry({ id: "opening", type: "opening_cash", amount: 80, cashCurrency: "EUR", cashAmount: 70 }),
+    cashEntry({ id: "deposit", currency: "GBP", amount: 100, cashCurrency: "EUR", cashAmount: 115 }),
+    trade({ id: "buy", quantity: 2, price: 100, fee: 2, cashCurrency: "EUR", cashAmount: 180 }),
+    trade({ id: "sale", type: "sell", quantity: 1, price: 150, fee: 3, cashCurrency: "EUR", cashAmount: 130 }),
+    cashEntry({ id: "dividend", type: "dividend", ticker: "AAPL", amount: 12, cashCurrency: "EUR", cashAmount: 10 }),
+    cashEntry({ id: "withdrawal", type: "withdrawal", amount: 25, cashCurrency: "EUR", cashAmount: 22 }),
+    cashEntry({ id: "fee", type: "fee", amount: 5, cashCurrency: "EUR", cashAmount: 4 })
+  ]));
+  const projection = projectPortfolioBook(input);
+  assert.deepEqual(projection.cash, [{ currency: "EUR", amount: 119 }]);
+  assert.equal(projection.reportingCash.amount, 119);
+  assert.equal(projection.reportingCash.complete, true);
+  assert.equal(projection.holdings[0].shares, 1);
+  assert.equal(projection.holdings[0].averageCost, 101);
+  const native = projectPortfolioBook(validated(book([], [trade({ currency: "EUR", fee: 7, cashCurrency: "EUR", cashAmount: 107 })])));
+  assert.equal(native.reportingCash.amount, -107);
+  assert.equal(native.holdings[0].averageCost, 107);
+  assert.match(native.warnings[0], /EUR cash is negative/);
+});
+
+test("zero-price trades and zero settled proceeds/opening cash are valid finite cash movements", () => {
+  const projection = projectPortfolioBook(validated(book([], [
+    cashEntry({ id: "zero-opening", type: "opening_cash", amount: 0, cashCurrency: "EUR", cashAmount: 0 }),
+    trade({ id: "free-buy", price: 0, cashCurrency: "EUR", cashAmount: 0 }),
+    trade({ id: "zero-sale", type: "sell", price: 0, cashCurrency: "EUR", cashAmount: 0 })
+  ])));
+  assert.deepEqual(projection.cash, [{ currency: "EUR", amount: 0 }]);
+  assert.deepEqual(projection.reportingCash, { currency: "EUR", amount: 0, knownAmount: 0, complete: true, missingTransactionIds: [] });
+  assert.deepEqual(projection.holdings, []);
+  const feeOnly = projectPortfolioBook(validated(book([], [trade({ price: 0, quantity: 2, fee: 10, cashCurrency: "EUR", cashAmount: 9 })])));
+  assert.equal(feeOnly.reportingCash.amount, -9);
+  assert.equal(feeOnly.holdings[0].averageCost, 5);
+});
+
+test("legacy foreign cash flows remain readable but cannot claim a reporting balance or negative foreign funding", () => {
+  const input = book([], [cashEntry({ currency: "EUR" }), trade({ id: "legacy-usd-buy", quantity: 5, fee: 2 })]);
+  const original = structuredClone(input);
+  const checked = validated(JSON.parse(JSON.stringify(input)));
+  const projection = projectPortfolioBook(checked);
+  assert.deepEqual(projection.cash, [{ currency: "EUR", amount: 1000 }, { currency: "USD", amount: -502 }]);
+  assert.deepEqual(projection.reportingCash, { currency: "EUR", amount: null, knownAmount: 1000, complete: false, missingTransactionIds: ["legacy-usd-buy"] });
+  assert.match(projection.warnings.join(" "), /actual converted cash amounts/);
+  assert.doesNotMatch(projection.warnings.join(" "), /USD cash is negative/);
+  assert.equal(Object.hasOwn(checked.transactions[1], "cashAmount"), false);
+  assert.deepEqual(input, original);
+  const empty = projectPortfolioBook(book([position()]));
+  assert.deepEqual(empty.reportingCash, { currency: "EUR", amount: 0, knownAmount: 0, complete: true, missingTransactionIds: [] });
+});
+
+test("offsetting legacy native amounts still need the actual dated conversions", () => {
+  const projection = projectPortfolioBook(validated(book([], [
+    trade({ id: "old-buy", date: "2026-10-02" }),
+    trade({ id: "old-sale", type: "sell", date: "2026-10-03" })
+  ])));
+  assert.deepEqual(projection.cash, [{ currency: "USD", amount: 0 }]);
+  assert.equal(projection.reportingCash.complete, false);
+  assert.equal(projection.reportingCash.amount, null);
+  assert.deepEqual(projection.reportingCash.missingTransactionIds, ["old-buy", "old-sale"]);
+  const partial = projectPortfolioBook(validated(book([position()], [
+    trade({ id: "eur-buy", currency: "EUR" }),
+    trade({ id: "legacy-usd-sale", type: "sell" })
+  ])));
+  assert.equal(partial.reportingCash.knownAmount, -100);
+  assert.equal(partial.reportingCash.amount, null);
+  assert.doesNotMatch(partial.warnings.join(" "), /cash is negative/);
+});
+
+test("settlement normalization requires a complete finite pair and the configured reporting currency", () => {
+  const normalized = normalizeTransaction(trade({ cashCurrency: " eur ", cashAmount: "180.50" }), { startDate: START, now: NOW, baseCurrency: "EUR" });
+  assert.equal(normalized.ok, true, normalized.error);
+  assert.equal(normalized.transaction.cashCurrency, "EUR");
+  assert.equal(normalized.transaction.cashAmount, 180.5);
+  for (const overrides of [
+    { cashCurrency: "EUR" }, { cashAmount: 100 }, { cashCurrency: "EUR", cashAmount: undefined },
+    { cashCurrency: "EUR", cashAmount: null }, { cashCurrency: "NOK", cashAmount: 100 },
+    { cashCurrency: "EUR", cashAmount: -1 }, { cashCurrency: "EUR", cashAmount: Infinity },
+    { cashCurrency: "EUR", cashAmount: NaN }, { cashCurrency: "USD", cashAmount: 100 }
+  ]) {
+    assert.equal(normalizeTransaction(trade(overrides), { startDate: START, now: NOW, baseCurrency: "EUR" }).ok, false);
+    invalid(book([], [trade(overrides)]));
+  }
+  invalid(book([], [trade({ cashCurrency: "eur", cashAmount: 100 })]), /supported currency/);
+  invalid(book([], [trade({ cashCurrency: "EUR", cashAmount: "100" })]), /finite/);
+  const overflow = book([], [
+    cashEntry({ id: "first", cashCurrency: "EUR", cashAmount: 1e308 }),
+    cashEntry({ id: "second", cashCurrency: "EUR", cashAmount: 1e308 })
+  ]);
+  invalid(overflow, /supported number range/);
+});
+
+test("editing settlement or deleting entries rebuilds cash without altering native share basis", () => {
+  const input = book([], [
+    cashEntry({ currency: "EUR" }),
+    trade({ id: "purchase", quantity: 2, price: 250, cashCurrency: "EUR", cashAmount: 450 })
+  ]);
+  assert.equal(projectPortfolioBook(validated(input)).reportingCash.amount, 550);
+  const edited = structuredClone(input); edited.transactions[1].cashAmount = 400;
+  const projection = projectPortfolioBook(validated(edited));
+  assert.equal(projection.reportingCash.amount, 600);
+  assert.equal(projection.holdings[0].averageCost, 250);
+  const deletedPurchase = structuredClone(input); deletedPurchase.transactions.pop();
+  assert.equal(projectPortfolioBook(validated(deletedPurchase)).reportingCash.amount, 1000);
+  assert.deepEqual(projectPortfolioBook(deletedPurchase).holdings, []);
+  const deletedFunding = structuredClone(input); deletedFunding.transactions.shift();
+  assert.equal(projectPortfolioBook(validated(deletedFunding)).reportingCash.amount, -450);
+  assert.match(projectPortfolioBook(deletedFunding).warnings[0], /EUR cash is negative/);
+  const missingSettlement = structuredClone(input);
+  delete missingSettlement.transactions[1].cashCurrency; delete missingSettlement.transactions[1].cashAmount;
+  assert.equal(projectPortfolioBook(validated(missingSettlement)).reportingCash.complete, false);
+  assert.equal(input.transactions[1].cashAmount, 450);
+});
+
+test("reporting-currency changes cannot silently reinterpret stored settlement amounts", () => {
+  const input = validated(book([], [trade({ cashCurrency: "EUR", cashAmount: 90 })]));
+  const roundTrip = validated(JSON.parse(JSON.stringify(input)));
+  assert.deepEqual(roundTrip.transactions, input.transactions);
+  const changed = structuredClone(input); changed.settings.baseCurrency = "USD";
+  invalid(changed, /reporting currency/);
+  const legacy = book([], [trade()]); legacy.settings.baseCurrency = "USD";
+  const projection = projectPortfolioBook(validated(legacy));
+  assert.equal(projection.reportingCash.amount, -100);
+  assert.equal(projection.reportingCash.complete, true);
+  assert.equal(normalizeTransaction(trade({ cashCurrency: "EUR", cashAmount: 90 }), { startDate: START, now: NOW }).ok, true);
+});
+
+test("settled sales reject a native net debit while unpaired legacy sales remain readable", () => {
+  const debitSale = trade({ type: "sell", price: 10, fee: 20 });
+  const old = projectPortfolioBook(validated(book([position()], [debitSale])));
+  assert.deepEqual(old.cash, [{ currency: "USD", amount: -10 }]);
+  assert.equal(old.holdings[0].shares, 1);
+  for (const cashAmount of [0, 20]) {
+    const settled = { ...debitSale, cashCurrency: "EUR", cashAmount };
+    invalid(book([position()], [settled]), /fees above gross proceeds/);
+    const normalized = normalizeTransaction(settled, { startDate: START, now: NOW, baseCurrency: "EUR" });
+    assert.equal(normalized.ok, false);
+    assert.match(normalized.error, /fees above gross proceeds/);
+  }
+  const feeEqualsProceeds = projectPortfolioBook(validated(book([position()], [
+    trade({ type: "sell", price: 10, fee: 10, cashCurrency: "EUR", cashAmount: 0 })
+  ])));
+  assert.equal(feeEqualsProceeds.reportingCash.amount, 0);
+  assert.equal(feeEqualsProceeds.holdings[0].shares, 1);
+});
+
+test("opening cash is unique by actual settled currency while separate legacy native openings remain readable", () => {
+  const eurOpening = cashEntry({ id: "eur-opening", type: "opening_cash", currency: "EUR", amount: 100 });
+  const usdOpening = cashEntry({ id: "usd-opening", type: "opening_cash", currency: "USD", amount: 100 });
+  invalid(book([], [eurOpening, { ...usdOpening, cashCurrency: "EUR", cashAmount: 90 }]), /one opening cash entry/);
+  invalid(book([], [
+    { ...usdOpening, cashCurrency: "EUR", cashAmount: 90 },
+    cashEntry({ id: "gbp-opening", type: "opening_cash", currency: "GBP", amount: 100, cashCurrency: "EUR", cashAmount: 115 })
+  ]), /one opening cash entry/);
+  const legacy = projectPortfolioBook(validated(book([], [eurOpening, usdOpening])));
+  assert.deepEqual(legacy.cash, [{ currency: "EUR", amount: 100 }, { currency: "USD", amount: 100 }]);
+  assert.deepEqual(legacy.reportingCash, { currency: "EUR", amount: null, knownAmount: 100, complete: false, missingTransactionIds: ["usd-opening"] });
+  const settled = projectPortfolioBook(validated(book([], [{ ...usdOpening, cashCurrency: "EUR", cashAmount: 90 }])));
+  assert.deepEqual(settled.cash, [{ currency: "EUR", amount: 90 }]);
+  assert.equal(settled.reportingCash.amount, 90);
 });

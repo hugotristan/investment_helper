@@ -3,7 +3,7 @@ import { isBlockedAssetTicker } from "../shared/symbols.js";
 const CURRENCIES = new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD"]);
 const TYPES = new Set(["buy", "sell", "deposit", "withdrawal", "dividend", "fee", "opening_cash"]);
 const BOOK_KEYS = ["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput"];
-const TRANSACTION_KEYS = ["id", "type", "date", "currency", "ticker", "quantity", "price", "amount", "fee", "note"];
+const TRANSACTION_KEYS = ["id", "type", "date", "currency", "ticker", "quantity", "price", "amount", "fee", "note", "cashCurrency", "cashAmount"];
 const tallinnDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Tallinn", year: "numeric", month: "2-digit", day: "2-digit" });
 
 export function portfolioToday(now = Date.now()) {
@@ -28,10 +28,11 @@ export function createPortfolioBook({ holdings = [], legacyPortfolioInput = "", 
   return validated.book;
 }
 
-export function normalizeTransaction(input, { startDate, now = Date.now() } = {}) {
+export function normalizeTransaction(input, { startDate, now = Date.now(), baseCurrency } = {}) {
   try {
     const firstDate = calendarDate(startDate, "Portfolio start date");
-    return { ok: true, transaction: transaction(input, firstDate, portfolioToday(now), false), error: null };
+    const reportingCurrency = baseCurrency === undefined ? null : currencyCode(baseCurrency);
+    return { ok: true, transaction: transaction(input, firstDate, portfolioToday(now), false, reportingCurrency), error: null };
   } catch (error) {
     return { ok: false, transaction: null, error: error.message };
   }
@@ -74,7 +75,7 @@ function normalizeBook(input, now) {
   if (!Array.isArray(input.transactions) || input.transactions.length > 10000) throw new TypeError("Transactions must contain at most 10,000 entries.");
   const legacyPortfolioInput = boundedText(input.legacyPortfolioInput, 1000000, "Legacy portfolio source");
   const openingHoldings = input.openingHoldings.map((holding) => normalizeOpening(holding, true));
-  const transactions = input.transactions.map((entry) => transaction(entry, startDate, today, true));
+  const transactions = input.transactions.map((entry) => transaction(entry, startDate, today, true, baseCurrency));
   const ids = new Set();
   for (const entry of [...openingHoldings, ...transactions]) {
     if (ids.has(entry.id)) throw new TypeError("Portfolio entry IDs must be unique.");
@@ -82,8 +83,9 @@ function normalizeBook(input, now) {
   }
   const openingCurrencies = new Set();
   for (const entry of transactions.filter(({ type }) => type === "opening_cash")) {
-    if (openingCurrencies.has(entry.currency)) throw new TypeError("Only one opening cash entry is allowed per currency.");
-    openingCurrencies.add(entry.currency);
+    const cashCurrency = entry.cashCurrency || entry.currency;
+    if (openingCurrencies.has(cashCurrency)) throw new TypeError("Only one opening cash entry is allowed per cash currency.");
+    openingCurrencies.add(cashCurrency);
   }
   return { schemaVersion: 1, id: "personal", settings: { baseCurrency, startDate }, openingHoldings, transactions, createdAt, updatedAt, legacyPortfolioInput };
 }
@@ -108,7 +110,7 @@ function normalizeOpening(input, strict, fallbackId) {
   return { id, kind: "manual", ticker, label: label || ticker, amount, status: input.status, currency };
 }
 
-function transaction(input, startDate, today, strict) {
+function transaction(input, startDate, today, strict, baseCurrency) {
   allowedKeys(input, TRANSACTION_KEYS, "Transaction");
   const id = entryId(input.id);
   if (!TYPES.has(input.type)) throw new TypeError("Choose a supported transaction type.");
@@ -137,6 +139,15 @@ function transaction(input, startDate, today, strict) {
     result.amount = number(input.amount, "Transaction amount", strict, type !== "opening_cash");
     if (type === "opening_cash" && date !== startDate) throw new TypeError("Opening cash must be dated on the portfolio start date.");
   }
+  const hasCashCurrency = Object.hasOwn(input, "cashCurrency");
+  const hasCashAmount = Object.hasOwn(input, "cashAmount");
+  if (hasCashCurrency !== hasCashAmount) throw new TypeError("Settled cash currency and amount must be supplied together.");
+  if (hasCashCurrency) {
+    result.cashCurrency = currencyCode(input.cashCurrency, strict);
+    result.cashAmount = number(input.cashAmount, "Settled cash amount", strict);
+    if (baseCurrency && result.cashCurrency !== baseCurrency) throw new TypeError("Settled cash currency must match the portfolio reporting currency. Update the settlement records before changing reporting currency.");
+    if (type === "sell" && result.fee > result.amount) throw new TypeError("A settled sale cannot have fees above gross proceeds. Record the resulting cash debit separately.");
+  }
   return result;
 }
 
@@ -144,6 +155,9 @@ function projectNormalized(book) {
   const positions = new Map();
   const manual = [];
   const cash = new Map();
+  const baseCurrency = book.settings.baseCurrency;
+  const missingTransactionIds = [];
+  const missingCurrencies = new Set();
   const reservedIds = new Set(book.openingHoldings.map(({ id }) => id));
   for (const holding of book.openingHoldings) {
     if (holding.kind === "manual") { manual.push({ ...holding }); continue; }
@@ -185,12 +199,23 @@ function projectNormalized(book) {
         change = finite(amount - fee);
       }
     } else if (type === "withdrawal" || type === "fee") change = -amount;
-    cash.set(currency, finite((cash.get(currency) || 0) + change));
+    const cashCurrency = entry.cashCurrency || currency;
+    if (entry.cashCurrency) change = ["buy", "withdrawal", "fee"].includes(type) ? -entry.cashAmount : entry.cashAmount;
+    cash.set(cashCurrency, finite((cash.get(cashCurrency) || 0) + change));
+    if (!entry.cashCurrency && currency !== baseCurrency) {
+      missingTransactionIds.push(entry.id);
+      missingCurrencies.add(currency);
+    }
   }
   const balances = [...cash].sort(([a], [b]) => a.localeCompare(b)).map(([currency, amount]) => ({ currency, amount: Object.is(amount, -0) ? 0 : amount }));
-  const warnings = balances.filter(({ amount }) => amount < 0).map(({ currency }) => `${currency} cash is negative. Funding history may be incomplete.`);
+  const knownAmount = cash.get(baseCurrency) || 0;
+  const complete = missingTransactionIds.length === 0;
+  const reportingCash = { currency: baseCurrency, amount: complete ? knownAmount : null, knownAmount, complete, missingTransactionIds };
+  const warnings = balances.filter(({ currency, amount }) => amount < 0 && !missingCurrencies.has(currency) && (currency !== baseCurrency || complete))
+    .map(({ currency }) => `${currency} cash is negative. Funding history may be incomplete.`);
+  if (!complete) warnings.push(`Reporting cash in ${baseCurrency} needs actual converted cash amounts for ${missingTransactionIds.length} foreign-currency transaction${missingTransactionIds.length === 1 ? "" : "s"}. The balance is incomplete.`);
   if (manual.length) warnings.push("Amount-only legacy holdings do not provide share quantities or cost basis.");
-  return { holdings: [...positions.values()].filter(({ shares }) => shares > 0).map((holding) => ({ ...holding })).concat(manual), cash: balances, warnings };
+  return { holdings: [...positions.values()].filter(({ shares }) => shares > 0).map((holding) => ({ ...holding })).concat(manual), cash: balances, reportingCash, warnings };
 }
 
 function plainObject(value) {

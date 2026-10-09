@@ -2,6 +2,16 @@
 
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
+## EUR cash for foreign trades
+
+**What changed:** Cash uses one account in the reporting currency, EUR by default. USD purchases retain their USD price, share quantity, and fee; the user enters the broker's final Total EUR paid (including fees). The cash total is deducted once. Sales use Net EUR received (after fees). The transaction list shows the native trade and actual cash settlement together. Older foreign transactions have a Complete cash amount action and leave the balance explicitly incomplete until edited.
+
+**How:** Optional paired `cashCurrency`/`cashAmount` fields extend the existing version-1 book and backup format. Every new entry saves its actual cash currency and total; the total replaces the native cash movement without changing native weighted cost basis. Same-currency entries derive cash from the native amounts unless a final trade total is entered. Legacy books remain readable without guessed conversions. Opening-cash uniqueness follows the actual cash currency, and changing that currency cannot reinterpret existing settlements. A release import map makes every feature share the same fresh ledger, store, and committed-state module.
+
+**Limits:** The final EUR amount must include the fee and conversion costs; the native fee must not be recorded again as a separate cash charge if already included. No exchange-rate API is needed. Current holdings and gains remain denominated in their original currencies; consolidated valuations and monthly performance are later steps. Net-debit sales with native fees greater than proceeds cannot use the positive net-received field.
+
+**Validation:** All 248 tests pass. Model, storage, and controller checks cover the EUR10,000 minus EUR5,000 minus EUR1,800 example, the exact EUR300 MSFT charge with a USD fee, edits/deletions, preserved net cash on note edits, net payouts, required/invalid settlements, known-but-incomplete legacy cash, opening-cash duplicates, backups and IndexedDB reloads, stale forms, and atomic failures. Visual browser verification remains unavailable because the browser helper cannot start.
+
 ## Ticker suggestions
 
 **What changed:** Portfolio ticker inputs, stock detail, the header search, and watchlist additions suggest matching stocks/ETFs from the first letter or company name. Up to eight matches show their symbol and name. Arrow keys/Enter, mouse, and touch select a symbol without submitting the form. Watchlist selection preserves any symbols before the current comma/semicolon.
