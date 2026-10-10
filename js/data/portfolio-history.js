@@ -5,7 +5,6 @@ export const PORTFOLIO_FX_SOURCE_URL = "https://api.frankfurter.dev/v2/providers
 export const PORTFOLIO_FX_CURRENCIES = Object.freeze(["USD", "GBP", "JPY", "CHF", "CAD", "AUD"]);
 export const PORTFOLIO_FX_MAX_POINTS = 1600;
 const DAY = 86400000;
-const SNAPSHOT_URL = new URL("../../data/portfolio-fx.json", import.meta.url);
 const normalizedSnapshots = new WeakSet();
 let request = null;
 let cachedSnapshot = null;
@@ -83,7 +82,7 @@ async function fetchSnapshot() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(usesCloudMarket() ? "/api/portfolio-fx" : SNAPSHOT_URL, { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
+    const response = await fetch(usesCloudMarket() ? "/api/portfolio-fx" : new URL("../../data/portfolio-fx.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const normalized = normalizeHistoricalFx(await response.json());
     if (!normalized) throw new Error("Invalid portfolio exchange-rate history");

@@ -1,6 +1,5 @@
 import { evaluateDataQuality, validHistoryPoints } from "../analysis/data-quality.js";
 
-const SNAPSHOT_URL = new URL("../../data/prices.json", import.meta.url);
 let request = null;
 let expiresAt = 0;
 
@@ -17,7 +16,7 @@ async function fetchSnapshot() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(SNAPSHOT_URL, { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
+    const response = await fetch(new URL("../../data/prices.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const snapshot = await response.json();
     if (snapshot?.schemaVersion !== 1 || !snapshot.byTicker || typeof snapshot.byTicker !== "object"

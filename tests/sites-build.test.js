@@ -7,6 +7,22 @@ import { gunzipSync } from "node:zlib";
 test("Sites build serves the full frontend and rejects anonymous private API access", async () => {
   execFileSync(process.execPath, ["scripts/build-sites.mjs"], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
   const { default: app } = await import("../dist/server/index.js?test-build");
+  // Workers do not supply a browser/Node file URL through import.meta.url.
+  // Loading shared parsers must not eagerly resolve browser snapshot paths.
+  execFileSync(process.execPath, ["--experimental-vm-modules", "--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import { readFileSync } from "node:fs";
+    import { createContext, SourceTextModule } from "node:vm";
+    const context = createContext({ URL, URLSearchParams, Request, Response, Headers,
+      TextEncoder, TextDecoder, AbortController, fetch, atob, btoa, crypto,
+      setTimeout, clearTimeout });
+    const worker = new SourceTextModule(readFileSync("dist/server/index.js", "utf8"), { context });
+    await worker.link(() => { throw new Error("The Worker must be self-contained"); });
+    await worker.evaluate();
+    const response = await worker.namespace.default.fetch(new Request("https://investment.example/api/health"));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).cloud, true);
+  `], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
   const page = await app.fetch(new Request("https://investment.example/"));
   assert.equal(page.status, 200);
   const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();

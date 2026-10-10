@@ -4,7 +4,6 @@ export const EXCHANGE_RATE_SOURCE = "ECB reference rate via Frankfurter";
 export const EXCHANGE_RATE_SOURCE_URL = "https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur";
 export const EXCHANGE_RATE_MAX_AGE_MS = 7 * 86400000;
 
-const SNAPSHOT_URL = new URL("../../data/exchange-rate.json", import.meta.url);
 let rawSnapshot = null;
 let request = null;
 let expiresAt = 0;
@@ -45,7 +44,7 @@ async function fetchSnapshot() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const response = await fetch(usesCloudMarket() ? "/api/exchange-rate" : SNAPSHOT_URL, { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
+    const response = await fetch(usesCloudMarket() ? "/api/exchange-rate" : new URL("../../data/exchange-rate.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const input = await response.json();
     rawSnapshot = normalizeExchangeRate(input) ? input : null;
