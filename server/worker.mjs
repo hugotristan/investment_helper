@@ -74,7 +74,8 @@ export function createApp(assets, options = {}) {
         const asset = assets[file];
         if (asset && typeof asset === "object" && asset.encoding === "gzip-base64") {
           const bytes = request.method === "HEAD" ? null : Uint8Array.from(atob(asset.data), (character) => character.charCodeAt(0));
-          return new Response(bytes, { headers: { ...privateHeaders, "Content-Type": asset.contentType || type,
+          // These bytes are already compressed. Workers otherwise gzip them again.
+          return new Response(bytes, { encodeBody: "manual", headers: { ...privateHeaders, "Content-Type": asset.contentType || type,
             "Content-Encoding": "gzip" } });
         }
         return new Response(request.method === "HEAD" ? null : asset, {

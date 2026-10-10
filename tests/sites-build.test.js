@@ -13,7 +13,16 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     import assert from "node:assert/strict";
     import { readFileSync } from "node:fs";
     import { createContext, SourceTextModule } from "node:vm";
-    const context = createContext({ URL, URLSearchParams, Request, Response, Headers,
+    import { gzipSync, gunzipSync } from "node:zlib";
+    // Model Workers' documented automatic Content-Encoding behavior.
+    class WorkersResponse extends Response {
+      constructor(body, init) {
+        const compressed = body != null && new Headers(init?.headers).get("content-encoding") === "gzip"
+          && init?.encodeBody !== "manual";
+        super(compressed ? gzipSync(body) : body, init);
+      }
+    }
+    const context = createContext({ URL, URLSearchParams, Request, Response: WorkersResponse, Headers,
       TextEncoder, TextDecoder, AbortController, fetch, atob, btoa, crypto,
       setTimeout, clearTimeout });
     const worker = new SourceTextModule(readFileSync("dist/server/index.js", "utf8"), { context });
@@ -22,6 +31,9 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     const response = await worker.namespace.default.fetch(new Request("https://investment.example/api/health"));
     assert.equal(response.status, 200);
     assert.equal((await response.json()).cloud, true);
+    const page = await worker.namespace.default.fetch(new Request("https://investment.example/"));
+    const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();
+    assert.match(html, /data-cloud-mode="sites"/);
   `], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
   const page = await app.fetch(new Request("https://investment.example/"));
   assert.equal(page.status, 200);
