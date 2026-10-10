@@ -36,7 +36,8 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
       }
     }
     const context = createContext({ URL, URLSearchParams, Request, Response: WorkersResponse, Headers,
-      TextEncoder, TextDecoder, AbortController, fetch, atob, btoa, crypto,
+      TextEncoder, TextDecoder, AbortController,
+      fetch() { throw new Error("Runtime fetch is not ready before the request"); }, atob, btoa, crypto,
       setTimeout, clearTimeout });
     const worker = new SourceTextModule(readFileSync("dist/server/index.js", "utf8"), { context });
     await worker.link(() => { throw new Error("The Worker must be self-contained"); });
@@ -54,6 +55,23 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     }), environment);
     const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();
     assert.match(html, /data-cloud-mode="sites"/);
+    // The hosting runtime supplies its outbound fetch when requests run. It
+    // must keep its global receiver rather than be captured as a bare callback.
+    let providerCalls = 0;
+    function runtimeFetch(url) {
+      assert.equal(this?.fetch, runtimeFetch);
+      assert.equal(url, "https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur");
+      providerCalls++;
+      return Promise.resolve(Response.json({ base: "USD", quote: "EUR", rate: 0.9,
+        date: new Date().toISOString().slice(0, 10) }));
+    }
+    context.fetch = runtimeFetch;
+    const rate = await worker.namespace.default.fetch(new Request("https://investment.example/api/exchange-rate", {
+      headers: { Cookie: login.headers.get("set-cookie").split(";")[0] }
+    }), environment);
+    assert.equal(rate.status, 200);
+    assert.equal((await rate.json()).rate, 0.9);
+    assert.equal(providerCalls, 1);
     database.close();
   `], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
   const page = await authorized("/");

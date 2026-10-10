@@ -79,10 +79,12 @@ export function loadPortfolioFx() {
 }
 
 async function fetchSnapshot() {
+  const cloud = usesCloudMarket();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  // Allow the Worker to recover from a timed-out provider with a dated snapshot.
+  const timeout = setTimeout(() => controller.abort(), cloud ? 16000 : 8000);
   try {
-    const response = await fetch(usesCloudMarket() ? "/api/portfolio-fx" : new URL("../../data/portfolio-fx.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
+    const response = await fetch(cloud ? "/api/portfolio-fx" : new URL("../../data/portfolio-fx.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const normalized = normalizeHistoricalFx(await response.json());
     if (!normalized) throw new Error("Invalid portfolio exchange-rate history");

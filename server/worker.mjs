@@ -1,6 +1,6 @@
 import { ApiError, checkSameOrigin, readJsonRequest } from "./request-body.mjs";
 import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, validateSaveEnvelope } from "./cloud-store.mjs";
-import { createMarketData, marketTicker } from "./market-data.mjs";
+import { createMarketAssetReader, createMarketData, marketTicker } from "./market-data.mjs";
 import { createPasswordAuth } from "./auth.mjs";
 
 const privateHeaders = {
@@ -28,7 +28,7 @@ function publicAsset(path) {
 }
 
 export function createApp(assets, options = {}) {
-  const market = createMarketData(options);
+  const market = createMarketData({ ...options, readMarketAsset: createMarketAssetReader(assets) });
   const clock = () => typeof options.now === "function" ? options.now() : options.now ?? Date.now();
   const passwordGate = createPasswordAuth({ now: clock });
   return {
@@ -94,7 +94,8 @@ export function createApp(assets, options = {}) {
         });
       } catch (error) {
         const send = userId ? userJson : json;
-        return error instanceof ApiError ? send({ error: error.message, code: error.code }, error.status)
+        return error instanceof ApiError ? send({ error: error.message, code: error.code,
+          ...(error.providerFailures ? { providerFailures: error.providerFailures } : {}) }, error.status)
           : send({ error: "The request could not be completed.", code: "SERVER_ERROR" }, 500);
       }
     },

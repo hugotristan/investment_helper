@@ -30,9 +30,9 @@ Confirmed cloud books also keep an owner-scoped IndexedDB recovery copy. Cloud r
 
 ## Market data
 
-The hosted frontend sends only a ticker to `GET /api/market/history`. The Worker requests a fixed Yahoo Finance chart URL and validates its identity, currency, dated daily prices and splits. Public results are cached briefly and concurrent requests for the same ticker share one request. Yahoo failures can use the latest real GitHub-published snapshot for covered symbols. Missing history stays unavailable. Market data never invents prices or changes the observation date during a retry.
+The hosted frontend sends only a ticker to `GET /api/market/history`. The Worker requests a fixed Yahoo Finance chart URL and validates its identity, currency, dated daily prices and splits. Public results are cached briefly and concurrent requests for the same ticker share one request. Yahoo failures can use the latest real GitHub-published snapshot for covered symbols, followed by the deployment's bundled snapshot if it is still recent. Missing history stays unavailable. Market data never invents prices or changes the observation date during a retry.
 
-`GET /api/exchange-rate` loads the dated ECB USD-to-EUR reference rate through Frankfurter. `GET /api/portfolio-fx` supplies five years of historical reference rates for the existing supported currencies. These references value holdings; manually recorded EUR settlements remain authoritative. News research, financial snapshots and ticker suggestions keep their existing sources. The backend does not place trades.
+`GET /api/exchange-rate` loads the dated ECB USD-to-EUR reference rate through Frankfurter. `GET /api/portfolio-fx` supplies five years of historical reference rates for the existing supported currencies. Both can recover from a provider failure using the validated GitHub-published snapshot and then a recent bundled snapshot. Current rates and the latest history observations must be no more than seven days old; fallback retains the actual publication and observation dates. Provider requests have bounded deadlines, and the browser allows enough time for recovery. These references value holdings; manually recorded EUR settlements remain authoritative. News research, financial snapshots and ticker suggestions keep their existing sources. The backend does not place trades.
 
 ## Schema and deployment
 

@@ -41,10 +41,12 @@ export function loadExchangeRate() {
 }
 
 async function fetchSnapshot() {
+  const cloud = usesCloudMarket();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  // The Worker can try a dated snapshot after its provider request times out.
+  const timeout = setTimeout(() => controller.abort(), cloud ? 16000 : 8000);
   try {
-    const response = await fetch(usesCloudMarket() ? "/api/exchange-rate" : new URL("../../data/exchange-rate.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
+    const response = await fetch(cloud ? "/api/exchange-rate" : new URL("../../data/exchange-rate.json", import.meta.url), { cache: "no-cache", credentials: "same-origin", signal: controller.signal });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const input = await response.json();
     rawSnapshot = normalizeExchangeRate(input) ? input : null;

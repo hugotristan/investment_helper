@@ -9,8 +9,55 @@ import { ApiError, readBoundedText } from "./request-body.mjs";
 const MAX_PUBLIC_HISTORY_BYTES = 4 * 1024 * 1024;
 const MAX_POINTS = 1600;
 const MAX_HISTORY_ENTRIES = 80;
-const PUBLISHED_PRICES_URL = "https://hugotristan.github.io/investment_helper/data/prices.json";
+const PUBLISHED_BASE_URL = "https://hugotristan.github.io/investment_helper/data/";
+const PUBLISHED_PRICES_URL = `${PUBLISHED_BASE_URL}prices.json`;
+const PUBLIC_ASSET_LIMITS = Object.freeze({ "data/prices.json": 14 * 1024 * 1024,
+  "data/exchange-rate.json": 16 * 1024, "data/portfolio-fx.json": 4 * 1024 * 1024 });
 const DAY = 86400000;
+
+// Only these embedded public market files can be read. Decompressed bytes are
+// bounded before JSON parsing, just like provider replies; no ledger is read.
+export function createMarketAssetReader(assets = {}) {
+  const requests = new Map();
+  return function readMarketAsset(path) {
+    if (!Object.hasOwn(PUBLIC_ASSET_LIMITS, path)) return Promise.resolve(null);
+    if (!requests.has(path)) requests.set(path, (async () => {
+      const asset = assets[path];
+      if (asset === undefined) return null;
+      let response;
+      if (typeof asset === "string") response = new Response(asset);
+      else if (asset?.encoding === "gzip-base64" && typeof asset.data === "string") {
+        if (asset.data.length > PUBLIC_ASSET_LIMITS[path] * 2) throw new Error("Invalid embedded public data.");
+        const compressed = Uint8Array.from(atob(asset.data), (character) => character.charCodeAt(0));
+        response = new Response(new Response(compressed).body.pipeThrough(new DecompressionStream("gzip")));
+      } else throw new Error("Invalid embedded public data.");
+      return JSON.parse(await readBoundedText(response, PUBLIC_ASSET_LIMITS[path]));
+    })());
+    return requests.get(path);
+  };
+}
+
+function providerFailure(provider, error) {
+  // Never return provider messages, response bodies, URLs, cookies or identities.
+  // A small set of categories makes runtime failures visible without secrets.
+  const reason = error?.publicFailureReason === "http" ? "http" : (error?.code === "BODY_TOO_LARGE" ? "size-limit"
+    : error?.code === "INVALID_BODY" ? "body-runtime"
+    : error?.name === "AbortError" || error?.name === "TimeoutError" ? "timeout"
+    : error?.name === "SyntaxError" ? "invalid-json"
+    : /illegal invocation|receiver|this.*(?:fetch|global|window)/i.test(String(error?.message || "")) ? "fetch-binding"
+    : /TextDecoder|fatal|encoding|decode/i.test(String(error?.message || "")) ? "decoder-runtime"
+    : /Intl|time.?zone|DateTimeFormat/i.test(String(error?.message || "")) ? "date-runtime"
+    : error?.name === "TypeError" ? "network-or-runtime" : "invalid-data");
+  return { provider, reason, ...(["TypeError", "RangeError", "ReferenceError", "SyntaxError", "AbortError", "TimeoutError"].includes(error?.name)
+    ? { errorName: error.name } : {}), ...(Number.isInteger(error?.publicStatus) && error.publicStatus >= 100 && error.publicStatus <= 599
+      ? { status: error.publicStatus } : {}) };
+}
+
+function unavailable(code, message, failures) {
+  const error = new ApiError(503, code, message);
+  error.providerFailures = failures.slice(0, 3);
+  return error;
+}
 
 function historicalFxStart(now) {
   const start = new Date(now);
@@ -45,7 +92,8 @@ export function marketTicker(input) {
 
 // Each app instance caches public prices only. No private ledger data, visitor
 // headers, or supplied URLs are passed to an external provider.
-export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now } = {}) {
+export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(url, init), now = Date.now,
+  readMarketAsset = async () => null, reportFailure = (details) => console.warn("Public market-data source failed.", details) } = {}) {
   const historyCache = new Map();
   const pending = new Map();
   let exchangeCache = null;
@@ -55,9 +103,23 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
   let publishedCache = null;
   let publishedRequest = null;
   let publishedRetryAt = 0;
+  let publishedFailures = [];
+  const reported = new Map();
   const queue = [];
   let active = 0;
   const clock = () => typeof now === "function" ? now() : now;
+
+  function failure(provider, error) {
+    const details = providerFailure(provider, error);
+    const time = clock();
+    if (!reported.has(provider) || time - reported.get(provider) >= 60000) {
+      reported.set(provider, time);
+      // Fixed provider names and bounded categories only; one report per source
+      // per minute prevents a large watchlist from flooding runtime logs.
+      try { reportFailure(details); } catch { /* Diagnostics never block prices. */ }
+    }
+    return details;
+  }
 
   function networkSlot(work) {
     return new Promise((resolve, reject) => {
@@ -75,11 +137,16 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
 
   async function fetchJson(url, maximumBytes) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const timer = setTimeout(() => controller.abort(), 5000);
     try {
       const response = await fetchImpl(url, { headers: { Accept: "application/json" }, credentials: "omit",
         redirect: "error", signal: controller.signal });
-      if (!response.ok) throw new Error("Provider unavailable.");
+      if (!response.ok) {
+        const error = new Error("Provider unavailable.");
+        error.publicFailureReason = "http";
+        error.publicStatus = response.status;
+        throw error;
+      }
       return JSON.parse(await readBoundedText(response, maximumBytes));
     } finally { clearTimeout(timer); }
   }
@@ -92,25 +159,40 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
     return serialized;
   }
 
-  async function publishedHistory(ticker, time) {
+  function validPriceSnapshot(raw, time) {
+    const generated = Date.parse(raw?.generatedAt);
+    return raw?.schemaVersion === 1 && Number.isFinite(generated) && generated <= time && time - generated <= 7 * DAY
+      && raw.byTicker && typeof raw.byTicker === "object" && !Array.isArray(raw.byTicker);
+  }
+
+  async function publishedHistory(ticker, time, failures) {
     let snapshot = publishedCache && time - publishedCache.checkedAt < 5 * 60000 ? publishedCache.snapshot : null;
     if (!snapshot) {
-      if (!publishedRequest && time < publishedRetryAt) return null;
+      if (!publishedRequest && time < publishedRetryAt) {
+        failures.push(...publishedFailures);
+        return null;
+      }
       if (!publishedRequest) {
         publishedRequest = (async () => {
           try {
-            const raw = await fetchJson(PUBLISHED_PRICES_URL, 14 * 1024 * 1024);
-            const generated = Date.parse(raw?.generatedAt);
-            if (raw?.schemaVersion !== 1 || !Number.isFinite(generated) || generated > time || time - generated > 7 * DAY
-              || !raw.byTicker || typeof raw.byTicker !== "object" || Array.isArray(raw.byTicker)) throw new Error("Invalid published prices.");
+            const raw = await fetchJson(PUBLISHED_PRICES_URL, PUBLIC_ASSET_LIMITS["data/prices.json"]);
+            if (!validPriceSnapshot(raw, time)) throw new Error("Invalid published prices.");
             publishedCache = { snapshot: raw, checkedAt: time };
+            publishedFailures = [];
             return raw;
-          } catch { publishedRetryAt = time + 30000; return null; }
+          } catch (error) { publishedFailures = [failure("published-prices", error)]; publishedRetryAt = time + 30000; return null; }
           finally { publishedRequest = null; }
         })();
       }
       snapshot = await publishedRequest;
     }
+    failures.push(...publishedFailures);
+    try { return snapshotHistory(snapshot, ticker, time); }
+    catch (error) { failures.push(failure("published-prices", error)); return null; }
+  }
+
+  function snapshotHistory(snapshot, ticker, time) {
+    if (!validPriceSnapshot(snapshot, time)) return null;
     const parsed = readSnapshotHistory(snapshot, ticker, { now: time });
     if (!parsed || time - Date.parse(parsed.historyAsOf) > 7 * DAY) return null;
     parsed.quote = readSnapshotQuote(snapshot, ticker, { now: time });
@@ -141,10 +223,16 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
         const history = normalizeStockHistory(parsed, ticker, { now: time });
         if (!history) throw new Error("Invalid daily history.");
         return saveHistory(ticker, history, time);
-      } catch {
-        const published = await publishedHistory(ticker, time);
+      } catch (error) {
+        const failures = [failure("yahoo", error)];
+        const published = await publishedHistory(ticker, time, failures);
         if (published) return saveHistory(ticker, published, time);
-        throw new ApiError(503, "PRICES_UNAVAILABLE", "The price provider is temporarily unavailable. Previously dated prices can still be used.");
+        try {
+          const embedded = snapshotHistory(await readMarketAsset("data/prices.json"), ticker, time);
+          if (embedded) return saveHistory(ticker, embedded, time);
+          throw new Error("Invalid embedded prices.");
+        } catch (embeddedError) { failures.push(failure("embedded-prices", embeddedError)); }
+        throw unavailable("PRICES_UNAVAILABLE", "The price provider is temporarily unavailable. Previously dated prices can still be used.", failures);
       } finally { pending.delete(ticker); }
     });
     pending.set(ticker, request);
@@ -166,8 +254,11 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
         if (!rate) throw new Error("Invalid reference rate.");
         exchangeCache = { rate, checkedAt: time };
         return rate;
-      } catch {
-        throw new ApiError(503, "RATE_UNAVAILABLE", "The current USD-to-EUR reference rate is temporarily unavailable.");
+      } catch (error) {
+        const failures = [failure("ecb-current", error)];
+        const rate = await publishedRate("exchange-rate.json", (raw) => normalizeExchangeRate(raw, { now: time }), failures);
+        if (rate) { exchangeCache = { rate, checkedAt: time }; return rate; }
+        throw unavailable("RATE_UNAVAILABLE", "The current USD-to-EUR reference rate is temporarily unavailable.", failures);
       } finally { exchangeRequest = null; }
     })();
     return exchangeRequest;
@@ -176,7 +267,7 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
   async function loadHistoricalFx() {
     const time = clock();
     if (historicalFxCache && time - historicalFxCache.checkedAt < 60 * 60000
-      && normalizeHistoricalFx(historicalFxCache.snapshot, { now: time })) return historicalFxCache.snapshot;
+      && validHistoricalFx(historicalFxCache.snapshot, time)) return historicalFxCache.snapshot;
     if (historicalFxRequest) return historicalFxRequest;
     historicalFxRequest = (async () => {
       try {
@@ -189,11 +280,41 @@ export function createMarketData({ fetchImpl = globalThis.fetch, now = Date.now 
         if (!snapshot) throw new Error("Invalid historical reference rates.");
         historicalFxCache = { snapshot, checkedAt: time };
         return snapshot;
-      } catch {
-        throw new ApiError(503, "RATES_UNAVAILABLE", "Historical reference rates are temporarily unavailable. Previously dated rates can still be used.");
+      } catch (error) {
+        const failures = [failure("ecb-history", error)];
+        const snapshot = await publishedRate("portfolio-fx.json", (raw) => validHistoricalFx(raw, time), failures);
+        if (snapshot) { historicalFxCache = { snapshot, checkedAt: time }; return snapshot; }
+        throw unavailable("RATES_UNAVAILABLE", "Historical reference rates are temporarily unavailable. Previously dated rates can still be used.", failures);
       } finally { historicalFxRequest = null; }
     })();
     return historicalFxRequest;
+  }
+
+  function validHistoricalFx(raw, time) {
+    const snapshot = normalizeHistoricalFx(raw, { now: time });
+    const start = Date.parse(historicalFxStart(time));
+    return snapshot && PORTFOLIO_FX_CURRENCIES.every((currency) => {
+      const points = snapshot.byCurrency[currency];
+      return points?.length >= 200 && Date.parse(points[0].date) - start <= 14 * DAY
+        && time - Date.parse(points.at(-1).date) <= 7 * DAY;
+    }) ? snapshot : null;
+  }
+
+  async function publishedRate(file, normalize, failures) {
+    const provider = file === "exchange-rate.json" ? "published-current-fx" : "published-history-fx";
+    try {
+      const raw = await fetchJson(`${PUBLISHED_BASE_URL}${file}`, PUBLIC_ASSET_LIMITS[`data/${file}`]);
+      const value = normalize(raw);
+      if (!value) throw new Error("Invalid published reference rates.");
+      return value;
+    } catch (error) { failures.push(failure(provider, error)); }
+    try {
+      const raw = await readMarketAsset(`data/${file}`);
+      const value = normalize(raw);
+      if (!value) throw new Error("Invalid embedded reference rates.");
+      return value;
+    } catch (error) { failures.push(failure(provider.replace("published", "embedded"), error)); }
+    return null;
   }
 
   return { loadHistory, loadExchangeRate, loadHistoricalFx };

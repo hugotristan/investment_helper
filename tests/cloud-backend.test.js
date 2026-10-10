@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { createApp } from "../server/worker.mjs";
+import { createMarketAssetReader } from "../server/market-data.mjs";
 import { createLocalDatabase } from "../server/local-database.mjs";
 import { createPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 import { normalizeStockHistory } from "../js/data/stock-history.js";
@@ -434,4 +435,125 @@ test("historical FX requests five years of fixed ECB pairs, inverts native rates
     const invalid = createApp(assets, { now: NOW, fetchImpl: async () => Response.json(fixture) });
     assert.equal((await response(invalid, {}, "/api/portfolio-fx")).status, 503);
   }
+});
+
+function publishedFixture(tickers = ["VWCE.DE", "MSFT"]) {
+  return { schemaVersion: 1, generatedAt: "2026-10-09T21:00:00.000Z", byTicker: Object.fromEntries(tickers.map((ticker) => {
+    const chart = yahooChart(ticker, { meta: { currency: ticker === "VWCE.DE" ? "EUR" : "USD",
+      instrumentType: ticker === "VWCE.DE" ? "ETF" : "EQUITY" } });
+    const history = parseYahooChart(chart, ticker);
+    history.source = "Yahoo Finance published snapshot";
+    history.quote = parseYahooQuote(chart, ticker, { now: NOW });
+    return [ticker, JSON.parse(JSON.stringify(history))];
+  })) };
+}
+
+function currentFxFixture() {
+  return { schemaVersion: 1, available: true, base: "USD", quote: "EUR", rate: 0.89238, date: "2026-10-09",
+    source: "ECB reference rate via Frankfurter", sourceUrl: EXCHANGE_RATE_SOURCE_URL, retrievedAt: "2026-10-09T21:00:00.000Z" };
+}
+
+function publishedFxFixture() {
+  return { schemaVersion: 1, source: "ECB reference rates via Frankfurter", sourceUrl: PORTFOLIO_FX_SOURCE_URL,
+    generatedAt: "2026-10-09T21:00:00.000Z", byCurrency: Object.fromEntries(["USD", "GBP", "JPY", "CHF", "CAD", "AUD"].map((currency) =>
+      [currency, fxFixture().filter((row) => row.quote === currency).map((row) => ({ date: row.date, rate: 1 / row.rate }))])) };
+}
+
+const embeddedJson = (value) => ({ encoding: "gzip-base64", data: gzipSync(JSON.stringify(value)).toString("base64"), contentType: "application/json" });
+
+test("default market fetch resolves the current global method with its receiver", async () => {
+  const original = globalThis.fetch;
+  const app = createApp(assets, { now: NOW });
+  const calls = [];
+  try {
+    // Install after app construction: Workers must resolve request-time fetch,
+    // and host APIs may reject detached calls even when Node accepts them.
+    globalThis.fetch = function (url, init) {
+      assert.equal(this, globalThis);
+      assert.deepEqual(init.headers, { Accept: "application/json" });
+      calls.push(String(url));
+      return Promise.resolve(Response.json(yahooChart("MSFT")));
+    };
+    const result = await response(app, {}, "/api/market/history?ticker=MSFT");
+    assert.equal(result.status, 200);
+    assert.equal(result.data.ticker, "MSFT");
+    assert.equal(calls.length, 1);
+  } finally { globalThis.fetch = original; }
+});
+
+test("current and historical FX use fixed public snapshots during live provider outages without changing dates", async () => {
+  const calls = [], diagnostics = [];
+  const app = createApp(assets, { now: NOW, reportFailure: (details) => diagnostics.push(details), fetchImpl: async (url, init) => {
+    calls.push(String(url));
+    assert.deepEqual(init.headers, { Accept: "application/json" });
+    assert.equal(init.credentials, "omit");
+    assert.equal(init.redirect, "error");
+    if (String(url).startsWith("https://api.frankfurter.dev/")) return new Response("Blocked", { status: 503 });
+    if (String(url) === "https://hugotristan.github.io/investment_helper/data/exchange-rate.json") return Response.json(currentFxFixture());
+    assert.equal(String(url), "https://hugotristan.github.io/investment_helper/data/portfolio-fx.json");
+    return Response.json(publishedFxFixture());
+  } });
+  const [current, history] = await Promise.all([response(app, {}, "/api/exchange-rate"), response(app, {}, "/api/portfolio-fx")]);
+  assert.equal(current.status, 200);
+  assert.equal(current.data.date, "2026-10-09");
+  assert.equal(current.data.retrievedAt, "2026-10-09T21:00:00.000Z");
+  assert.equal(history.status, 200);
+  assert.equal(history.data.generatedAt, "2026-10-09T21:00:00.000Z");
+  assert.equal(history.data.byCurrency.USD.at(-1).date, "2026-10-09");
+  assert.equal(calls.length, 4);
+  assert.deepEqual(diagnostics.map(({ provider, reason, status }) => ({ provider, reason, status })), [
+    { provider: "ecb-current", reason: "http", status: 503 }, { provider: "ecb-history", reason: "http", status: 503 },
+  ]);
+  assert.equal((await response(app, {}, "/api/exchange-rate")).status, 200);
+  assert.equal((await response(app, {}, "/api/portfolio-fx")).status, 200);
+  assert.equal(calls.length, 4);
+});
+
+test("network runtime failures recover from bounded compressed embedded public prices and rates", async () => {
+  const diagnostics = [], calls = [];
+  const app = createApp({ ...assets, "data/prices.json": embeddedJson(publishedFixture()),
+    "data/exchange-rate.json": embeddedJson(currentFxFixture()), "data/portfolio-fx.json": embeddedJson(publishedFxFixture()) },
+  { now: NOW, reportFailure: (details) => diagnostics.push(details), fetchImpl: async (url) => {
+    calls.push(String(url));
+    throw new TypeError("Illegal invocation: untrusted private text must not be echoed");
+  } });
+  const paths = ["/api/market/history?ticker=VWCE.DE", "/api/market/history?ticker=MSFT", "/api/exchange-rate", "/api/portfolio-fx"];
+  for (const path of paths) assert.equal((await response(app, {}, path, { user: null })).status, 401);
+  assert.equal(calls.length, 0);
+  const [vwce, msft, current, historical] = await Promise.all(paths.map((path) => response(app, {}, path)));
+  assert.equal(vwce.status, 200);
+  assert.equal(vwce.data.currency, "EUR");
+  assert.equal(vwce.data.source, "Yahoo Finance published snapshot");
+  assert.equal(vwce.data.historyAsOf, "2026-10-09T13:30:00.000Z");
+  assert.equal(msft.status, 200);
+  assert.equal(msft.data.currency, "USD");
+  assert.equal(current.status, 200);
+  assert.equal(current.data.date, "2026-10-09");
+  assert.equal(historical.status, 200);
+  assert.equal(historical.data.generatedAt, "2026-10-09T21:00:00.000Z");
+  assert.equal(calls.filter((url) => url.endsWith("/prices.json")).length, 1);
+  assert.equal(diagnostics.filter(({ provider }) => provider === "yahoo").length, 1);
+  assert(diagnostics.every(({ reason }) => reason === "fetch-binding"));
+  assert(!JSON.stringify(diagnostics).includes("untrusted private text"));
+});
+
+test("embedded recovery rejects stale prices, wrong-currency rates, incomplete histories and oversized decompressed files", async () => {
+  const stale = publishedFixture();
+  stale.generatedAt = "2026-01-01T00:00:00.000Z";
+  const incomplete = publishedFxFixture();
+  delete incomplete.byCurrency.USD;
+  const app = createApp({ ...assets, "data/prices.json": embeddedJson(stale),
+    "data/exchange-rate.json": embeddedJson({ ...currentFxFixture(), base: "EUR", quote: "USD" }),
+    "data/portfolio-fx.json": embeddedJson(incomplete) },
+  { now: NOW, reportFailure() {}, fetchImpl: async () => { throw new TypeError("Illegal invocation and credential-like private text"); } });
+  for (const path of ["/api/market/history?ticker=VWCE.DE", "/api/exchange-rate", "/api/portfolio-fx"]) {
+    const result = await response(app, {}, path);
+    assert.equal(result.status, 503);
+    assert.equal(result.data.providerFailures.length, 3);
+    assert.equal(result.data.providerFailures[0].reason, "fetch-binding");
+    assert(!JSON.stringify(result.data).includes("credential-like private text"));
+  }
+  const reader = createMarketAssetReader({ "data/exchange-rate.json": embeddedJson({ padding: "x".repeat(16 * 1024) }) });
+  await assert.rejects(reader("data/exchange-rate.json"), { code: "BODY_TOO_LARGE" });
+  assert.equal(await reader("server/auth.mjs"), null);
 });

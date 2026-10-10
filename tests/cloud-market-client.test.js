@@ -55,25 +55,37 @@ test("Sites keeps genuine dated published history during a Worker outage", async
   assert.deepEqual(calls, ["/api/market/history?ticker=CLOUDTHREE"]);
 });
 
-test("Sites uses the Worker for current and historical ECB rates", async () => {
+test("Sites waits for Worker fallback for current and historical ECB rates while preserving their dates", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
   const calls = [];
+  const pending = [];
   const date = closeDate.slice(0, 10);
-  await cloudFetch(async (url) => {
+  const retrievedAt = new Date(now).toISOString();
+  await cloudFetch((url, { signal }) => new Promise((resolve, reject) => {
     calls.push(String(url));
-    return Response.json(String(url) === "/api/exchange-rate" ? {
+    signal.addEventListener("abort", () => reject(new DOMException("Timed out", "AbortError")), { once: true });
+    pending.push(() => resolve(Response.json(String(url) === "/api/exchange-rate" ? {
       schemaVersion: 1, available: true, base: "USD", quote: "EUR", rate: 0.9, date,
       source: "ECB reference rate via Frankfurter", sourceUrl: "https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur",
-      retrievedAt: new Date(now).toISOString()
+      retrievedAt
     } : {
       schemaVersion: 1, source: "ECB reference rates via Frankfurter",
-      sourceUrl: "https://api.frankfurter.dev/v2/providers/ecb/rates", generatedAt: new Date(now).toISOString(),
+      sourceUrl: "https://api.frankfurter.dev/v2/providers/ecb/rates", generatedAt: retrievedAt,
       byCurrency: { USD: [{ date, rate: 0.9 }] }
-    });
-  }, async () => {
+    })));
+  }), async () => {
     const { loadExchangeRate } = await import("../js/data/exchange-rate.js?cloud-client-test");
     const { loadPortfolioFx } = await import("../js/data/portfolio-history.js?cloud-client-test");
-    assert.equal((await loadExchangeRate()).rate, 0.9);
-    assert.equal((await loadPortfolioFx()).byCurrency.USD[0].rate, 0.9);
+    const requests = Promise.all([loadExchangeRate(), loadPortfolioFx()]);
+    // A provider timeout followed by the Worker's fallback can outlast a static-file request.
+    t.mock.timers.tick(9000);
+    pending.forEach((complete) => complete());
+    const [current, historical] = await requests;
+    assert.equal(current.rate, 0.9);
+    assert.equal(current.date, date);
+    assert.equal(current.retrievedAt, retrievedAt);
+    assert.deepEqual(historical.byCurrency.USD[0], { date, rate: 0.9 });
+    assert.equal(historical.generatedAt, retrievedAt);
   });
   assert.deepEqual(calls, ["/api/exchange-rate", "/api/portfolio-fx"]);
 });
