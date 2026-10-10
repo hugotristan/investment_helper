@@ -58,8 +58,9 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     // The hosting runtime supplies its outbound fetch when requests run. It
     // must keep its global receiver rather than be captured as a bare callback.
     let providerCalls = 0;
-    function runtimeFetch(url) {
+    function runtimeFetch(url, init) {
       assert.equal(this?.fetch, runtimeFetch);
+      assert.equal(Object.hasOwn(init, "credentials"), false, "Workers do not support browser credential options");
       assert.equal(url, "https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur");
       providerCalls++;
       return Promise.resolve(Response.json({ base: "USD", quote: "EUR", rate: 0.9,

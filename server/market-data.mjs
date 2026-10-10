@@ -45,6 +45,7 @@ function providerFailure(provider, error) {
     : error?.name === "AbortError" || error?.name === "TimeoutError" ? "timeout"
     : error?.name === "SyntaxError" ? "invalid-json"
     : /illegal invocation|receiver|this.*(?:fetch|global|window)/i.test(String(error?.message || "")) ? "fetch-binding"
+    : /(?:credentials|mode|referrer).*(?:unsupported|unimplemented|not implemented|not supported)|(?:unsupported|unimplemented|not implemented|not supported).*(?:credentials|mode|referrer)/i.test(String(error?.message || "")) ? "request-init-runtime"
     : /TextDecoder|fatal|encoding|decode/i.test(String(error?.message || "")) ? "decoder-runtime"
     : /Intl|time.?zone|DateTimeFormat/i.test(String(error?.message || "")) ? "date-runtime"
     : error?.name === "TypeError" ? "network-or-runtime" : "invalid-data");
@@ -139,7 +140,9 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     try {
-      const response = await fetchImpl(url, { headers: { Accept: "application/json" }, credentials: "omit",
+      // Workers have no browser cookie jar; credentials is a browser-only init
+      // member which some Worker runtimes reject before making any request.
+      const response = await fetchImpl(url, { headers: { Accept: "application/json" },
         redirect: "error", signal: controller.signal });
       if (!response.ok) {
         const error = new Error("Provider unavailable.");
