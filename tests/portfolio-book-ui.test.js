@@ -60,6 +60,7 @@ function fixture(initial = null, options = {}) {
     } };
   const controller = createPortfolioBookController({ store, document: doc, now: () => timestamp, uuid: () => `tx-${++ids}`,
     validateTicker: async (ticker) => { checked.push(ticker); return options.validity || "valid"; }, subscribe: false,
+    resolveTicker: options.resolveTicker || (async (value) => value.trim().toUpperCase()),
     onChange: () => { changes++; }, download: (serialized) => { exported = serialized; } });
   return { controller, store, get stored() { return stored; }, set stored(value) { stored = value; },
     get writes() { return writes; }, get changes() { return changes; }, get checked() { return checked; }, get exported() { return exported; } };
@@ -141,6 +142,19 @@ test("new tickers need stock/ETF validation; nonsense cannot be persisted", asyn
   assert.deepEqual(f.checked, ["XXXXXXXXXX"]);
   assert.equal(f.writes, 0);
   assert.match(node("transactionMessage").textContent, /Ticker not found/);
+});
+
+test("company input resolves before validation and only its canonical ticker is saved", async () => {
+  const f = fixture(book(), { resolveTicker: async (value) => value === "Sandisk" ? "SNDK" : null });
+  await f.controller.initialize();
+  fill(f.controller, { ticker: "Sandisk" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  assert.deepEqual(f.checked, ["SNDK"]);
+  assert.equal(f.stored.transactions[0].ticker, "SNDK");
+  fill(f.controller, { ticker: "Ambiguous company" });
+  assert.equal(await f.controller.saveTransaction(), false);
+  assert.equal(f.writes, 1);
+  assert.match(node("transactionMessage").textContent, /Select a matching stock/);
 });
 
 test("cash and dividend forms ignore stale hidden trade fields", async () => {

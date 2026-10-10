@@ -5,6 +5,7 @@ import { applyQuoteSnapshot, loadMarketContext, loadMarketSeries, loadQuoteSnaps
 import { uniqueArticles } from "../data/news-helpers.js";
 import { loadNewsSources } from "../data/news.js";
 import { loadFundamentalsSnapshot } from "../data/fundamentals.js";
+import { resolveTickerInput } from "../data/ticker-search.js";
 import { renderFundamentals } from "./fundamentals.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { isBlockedAssetTicker, parseDetailTicker } from "../shared/symbols.js";
@@ -21,24 +22,25 @@ export async function runStockDetail() {
     return;
   }
 
-  const parsed = parseDetailTicker(els.detailTickerInput.value);
-  if (!parsed.ticker) {
-    els.detailOutput.innerHTML = `<div class="empty-state">Enter a ticker, like MSFT, NVDA, VTI, or INTC.</div>`;
-    return;
-  }
-  if (isBlockedAssetTicker(parsed.ticker)) {
-    els.detailOutput.innerHTML = `<div class="empty-state">That asset type is outside this stock-and-ETF version. Use a stock or ETF ticker.</div>`;
-    return;
-  }
-
   isDetailRunning = true;
-  state.detailTicker = parsed.ticker;
-  persist();
-  els.detailTickerInput.value = parsed.ticker;
   els.detailButton.disabled = true;
-  els.detailOutput.innerHTML = `<div class="empty-state">Loading prices, company data, and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
-
   try {
+    const resolved = await resolveTickerInput(els.detailTickerInput.value);
+    const parsed = resolved ? parseDetailTicker(resolved) : { ticker: "" };
+    if (!parsed.ticker) {
+      els.detailOutput.innerHTML = `<div class="empty-state">Enter a ticker or select a matching stock or ETF from the suggestions.</div>`;
+      return;
+    }
+    if (isBlockedAssetTicker(parsed.ticker)) {
+      els.detailOutput.innerHTML = `<div class="empty-state">That asset type is outside this stock-and-ETF version. Use a stock or ETF ticker.</div>`;
+      return;
+    }
+
+    state.detailTicker = parsed.ticker;
+    persist();
+    els.detailTickerInput.value = parsed.ticker;
+    els.detailOutput.innerHTML = `<div class="empty-state">Loading prices, company data, and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
+
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
     const [series, quotes, news, marketContext, fundamentals] = await Promise.all([
       loadMarketSeries(parsed.ticker),

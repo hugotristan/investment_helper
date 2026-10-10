@@ -1,6 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildTickerCatalog, loadTickerCatalog, searchTickers } from "../js/data/ticker-search.js";
+import { buildTickerCatalog, loadTickerCatalog, searchTickers, resolveTickerInput, findListedInstrument,
+  normalizeInstrumentCatalog, INSTRUMENT_SOURCE, INSTRUMENT_SOURCE_URL } from "../js/data/ticker-search.js";
+
+const now = Date.now();
+const directoryDate = new Date(now).toISOString().slice(0, 10).replaceAll("-", "");
+const sourceAsOf = `${directoryDate.slice(4, 8)}${directoryDate.slice(0, 4)}00:00`;
+const instruments = { schemaVersion: 1, source: INSTRUMENT_SOURCE, sourceUrl: INSTRUMENT_SOURCE_URL, sourceAsOf,
+  generatedAt: new Date(now).toISOString(), entries: [
+    { ticker: "SNDK", label: "SanDisk Corporation - Common Stock", type: "stock", exchange: "Q", aliases: ["SanDisk Corporation", "SanDisk"] },
+    { ticker: "ASML", label: "ASML Holding N.V. - American Depositary Shares", type: "stock", exchange: "Q", aliases: ["ASML Holding N.V.", "ASML"] },
+    { ticker: "BRK-B", label: "Berkshire Hathaway Inc. Class B Common Stock", type: "stock", exchange: "N", aliases: ["BRK.B", "Berkshire Hathaway"] },
+    { ticker: "NEWETF", label: "New Index ETF", type: "ETF", exchange: "P", aliases: [] }
+  ] };
 
 const secTickers = { schemaVersion: 1, companyTickers: {
   AAPL: { ticker: "AAPL", title: "Apple Inc.", cik_str: 320193 },
@@ -75,17 +87,19 @@ test("local loader uses repository-relative same-origin files once and survives 
   globalThis.fetch = async (url, options) => {
     requests.push({ url: String(url), options });
     if (String(url).endsWith("/data/sec-tickers.json")) return { ok: true, json: async () => secTickers };
+    if (String(url).endsWith("/data/instruments.json")) return { ok: true, json: async () => instruments };
     return { ok: false, status: 503 };
   };
   try {
     const [first, second] = await Promise.all([loadTickerCatalog(), loadTickerCatalog()]);
     assert.equal(first, second);
-    assert.equal(requests.length, 2);
+    assert.equal(requests.length, 3);
     assert.equal(requests.filter(({ url }) => url.endsWith("/data/sec-tickers.json")).length, 1);
     assert.ok(requests.every(({ options }) => options.credentials === "same-origin"));
-    assert.ok(requests.every(({ url }) => [new URL("../data/sec-tickers.json", import.meta.url).href, new URL("../data/prices.json", import.meta.url).href].includes(url)));
+    assert.ok(requests.every(({ url }) => [new URL("../data/instruments.json", import.meta.url).href, new URL("../data/sec-tickers.json", import.meta.url).href, new URL("../data/prices.json", import.meta.url).href].includes(url)));
     assert.equal(searchTickers("Zebra", { catalog: first })[0].ticker, "ZZZ");
     assert.equal(searchTickers("spy", { catalog: first })[0].type, "ETF");
+    assert.equal(searchTickers("sandisk", { catalog: first })[0].ticker, "SNDK");
   } finally { globalThis.fetch = originalFetch; }
 });
 
@@ -101,5 +115,58 @@ test("unavailable same-origin files leave configured suggestions and free typing
     assert.equal(searchTickers("QQQ", { catalog })[0].type, "ETF");
     assert.match(catalog.coverage, /Other tickers can be typed/);
     assert.doesNotMatch(catalog.coverage, /bundled US issuers/);
+    assert.equal(catalog.instrumentSnapshot.generatedAt, instruments.generatedAt);
+    assert.equal(searchTickers("Sandisk", { catalog })[0].ticker, "SNDK");
   } finally { globalThis.fetch = originalFetch; Date.now = originalNow; }
+});
+
+test("published directory broadens names and ADR/ETF suggestions while preserving non-US fallbacks", async () => {
+  const catalog = buildTickerCatalog({ instruments, now });
+  assert.equal(searchTickers("sand", { catalog })[0].ticker, "SNDK");
+  assert.equal(searchTickers("asml", { catalog })[0].ticker, "ASML");
+  assert.equal(searchTickers("New Index", { catalog })[0].type, "ETF");
+  assert.ok(catalog.entries.some(({ ticker }) => ticker === "VWCE.DE"));
+  assert.match(catalog.coverage, /4 US-listed stocks and ETFs/);
+  assert.equal(await resolveTickerInput("Sandisk", { catalog }), "SNDK");
+  assert.equal(await resolveTickerInput("SanDisk Corporation", { catalog }), "SNDK");
+  assert.equal(await resolveTickerInput("SanDisk Corporation - Common Stock", { catalog }), "SNDK");
+  assert.equal(await resolveTickerInput("Berkshire Hathaway Inc.", { catalog }), "BRK-B");
+  assert.equal(await resolveTickerInput("brk.b", { catalog }), "BRK-B");
+  assert.equal(await resolveTickerInput("sndk", { catalog }), "SNDK");
+  assert.equal(await resolveTickerInput("OTHER.DE", { catalog }), "OTHER.DE");
+  assert.equal(await resolveTickerInput("Some random company", { catalog }), null);
+});
+
+test("company names require an unambiguous exact match; prefixes remain suggestions", async () => {
+  const catalog = [{ ticker: "ACM", label: "Acme Corp", type: "stock", aliases: ["Acme"] },
+    { ticker: "ACMA", label: "Acme Corp Class A Common Stock", type: "stock", aliases: ["Acme"] }];
+  assert.equal(await resolveTickerInput("Acme", { catalog }), null);
+  assert.equal(await resolveTickerInput("acm", { catalog }), "ACM");
+  assert.equal(await resolveTickerInput("Acme C", { catalog }), null);
+  assert.equal(await resolveTickerInput("not-in-list", { catalog }), "NOT-IN-LIST");
+  assert.equal(await resolveTickerInput("X".repeat(121), { catalog }), null);
+});
+
+test("listing verification uses only recent official snapshot provenance and never configured aliases", () => {
+  const catalog = buildTickerCatalog({ instruments, secTickers, priceSnapshot, now });
+  assert.deepEqual(findListedInstrument(catalog, "SNDK", { now }), { ticker: "SNDK", name: "SanDisk Corporation - Common Stock",
+    quoteType: "EQUITY", exchange: "Q", source: INSTRUMENT_SOURCE, sourceUrl: INSTRUMENT_SOURCE_URL, verifiedAt: instruments.generatedAt });
+  assert.equal(findListedInstrument(catalog, "NEWETF", { now }).quoteType, "ETF");
+  assert.equal(findListedInstrument(catalog, "AAPL", { now }), null);
+  assert.equal(findListedInstrument(catalog, "SNDK", { now: now + 8 * 86400000 }), null);
+  assert.equal(findListedInstrument({ ...catalog, instrumentSnapshot: { ...instruments, source: "invented" } }, "SNDK", { now }), null);
+  assert.equal(findListedInstrument(catalog, "SNDK", { now: now - 1000 }), null);
+  const oldSource = { ...instruments, sourceAsOf: "0101202000:00" };
+  assert.equal(findListedInstrument(buildTickerCatalog({ instruments: oldSource, now }), "SNDK", { now }), null);
+});
+
+test("directory normalization rejects malformed dates, types, provenance, symbols and duplicate identities", () => {
+  assert.equal(normalizeInstrumentCatalog(instruments, { now }).entries.length, 4);
+  for (const patch of [{ source: "Other" }, { sourceUrl: "https://example.com" }, { generatedAt: new Date(now + 1).toISOString() },
+    { sourceAsOf: "0230202600:00" }, { sourceAsOf: "1009202624:00" }, { entries: [] },
+    { entries: [...instruments.entries, instruments.entries[0]] },
+    { entries: [{ ...instruments.entries[0], ticker: "<SCRIPT>" }] },
+    { entries: [{ ...instruments.entries[0], type: "warrant" }] }]) {
+    assert.equal(normalizeInstrumentCatalog({ ...instruments, ...patch }, { now }), null);
+  }
 });

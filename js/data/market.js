@@ -4,13 +4,24 @@ import { PRICE_TIMEOUT_MS, marketProxyTickers } from "../config/settings.js";
 import { fetchWithRetry, fetchWithTimeout, mapLimit } from "./http.js";
 import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { unique } from "../shared/text.js";
-import { loadPriceSnapshot, readSnapshotQuote, readSnapshotSeries } from "./price-snapshot.js";
-import { parseYahooChart, parseYahooQuote } from "./yahoo-chart.js";
+import { loadPriceSnapshot, readSnapshotHistory, readSnapshotQuote, readSnapshotSeries } from "./price-snapshot.js";
+import { findListedInstrument, loadTickerCatalog } from "./ticker-search.js";
+import { loadStockHistory, readCachedStockHistory } from "./stock-history.js";
+import { parseYahooQuote } from "./yahoo-chart.js";
 import { loadScanCache } from "./scan-cache.js";
 
 export async function validateWatchlistTicker(ticker) {
-  const published = readSnapshotSeries(await loadPriceSnapshot(), ticker);
-  if (published) return ["EQUITY", "ETF"].includes(published.instrumentType.toUpperCase()) ? "valid" : "unsupported";
+  ticker = String(ticker || "").trim().toUpperCase();
+  if (isBlockedAssetTicker(ticker)) return "unsupported";
+  if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(ticker)) return "invalid";
+  // Identity is independent of the 200 daily bars needed for a market signal.
+  const published = readSnapshotHistory(await loadPriceSnapshot(), ticker);
+  if (published && Date.now() - Date.parse(published.historyAsOf) <= 7 * 86400000) {
+    return ["EQUITY", "ETF"].includes(published.instrumentType.toUpperCase()) ? "valid" : "unsupported";
+  }
+  // A current exchange listing also proves existence during price-provider outages.
+  // Configured suggestion labels alone never qualify as a listing proof.
+  if (findListedInstrument(await loadTickerCatalog(), ticker)) return "valid";
   // Newly added symbols outside the published universe still need metadata.
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=5d&interval=1d`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
@@ -51,11 +62,12 @@ export async function loadQuoteSnapshots(tickers) {
 
   const snapshot = await loadPriceSnapshot();
   const savedQuotes = loadScanCache()?.quotes?.byTicker;
-  const settled = await mapLimit(symbols, 3, (ticker) => {
+  const settled = await mapLimit(symbols, 3, async (ticker) => {
     const published = readSnapshotQuote(snapshot, ticker);
     const saved = savedQuotes?.get(ticker);
     if (published) return saved && saved.quoteTime > published.quoteTime ? saved : published;
-    return saved || loadIntradayQuote(ticker);
+    const fresh = await loadIntradayQuote(ticker);
+    return fresh && (!saved || fresh.quoteTime >= saved.quoteTime) ? fresh : saved || fresh;
   });
   const quotes = settled
     .map((result) => result.status === "fulfilled" ? result.value : null)
@@ -71,6 +83,7 @@ export async function loadQuoteSnapshots(tickers) {
 }
 
 async function loadIntradayQuote(ticker) {
+  const cached = readCachedStockHistory(ticker)?.quote;
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1m`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
@@ -91,7 +104,7 @@ async function loadIntradayQuote(ticker) {
     }
   }
 
-  return null;
+  return (await loadStockHistory(ticker))?.quote || cached || null;
 }
 
 export function applyQuoteSnapshot(series, quoteMap) {
@@ -135,30 +148,11 @@ export async function loadMarketSeries(ticker, { snapshot, cachedSeries } = {}) 
   // Keep a later real history already saved in this browser if a deployment
   // temporarily publishes an older snapshot. Neither path changes its date.
   if (published) return saved && Date.parse(evaluateDataQuality(saved).asOf) > Date.parse(published.historyAsOf) ? saved : published;
-  if (saved) return { ...saved, source: `${saved.source.replace(/ \(saved history\)$/, "")} (saved history)` };
-  const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1y&interval=1d&events=splits`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
-
-  for (const [index, url] of [directUrl, proxyUrl].entries()) {
-    try {
-      const response = await fetchWithRetry(url, {
-        timeoutMs: index === 0 ? PRICE_TIMEOUT_MS : PRICE_TIMEOUT_MS + 6000,
-        type: "json",
-        attempts: 1,
-        delayMs: 1200
-      });
-      if (!response.ok) continue;
-      const json = await response.json();
-      const parsed = parseYahooChart(json, ticker);
-      if (parsed?.prices.length) {
-        parsed.source = url === directUrl ? "Yahoo Finance chart" : "Yahoo Finance via CORS relay";
-        return parsed;
-      }
-    } catch {
-      // Fall through to the next data route.
-    }
+  const history = await loadStockHistory(ticker, { snapshot });
+  if (history && (!saved || Date.parse(history.historyAsOf) >= Date.parse(saved.historyAsOf || evaluateDataQuality(saved).asOf))) {
+    return { ...history, prices: history.prices.slice(-400) };
   }
-
+  if (saved) return { ...saved, source: `${saved.source.replace(/ \(saved history\)$/, "")} (saved history)` };
   return unavailableSeries(ticker);
 }
 

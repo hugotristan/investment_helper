@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 import { calculatePortfolioPerformance } from "../js/analysis/portfolio-performance.js";
+import { setActivePortfolioBook } from "../js/portfolio-state.js";
 
 const nodes = new Map();
 globalThis.document = { getElementById: (id) => {
@@ -10,7 +11,7 @@ globalThis.document = { getElementById: (id) => {
   return nodes.get(id);
 } };
 globalThis.localStorage = { getItem: () => null, setItem() { throw new Error("Performance rendering must not change saved data"); } };
-const { renderPortfolioPerformance, renderValueChart } = await import("../js/features/portfolio-performance.js");
+const { renderPortfolioPerformance, renderValueChart, refreshPortfolioPerformance } = await import("../js/features/portfolio-performance.js");
 const html = (id) => nodes.get(id)?.innerHTML;
 const NOW = Date.parse("2026-10-10T12:00:00Z");
 const fxHistory = { schemaVersion: 1, source: "ECB reference rates via Frankfurter",
@@ -74,4 +75,67 @@ test("before portfolio setup performance clears prior results and offers the por
   assert.equal(html("portfolioPerformanceHoldings"), "");
   assert.match(html("portfolioPerformanceChart"), /href="#portfolio"/);
   assert.equal(nodes.get("portfolioChartReadout").textContent, "");
+});
+
+test("refresh loads a newly recorded stock outside published prices without sending or changing its transactions", async (t) => {
+  const originalFetch = globalThis.fetch, originalNow = Date.now;
+  t.after(() => { globalThis.fetch = originalFetch; Date.now = originalNow; setActivePortfolioBook(null); });
+  Date.now = () => NOW;
+  const book = createPortfolioBook({ baseCurrency: "EUR", startDate: "2026-10-07", now: NOW });
+  book.transactions = [
+    { id: "fund", date: "2026-10-07", type: "deposit", currency: "EUR", amount: 1000, cashCurrency: "EUR", cashAmount: 1000 },
+    { id: "buy", date: "2026-10-08", type: "buy", ticker: "SNDK", currency: "USD", quantity: 1, price: 100,
+      amount: 100, fee: 0, cashCurrency: "EUR", cashAmount: 90 }
+  ];
+  const before = structuredClone(book);
+  const external = [];
+  globalThis.fetch = async (url, options) => {
+    const path = String(url);
+    if (path.endsWith("/data/prices.json")) return Response.json({ schemaVersion: 1, generatedAt: "2026-10-10T10:00:00Z",
+      byTicker: { SPY: { ...history("SPY", 400, 410), instrumentType: "ETF" } } });
+    if (path.endsWith("/data/portfolio-fx.json")) return Response.json(fxHistory);
+    external.push(path);
+    assert.equal(options.body, undefined);
+    assert.doesNotMatch(path, /1000|quantity|cashAmount|transactions/);
+    return Response.json({ chart: { result: [{ meta: { symbol: "SNDK", currency: "USD", instrumentType: "EQUITY", dataGranularity: "1d" },
+      timestamp: ["2026-10-07", "2026-10-08", "2026-10-09"].map((date) => Date.parse(`${date}T13:30:00Z`) / 1000),
+      indicators: { quote: [{ close: [100, 100, 115] }] } }] } });
+  };
+  setActivePortfolioBook(book);
+  const result = await refreshPortfolioPerformance();
+  assert.equal(result.summary.currentValue, 1013.5);
+  assert.equal(result.holdings[0].ticker, "SNDK");
+  assert.ok(html("portfolioPerformanceSummary").includes(money(1013.5)));
+  assert.equal(external.length, 1);
+  assert.match(external[0], /\/SNDK\?range=5y/);
+  assert.deepEqual(book, before);
+});
+
+test("a history response arriving after the active book changes cannot overwrite the cleared portfolio screen", async (t) => {
+  const originalFetch = globalThis.fetch, originalNow = Date.now;
+  t.after(() => { globalThis.fetch = originalFetch; Date.now = originalNow; setActivePortfolioBook(null); });
+  Date.now = () => NOW;
+  const book = createPortfolioBook({ baseCurrency: "EUR", startDate: "2026-10-07", now: NOW });
+  book.transactions = [
+    { id: "fund", date: "2026-10-07", type: "deposit", currency: "EUR", amount: 1000, cashCurrency: "EUR", cashAmount: 1000 },
+    { id: "buy", date: "2026-10-08", type: "buy", ticker: "QCOM", currency: "USD", quantity: 1, price: 100,
+      amount: 100, fee: 0, cashCurrency: "EUR", cashAmount: 90 }
+  ];
+  let release, started;
+  const seen = new Promise((resolve) => { started = resolve; });
+  globalThis.fetch = async () => {
+    started();
+    await new Promise((resolve) => { release = resolve; });
+    return Response.json({ chart: { result: [{ meta: { symbol: "QCOM", currency: "USD", instrumentType: "EQUITY", dataGranularity: "1d" },
+      timestamp: [Date.parse("2026-10-09T13:30:00Z") / 1000], indicators: { quote: [{ close: [115] }] } }] } });
+  };
+  setActivePortfolioBook(book);
+  const oldRefresh = refreshPortfolioPerformance();
+  await seen;
+  setActivePortfolioBook(null);
+  await refreshPortfolioPerformance();
+  release();
+  assert.equal(await oldRefresh, null);
+  assert.equal(html("portfolioPerformanceSummary"), "");
+  assert.match(html("portfolioPerformanceChart"), /href="#portfolio"/);
 });

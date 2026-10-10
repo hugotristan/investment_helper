@@ -5,7 +5,7 @@ const DAY = 86400000;
 const MAX_PRICE_AGE = 7 * DAY;
 const CASH_TOLERANCE = 1e-7;
 const FUNDING = new Set(["deposit", "withdrawal"]);
-const PRICE_SOURCE = "Yahoo Finance published snapshot";
+const PRICE_SOURCES = new Set(["Yahoo Finance published snapshot", "Yahoo Finance chart", "Yahoo Finance via CORS relay"]);
 const METHOD_SOURCE = "https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/";
 
 // Rates are ratios (0.1 means 10%). Gains use recorded EUR settlements, while
@@ -78,7 +78,7 @@ export function calculatePortfolioPerformance({ book, histories = {}, fxHistory 
   for (const [key, acquired] of splitAcquisition) {
     const ticker = key.split("|")[0];
     const history = histories?.[ticker];
-    if (history?.source === PRICE_SOURCE && (history.splitsComplete === false || !Array.isArray(history.splits)
+    if (PRICE_SOURCES.has(history?.source) && (history.splitsComplete === false || !Array.isArray(history.splits)
       || history.splits.some((split) => {
         const date = dayOf(split?.date);
         return !date || date >= acquired && date <= last;
@@ -109,7 +109,7 @@ export function calculatePortfolioPerformance({ book, histories = {}, fxHistory 
     if (priceCache.has(key)) return priceCache.get(key);
     const history = Object.hasOwn(histories || {}, ticker) ? histories[ticker] : null;
     let prices = null;
-    if (!history || history.ticker !== ticker || history.currency !== currency || history.source !== PRICE_SOURCE
+    if (!history || history.ticker !== ticker || history.currency !== currency || !PRICE_SOURCES.has(history.source)
       || !Array.isArray(history.prices) || history.prices.length > 1600) {
       reasons.add(`Real daily ${ticker} prices in ${currency} are unavailable.`);
     } else if (acquired && (history.splitsComplete === false || !Array.isArray(history.splits))) {

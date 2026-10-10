@@ -1,5 +1,6 @@
 import { normalizeHolding } from "../analysis/holdings.js";
 import { validateWatchlistTicker } from "../data/market.js";
+import { resolveTickerInput } from "../data/ticker-search.js";
 import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
 import { persist, state } from "../storage.js";
@@ -81,17 +82,19 @@ async function saveHolding(event) {
   if (busy) return;
   const id = element("holdingId").value;
   const expectedRevision = formRevision;
-  const normalized = normalizeHolding({ id: id || crypto.randomUUID(), ticker: element("holdingTicker").value,
-    label: element("holdingLabel").value, shares: element("holdingShares").value,
-    averageCost: element("holdingCost").value, currency: element("holdingCurrency").value });
-  if (!normalized.ok) { setMessage(normalized.error); return; }
-  const holding = normalized.holding;
-  if (!currencies.has(holding.currency)) { setMessage("Choose one of the supported purchase currencies."); return; }
-  if (isBlockedAssetTicker(holding.ticker)) { setMessage("Only stock and ETF holdings are supported."); return; }
-  if (id && !editableHoldings().some((row) => row.id === id)) { setMessage("That holding is no longer saved. Cancel the edit and start again."); return; }
   setBusy(true);
-  setMessage(`Checking ${holding.ticker} against live stock and ETF data…`);
   try {
+    const ticker = await resolveTickerInput(element("holdingTicker").value);
+    if (!ticker) { setMessage("Select a matching stock or ETF, or enter its ticker symbol."); return; }
+    const normalized = normalizeHolding({ id: id || crypto.randomUUID(), ticker,
+      label: element("holdingLabel").value, shares: element("holdingShares").value,
+      averageCost: element("holdingCost").value, currency: element("holdingCurrency").value });
+    if (!normalized.ok) { setMessage(normalized.error); return; }
+    const holding = normalized.holding;
+    if (!currencies.has(holding.currency)) { setMessage("Choose one of the supported purchase currencies."); return; }
+    if (isBlockedAssetTicker(holding.ticker)) { setMessage("Only stock and ETF holdings are supported."); return; }
+    if (id && !editableHoldings().some((row) => row.id === id)) { setMessage("That holding is no longer saved. Cancel the edit and start again."); return; }
+    setMessage(`Checking ${holding.ticker} against stock and ETF listings…`);
     const validity = await validateWatchlistTicker(holding.ticker);
     if (validity !== "valid") {
       setMessage(validity === "invalid" ? "Ticker not found. Check the symbol and exchange suffix."

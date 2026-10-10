@@ -36,6 +36,27 @@ jobs:
       - name: Test app modules
         run: npm test
 
+      - name: Restore stock and ETF directory
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: data/instruments.json
+          key: instruments-${{ github.run_id }}
+          restore-keys: |
+            instruments-
+
+      - name: Refresh stock and ETF directory
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
+        run: node scripts/update-instruments.mjs
+
+      - name: Preserve stock and ETF directory
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: data/instruments.json
+          key: instruments-${{ github.run_id }}
+
       - name: Restore latest fundamentals snapshot
         uses: actions/cache/restore@v4
         continue-on-error: true

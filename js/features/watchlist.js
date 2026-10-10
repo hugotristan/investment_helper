@@ -1,5 +1,6 @@
 import { mapLimit } from "../data/http.js";
 import { validateWatchlistTicker } from "../data/market.js";
+import { resolveTickerInput } from "../data/ticker-search.js";
 import { isBlockedAssetTicker, parseTickers } from "../shared/symbols.js";
 import { escapeHtml, unique } from "../shared/text.js";
 import { persist, state } from "../storage.js";
@@ -40,29 +41,34 @@ function updateWatchlist(tickers, notify = true) {
 
 async function saveWatchlistInput(value, replace, notify = true) {
   if (isWatchlistValidating) return;
-  const input = value.trim().toUpperCase();
-  const entries = input.split(/[\s,;]+/).filter(Boolean);
-  if ((!entries.length && !replace) || entries.some((ticker) => !/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(ticker))) {
-    els.watchlistMessage.textContent = "Enter ticker symbols of up to 20 characters, separated by commas or spaces (e.g. AAPL, BRK-B, VWCE.DE).";
-    return;
-  }
-  if (entries.some(isBlockedAssetTicker)) {
-    els.watchlistMessage.textContent = "This watchlist supports stocks and ETFs. Remove cryptocurrency symbols to continue.";
-    return;
-  }
-  const current = parseTickers(state.tickerInput);
-  const additions = unique(entries).filter((ticker) => !current.includes(ticker));
-  const next = replace ? unique(entries) : current.concat(additions);
-  if (!additions.length && !replace) {
-    els.watchlistMessage.textContent = "Those tickers are already on your watchlist.";
-    return;
-  }
-  if (next.length > 90) {
-    els.watchlistMessage.textContent = "Your watchlist can hold up to 90 tickers. Remove some before adding more.";
-    return;
-  }
   setWatchlistValidating(true);
   try {
+    if (value.length > 2000) { els.watchlistMessage.textContent = "Enter up to 90 stock or ETF tickers."; return; }
+    const chunks = value.trim().split(/[,;]+/).map((part) => part.trim()).filter(Boolean);
+    const entries = (await Promise.all(chunks.map(async (chunk) => {
+      const resolved = await resolveTickerInput(chunk);
+      if (resolved) return [resolved];
+      return Promise.all(chunk.split(/\s+/).map((part) => resolveTickerInput(part)));
+    }))).flat();
+    if ((!entries.length && !replace) || entries.some((ticker) => !/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(ticker))) {
+      els.watchlistMessage.textContent = "Enter ticker symbols of up to 20 characters, separated by commas or spaces (e.g. AAPL, BRK-B, VWCE.DE).";
+      return;
+    }
+    if (entries.some(isBlockedAssetTicker)) {
+      els.watchlistMessage.textContent = "This watchlist supports stocks and ETFs. Remove cryptocurrency symbols to continue.";
+      return;
+    }
+    const current = parseTickers(state.tickerInput);
+    const additions = unique(entries).filter((ticker) => !current.includes(ticker));
+    const next = replace ? unique(entries) : current.concat(additions);
+    if (!additions.length && !replace) {
+      els.watchlistMessage.textContent = "Those tickers are already on your watchlist.";
+      return;
+    }
+    if (next.length > 90) {
+      els.watchlistMessage.textContent = "Your watchlist can hold up to 90 tickers. Remove some before adding more.";
+      return;
+    }
     if (additions.length) {
       els.watchlistMessage.textContent = `Checking ${additions.join(", ")}…`;
       const results = await mapLimit(additions, 6, validateWatchlistTicker);

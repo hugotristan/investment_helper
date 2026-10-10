@@ -86,6 +86,21 @@ test("a fully sold holding keeps its realized gain with zero residual basis", ()
   assert.equal(result.summary.totalGain, 18);
 });
 
+test("validated on-demand stock histories support valuation and preserve the corporate-action gate", () => {
+  const input = book("2026-01-01", [deposit(1000), trade("buy", 1, 100)]);
+  for (const source of ["Yahoo Finance chart", "Yahoo Finance via CORS relay"]) {
+    const loaded = history("VWCE.DE", "EUR", undefined, undefined, 120, { source });
+    const result = run(input, { histories: { "VWCE.DE": loaded } });
+    assert.equal(result.summary.currentValue, 1020);
+    assert.equal(result.summary.unrealizedGain, 20);
+    const blocked = run(input, { histories: { "VWCE.DE": { ...loaded, splitsComplete: false } } });
+    assert.equal(blocked.summary.currentValue, null);
+    assert.match(blocked.reasons.join(" "), /split history is incomplete|corporate actions/);
+  }
+  const fabricated = run(input, { histories: { "VWCE.DE": history("VWCE.DE", "EUR", undefined, undefined, 120, { source: "arbitrary" }) } });
+  assert.equal(fabricated.summary.currentValue, null);
+});
+
 test("a large month-end deposit increases value and funding, not profit or return", () => {
   const input = book("2026-01-01", [openingCash(100), trade("buy", 1, 100), deposit(10000, { date: "2026-01-31" })]);
   const result = run(input, { histories: { "VWCE.DE": history("VWCE.DE", "EUR", undefined, undefined, 110), SPY: history("SPY", "EUR") } });

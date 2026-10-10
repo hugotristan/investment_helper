@@ -1,5 +1,13 @@
 # Feature changes
 
+## Stock lookup and history coverage
+
+**What changed:** Suggestions cover over 11,000 US-listed stocks and ETFs instead of the small preset. SanDisk/SNDK, Qualcomm, ASML, Dell, Cisco, and other missing companies resolve by name or ticker. Exact unique names work in portfolio transactions, opening positions, watchlist additions, stock details, and stock checks; ambiguous names require selection. Configured international symbols remain supported.
+
+**How:** A separately published Nasdaq directory avoids dependence on the blocked SEC index. Recent official listings prove stock/ETF identity independently of price availability. Stocks outside the published price preset fetch real five-year daily Yahoo history on demand, with relay fallback and a bounded cache for public market data. Performance uses this history; scans retain their 200-bar requirement. Young stocks can be saved and valued from real recent quotes/closes while signals remain unavailable. Cached quotes do not suppress refreshes, and failures preserve original observation dates. No personal transaction records are uploaded or changed.
+
+**Validation:** Parser and catalog tests cover security-type filtering, share classes, names, ambiguity, stale listing proofs, and failed publication. History tests cover identity, dates, splits, bounded concurrency, cache failures, and denied browser storage. Portfolio tests cover company-name saves, changing books during refresh, and short-history valuations without signals. Real provider requests returned completed history for SNDK, QCOM, and ASML.
+
 Each feature is delivered in its own commit. This log records the behavior, implementation, and validation for that feature.
 
 ## Personal portfolio calculations and performance

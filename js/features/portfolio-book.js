@@ -1,6 +1,7 @@
 import { createPortfolioBook, normalizeTransaction, portfolioToday, validatePortfolioBook } from "../analysis/portfolio-ledger.js";
 import { MAX_PORTFOLIO_BACKUP_BYTES, parsePortfolioBackup, portfolioBookStore, serializePortfolioBackup } from "../data/portfolio-book-store.js";
 import { validateWatchlistTicker } from "../data/market.js";
+import { resolveTickerInput } from "../data/ticker-search.js";
 import { getActivePortfolioBook, getPortfolioProjection, setActivePortfolioBook } from "../portfolio-state.js";
 import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
@@ -12,6 +13,7 @@ const debits = new Set(["buy", "withdrawal", "fee"]);
 
 export function createPortfolioBookController({ store = portfolioBookStore, document: doc = globalThis.document,
   now = () => Date.now(), uuid = () => crypto.randomUUID(), validateTicker = validateWatchlistTicker,
+  resolveTicker = resolveTickerInput,
   onChange = () => {}, download = downloadBackup, subscribe = true } = {}) {
   let busy = false;
   let loaded = false;
@@ -131,9 +133,11 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
         // With no opening balances there is no snapshot to reinterpret or double-count.
         startDate = date;
       }
+      const ticker = trade || type === "dividend" ? await resolveTicker(el("transactionTicker").value) : null;
+      if ((trade || type === "dividend") && !ticker) throw new TypeError("Select a matching stock or ETF, or enter its ticker symbol.");
       const normalized = normalizeTransaction({ id: id || uuid(), type,
         date, currency: el("transactionCurrency").value,
-        ...(trade || type === "dividend" ? { ticker: el("transactionTicker").value } : {}),
+        ...(trade || type === "dividend" ? { ticker } : {}),
         ...(trade ? { quantity: el("transactionQuantity").value, price: el("transactionPrice").value, fee: el("transactionFee").value || 0 }
           : { amount: el("transactionAmount").value }), note: el("transactionNote").value },
       { startDate, now: now(), baseCurrency: book.settings.baseCurrency });

@@ -4,7 +4,8 @@ import { applyQuoteSnapshot, loadMarketSeries, loadQuoteSnapshots } from "../dat
 import { uniqueArticles } from "../data/news-helpers.js";
 import { loadNewsSources } from "../data/news.js";
 import { formatNumber, formatPercent, formatSignal } from "../shared/format.js";
-import { isBlockedAssetTicker, parseQuestionTarget } from "../shared/symbols.js";
+import { isBlockedAssetTicker } from "../shared/symbols.js";
+import { resolveStockQuestion } from "../shared/stock-input.js";
 import { dateValue, escapeHtml, unique } from "../shared/text.js";
 import { els, showToast } from "../ui/dom.js";
 
@@ -17,21 +18,21 @@ export async function answerQuestion() {
   }
 
   const question = els.askInput.value.trim();
-  const parsed = parseQuestionTarget(question);
-  if (!parsed.ticker) {
-    els.askAnswer.innerHTML = `<div class="empty-state">No ticker recognized. Enter a ticker such as INTC or a company name such as Intel.</div>`;
-    return;
-  }
-  if (isBlockedAssetTicker(parsed.ticker)) {
-    els.askAnswer.innerHTML = `<div class="empty-state">That asset type is outside this stock-and-ETF version. Ask about a listed company or fund instead.</div>`;
-    return;
-  }
-
   isQuestionRunning = true;
   els.askButton.disabled = true;
-  els.askAnswer.innerHTML = `<div class="empty-state">Checking prices and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
-
   try {
+    const parsed = await resolveStockQuestion(question);
+    if (!parsed?.ticker) {
+      els.askAnswer.innerHTML = `<div class="empty-state">No ticker recognized. Enter a ticker such as INTC or a company name such as Intel.</div>`;
+      return;
+    }
+    if (isBlockedAssetTicker(parsed.ticker)) {
+      els.askAnswer.innerHTML = `<div class="empty-state">That asset type is outside this stock-and-ETF version. Ask about a listed company or fund instead.</div>`;
+      return;
+    }
+
+    els.askAnswer.innerHTML = `<div class="empty-state">Checking prices and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
+
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
     const [series, quotes, news] = await Promise.all([
       loadMarketSeries(parsed.ticker),

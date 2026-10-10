@@ -90,6 +90,29 @@ test("sample, unqualified, stale, and future histories cannot be rescued by a re
   }
 });
 
+test("a verified young stock can be valued without enough history for a market signal", () => {
+  const date = new Date(NOW - DAY);
+  const item = result("NEW", { score: null, instrumentType: "EQUITY", source: "Yahoo Finance chart",
+    dataQuality: { eligible: false, asOf: date.toISOString(), reason: "Fewer than 200 daily prices." },
+    historyAsOf: date.toISOString(), prices: [{ date, close: 95 }] });
+  const valued = calculate([holding("NEW")], [item]).holdings[0];
+  assert.equal(valued.currentValue, 1000);
+  assert.equal(valued.gain, 200);
+  assert.equal(item.dataQuality.eligible, false);
+  assert.equal(item.score, null);
+  const daily = calculate([holding("NEW")], [{ ...item, quote: null, latest: null }]).holdings[0];
+  assert.equal(daily.currentValue, 950);
+  assert.equal(daily.source, "daily");
+  for (const bad of [{ source: "Sample fallback" }, { instrumentType: "FUTURE" },
+    { prices: [] }, { dataQuality: { eligible: false, asOf: new Date(NOW).toISOString() } }]) {
+    assert.equal(calculate([holding("NEW")], [{ ...item, ...bad }]).holdings[0].currentValue, null);
+  }
+  const substituted = { ...item, source: "Yahoo Finance chart + Yahoo intraday", latest: 1000,
+    quote: { ...item.quote, quoteTime: new Date(NOW + 86400000), price: 1000 },
+    prices: [{ date, close: 1000 }] };
+  assert.equal(calculate([holding("NEW")], [substituted]).holdings[0].currentValue, null);
+});
+
 test("zero cost basis never produces an infinite return and unchanged prices are flat", () => {
   const answer = calculate([holding("FREE", { averageCost: 0 }), holding("FLAT", { averageCost: 100 })], [result("FREE"), result("FLAT")]);
   assert.equal(answer.holdings[0].costBasis, 0);

@@ -65,8 +65,12 @@ export function calculateHoldings(holdings, results, { now = Date.now() } = {}) 
 
 function priceForHolding(item, currency, now) {
   const historyTime = Date.parse(item?.dataQuality?.asOf || "");
-  if (!hasQualifiedSignal(item) || /^sample\b/i.test(String(item.source || ""))
-    || !Number.isFinite(historyTime) || historyTime > now + DAY_MS || now - historyTime > MAX_AGE_MS) return null;
+  const points = validHistoryPoints(item);
+  const verifiedShortHistory = ["EQUITY", "ETF"].includes(item?.instrumentType)
+    && /^Yahoo Finance (?:published snapshot|chart|via CORS relay)(?: \+ .*)?$/.test(item?.source || "")
+    && points.length > 0 && new Date(points.at(-1).date).getTime() === historyTime;
+  if ((!hasQualifiedSignal(item) && !verifiedShortHistory) || /^sample\b/i.test(String(item?.source || ""))
+    || !Number.isFinite(historyTime) || historyTime > now || now - historyTime > MAX_AGE_MS) return null;
   const quote = item.quote;
   const quoteTime = quote?.quoteTime ? new Date(quote.quoteTime).getTime() : NaN;
   if (quote && (!quote.ticker || quote.ticker === item.ticker) && quote.currency === currency
@@ -86,6 +90,9 @@ function priceForHolding(item, currency, now) {
   // Intraday substitution changes item.latest and the last prices point. Without
   // the original close snapshot neither can establish a genuine daily price.
   if (/\+\s*Yahoo intraday\b/i.test(String(item.source || ""))) return null;
+  if (verifiedShortHistory && item.currency === currency) {
+    return { price: points.at(-1).close, asOf: new Date(historyTime).toISOString(), source: "daily" };
+  }
   if (item.currency === currency && Number.isFinite(item.latest) && item.latest > 0) {
     if (quote && item.latest === quote.price) {
       const dailyPoint = validHistoryPoints(item).at(-1);

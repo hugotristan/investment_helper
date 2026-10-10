@@ -1,5 +1,6 @@
 import { calculatePortfolioPerformance } from "../analysis/portfolio-performance.js";
-import { loadPriceSnapshot, readSnapshotHistory } from "../data/price-snapshot.js";
+import { loadPriceSnapshot } from "../data/price-snapshot.js";
+import { loadStockHistories } from "../data/stock-history.js";
 import { loadPortfolioFx } from "../data/portfolio-history.js";
 import { getActivePortfolioBook } from "../portfolio-state.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -32,7 +33,8 @@ export async function refreshPortfolioPerformance() {
     if (!book) { renderPortfolioPerformance(null); return null; }
     const tickers = new Set(["SPY", ...book.openingHoldings.map((holding) => holding.ticker),
       ...book.transactions.map((entry) => entry.ticker).filter(Boolean)]);
-    const histories = Object.fromEntries([...tickers].map((ticker) => [ticker, readSnapshotHistory(snapshot, ticker)]));
+    const histories = await loadStockHistories([...tickers], { snapshot });
+    if (id !== refreshId || book !== getActivePortfolioBook()) return null;
     const report = calculatePortfolioPerformance({ book, histories, fxHistory });
     renderPortfolioPerformance(report);
     return report;
