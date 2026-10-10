@@ -1,4 +1,5 @@
 import { validatePortfolioBook } from "../analysis/portfolio-ledger.js";
+import { cloudSession, createCloudPortfolioStore } from "./cloud-portfolio-store.js";
 
 export const PORTFOLIO_DATABASE_NAME = "investment-helper-portfolio-v1";
 export const PORTFOLIO_DATABASE_VERSION = 1;
@@ -83,6 +84,7 @@ export function parsePortfolioBackup(serialized, { now } = {}) {
 }
 
 export function createPortfolioBookStore(options = {}) {
+  const bookKey = options.bookKey || PORTFOLIO_BOOK_KEY;
   let indexedDB;
   let accessError;
   let lastError = null;
@@ -147,7 +149,7 @@ export function createPortfolioBookStore(options = {}) {
         reject(failure);
       }
       function put(store) {
-        const request = store.put(book, PORTFOLIO_BOOK_KEY);
+        const request = store.put(book, bookKey);
         request.onsuccess = () => { requestSucceeded = true; value = book; };
         request.onerror = () => fail(request.error, true);
       }
@@ -164,7 +166,7 @@ export function createPortfolioBookStore(options = {}) {
         };
         const store = transaction.objectStore(PORTFOLIO_STORE_NAME);
         if (mode === "readwrite" && expectedUpdatedAt === undefined) { put(store); return; }
-        const request = store.get(PORTFOLIO_BOOK_KEY);
+        const request = store.get(bookKey);
         request.onerror = () => fail(request.error, true);
         request.onsuccess = () => {
           try {
@@ -196,8 +198,13 @@ export function createPortfolioBookStore(options = {}) {
   return Object.freeze({
     read: () => operate("readonly"),
     write: (book, { expectedUpdatedAt } = {}) => operate("readwrite", book, expectedUpdatedAt),
-    get lastError() { return lastError; }
+    get lastError() { return lastError; },
+    get mode() { return "browser"; }
   });
 }
 
-export const portfolioBookStore = createPortfolioBookStore();
+export const browserPortfolioBookStore = createPortfolioBookStore();
+export const portfolioBookStore = cloudSession.isCloud
+  ? createCloudPortfolioStore({ session: cloudSession, browserStore: browserPortfolioBookStore,
+    cacheForUser: (userId) => createPortfolioBookStore({ bookKey: `cloud:${userId}` }) })
+  : browserPortfolioBookStore;

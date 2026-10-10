@@ -1,5 +1,13 @@
 # Feature changes
 
+## Private cloud backend and portfolio sync
+
+**What changed:** Investment Helper has its own private OpenAI Site. Portfolio transactions and the watchlist now load across devices signed in with the owner ChatGPT account. The GitHub Pages copy retains browser-local storage. Existing portfolios move through the existing export/preview/restore backup flow. Cloud connection state, account sign-out and safe reload controls are shown in the sidebar.
+
+**How:** A JavaScript Worker serves the frontend, authorizes native Sites identity and persists separate per-user D1 records. Conditional revision checks reject stale writes, including simultaneous first imports. Same-origin JSON requests are bounded; identity changes fail closed. Confirmed cloud books keep owner-scoped IndexedDB recovery copies. The Worker also loads public Yahoo histories and current/historical ECB rates, with dated published-price fallback and bounded public caches.
+
+**Validation:** Real SQLite tests apply the generated D1 migrations and cover owner isolation, concurrent saves, stale revisions, changed accounts, malformed/oversized requests, CSRF, provider failures and public-asset limits. Client tests cover confirmed saves, uncertain timeouts, recovery copies, migration, watchlist conflicts and blocked browser storage. Build verification exercises the packaged Worker, cloud-mode frontend and anonymous API rejection. See [the implementation guide](how-it-works.md).
+
 ## Stock lookup and history coverage
 
 **What changed:** Suggestions cover over 11,000 US-listed stocks and ETFs instead of the small preset. SanDisk/SNDK, Qualcomm, ASML, Dell, Cisco, and other missing companies resolve by name or ticker. Exact unique names work in portfolio transactions, opening positions, watchlist additions, stock details, and stock checks; ambiguous names require selection. Configured international symbols remain supported.

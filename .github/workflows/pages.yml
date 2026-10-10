@@ -34,7 +34,11 @@ jobs:
           node-version: '22'
 
       - name: Test app modules
-        run: npm test
+        # Worker build and schema tooling are development-only dependencies.
+        # Install the exact lockfile before module and build verification.
+        run: |
+          npm ci
+          npm test
 
       - name: Restore stock and ETF directory
         uses: actions/cache/restore@v4
@@ -142,10 +146,13 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Prepare browser-local static app
+        run: node scripts/build-github.mjs
+
       - name: Upload static files
         uses: actions/upload-pages-artifact@v4
         with:
-          path: .
+          path: dist/github
 
       - name: Deploy to GitHub Pages
         id: deployment

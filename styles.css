@@ -698,3 +698,17 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.cloud-storage-message { margin: 8px 0; color: var(--muted, #61676a); font-size: .75rem; line-height: 1.5; overflow-wrap: anywhere; }
+.cloud-storage-message:empty { display: none; }
+.cloud-reload { width: 100%; padding: 8px; font-size: .75rem; }
+.cloud-signout { display: inline-block; margin-top: 12px; color: inherit; font-size: .75rem; }
+.cloud-signout[hidden], .cloud-reload[hidden], .cloud-migration[hidden] { display: none; }
+.cloud-migration p { margin: 0; line-height: 1.6; }
+.cloud-migration button { margin-top: 12px; }
+[data-private-blocked="true"] [data-page="portfolio"],
+[data-private-blocked="true"] [data-page="portfolio-performance"],
+[data-private-blocked="true"] [data-page="screener"],
+[data-private-blocked="true"] #watchlistChips,
+[data-private-blocked="true"] #screenerResults,
+[data-private-blocked="true"] #watchlistMoves { visibility: hidden; pointer-events: none; }

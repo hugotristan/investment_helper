@@ -9,6 +9,7 @@ import { findListedInstrument, loadTickerCatalog } from "./ticker-search.js";
 import { loadStockHistory, readCachedStockHistory } from "./stock-history.js";
 import { parseYahooQuote } from "./yahoo-chart.js";
 import { loadScanCache } from "./scan-cache.js";
+import { usesCloudMarket } from "./cloud-mode.js";
 
 export async function validateWatchlistTicker(ticker) {
   ticker = String(ticker || "").trim().toUpperCase();
@@ -22,6 +23,10 @@ export async function validateWatchlistTicker(ticker) {
   // A current exchange listing also proves existence during price-provider outages.
   // Configured suggestion labels alone never qualify as a listing proof.
   if (findListedInstrument(await loadTickerCatalog(), ticker)) return "valid";
+  if (usesCloudMarket()) {
+    const history = await loadStockHistory(ticker);
+    return history ? ["EQUITY", "ETF"].includes(history.instrumentType) ? "valid" : "unsupported" : "unavailable";
+  }
   // Newly added symbols outside the published universe still need metadata.
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=5d&interval=1d`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
@@ -65,9 +70,9 @@ export async function loadQuoteSnapshots(tickers) {
   const settled = await mapLimit(symbols, 3, async (ticker) => {
     const published = readSnapshotQuote(snapshot, ticker);
     const saved = savedQuotes?.get(ticker);
-    if (published) return saved && saved.quoteTime > published.quoteTime ? saved : published;
+    if (published && !usesCloudMarket()) return saved && saved.quoteTime > published.quoteTime ? saved : published;
     const fresh = await loadIntradayQuote(ticker);
-    return fresh && (!saved || fresh.quoteTime >= saved.quoteTime) ? fresh : saved || fresh;
+    return [fresh, saved, published].filter(Boolean).sort((a, b) => new Date(b.quoteTime) - new Date(a.quoteTime))[0] || null;
   });
   const quotes = settled
     .map((result) => result.status === "fulfilled" ? result.value : null)
@@ -84,6 +89,7 @@ export async function loadQuoteSnapshots(tickers) {
 
 async function loadIntradayQuote(ticker) {
   const cached = readCachedStockHistory(ticker)?.quote;
+  if (usesCloudMarket()) return (await loadStockHistory(ticker))?.quote || cached || null;
   const directUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=1d&interval=1m`;
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`;
 
@@ -147,7 +153,7 @@ export async function loadMarketSeries(ticker, { snapshot, cachedSeries } = {}) 
   const saved = (cachedSeries || loadScanCache()?.series || []).find((item) => item.ticker === ticker && evaluateDataQuality(item).eligible);
   // Keep a later real history already saved in this browser if a deployment
   // temporarily publishes an older snapshot. Neither path changes its date.
-  if (published) return saved && Date.parse(evaluateDataQuality(saved).asOf) > Date.parse(published.historyAsOf) ? saved : published;
+  if (published && !usesCloudMarket()) return saved && Date.parse(evaluateDataQuality(saved).asOf) > Date.parse(published.historyAsOf) ? saved : published;
   const history = await loadStockHistory(ticker, { snapshot });
   if (history && (!saved || Date.parse(history.historyAsOf) >= Date.parse(saved.historyAsOf || evaluateDataQuality(saved).asOf))) {
     return { ...history, prices: history.prices.slice(-400) };

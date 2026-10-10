@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-cloud-mode="browser">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261010-portfolio-performance">
+    <link rel="stylesheet" href="styles.css?v=20261010-cloud-storage">
   </head>
   <body>
     <div class="app-layout">
@@ -31,7 +31,7 @@
             <a href="#sources" data-page-link="sources">Data sources</a>
           </nav>
         </details>
-        <div class="sidebar-footer"><p class="workspace-badge">Saved in this browser</p></div>
+        <div class="sidebar-footer"><p id="cloudStorageStatus" class="workspace-badge" role="status">Saved in this browser</p><p id="cloudStorageMessage" class="cloud-storage-message" role="status" aria-live="polite"></p><button id="cloudReload" class="ghost cloud-reload" type="button" hidden>Reload cloud data</button><a id="cloudSignOut" class="cloud-signout" href="/signout-with-chatgpt" target="_top" hidden>Sign out</a></div>
       </aside>
       <div class="workspace">
         <header class="topbar">
@@ -85,6 +85,7 @@
                     <div class="watchlist-add-row"><input id="watchlistAddInput" type="text" placeholder="AAPL, MSFT" autocomplete="off" spellcheck="false" aria-describedby="watchlistMessage"><button type="submit">Add</button></div>
                   </form>
                   <p id="watchlistMessage" class="watchlist-message" role="status" aria-live="polite"></p>
+                  <button id="watchlistDiscardEdits" class="ghost" type="button" hidden>Discard edits and reload</button>
                   <details class="watchlist-bulk"><summary>Edit as text</summary><label for="tickerInput"><span>Separate tickers with commas or spaces</span></label><textarea id="tickerInput" rows="3" spellcheck="false" aria-describedby="watchlistMessage"></textarea><button id="watchlistApplyButton" type="button">Save tickers</button></details>
                 </section>
               </div>
@@ -111,6 +112,7 @@
           </section>
 
           <section class="view-page" data-page="portfolio" aria-label="Portfolio" hidden>
+            <div id="cloudMigration" class="panel cloud-migration" hidden><p>Bring your existing portfolio here: export a backup from the GitHub app, then choose and restore that file under Backup and restore.</p><button id="cloudUploadBrowser" class="ghost" type="button" hidden>Upload browser portfolio</button></div>
             <div id="portfolioTotals" class="portfolio-totals" aria-label="Portfolio totals">
               <article><span>Money put in</span><strong>Loading…</strong></article>
               <article><span>Total value</span><strong>Loading…</strong></article>
@@ -285,7 +287,8 @@
           "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261010-portfolio-performance",
           "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261009-holdings-disclosures",
           "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261009-eur-cash",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261009-eur-cash",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261010-cloud-storage",
+          "./js/storage.js": "./js/storage.js?v=20261010-cloud-storage",
           "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261009-eur-cash",
           "./js/data/market.js": "./js/data/market.js?v=20261010-stock-coverage",
           "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261010-stock-coverage",
@@ -293,13 +296,13 @@
           "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261010-stock-coverage",
           "./js/features/detail.js": "./js/features/detail.js?v=20261010-stock-coverage",
           "./js/features/questions.js": "./js/features/questions.js?v=20261010-stock-coverage",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261010-stock-coverage",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261010-stock-coverage",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261010-stock-coverage",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261010-cloud-storage",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261010-cloud-storage",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261010-cloud-storage",
           "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261010-stock-coverage"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261010-stock-coverage"></script>
+    <script type="module" src="app.js?v=20261010-cloud-storage"></script>
   </body>
 </html>

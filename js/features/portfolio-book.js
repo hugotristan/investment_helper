@@ -36,7 +36,9 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const book = await store.read();
       loaded = true;
       apply(book);
-      message("portfolioBookStatus", book ? "Portfolio saved in this browser. Export a backup to keep a separate copy." : "");
+      message("portfolioBookStatus", book ? store.mode === "cloud" ? "Portfolio synced across your devices. Export a backup to keep a separate copy."
+        : "Portfolio saved in this browser. Export a backup to keep a separate copy."
+        : store.mode === "cloud" ? "To bring your existing portfolio here, export a backup from the GitHub app and restore it below." : "");
     } catch (error) {
       el("portfolioSetup").hidden = true;
       message("portfolioBookStatus", `${error.message} Your previous holdings remain visible. Reload to retry.`);
@@ -88,7 +90,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     try { await action(); return true; }
     catch (error) {
       message(id, error.message || "The change could not be saved.");
-      if (error.code === "CONFLICT") message("portfolioBookStatus", "Another tab changed this portfolio. Reload before saving your edits. Your edits have not been saved.");
+      if (error.code === "CONFLICT") message("portfolioBookStatus", "Another tab or device changed this portfolio. Reload cloud data or this page before saving your edits. Your edits have not been saved.");
       return false;
     } finally { setBusy(false); }
   }
@@ -249,7 +251,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       if (!parsed.ok) throw new TypeError(parsed.error);
       pendingBackup = { book: parsed.book, expectedUpdatedAt };
       const book = parsed.book;
-      message("portfolioBackupPreview", `Ready to restore: ${book.settings.baseCurrency}, starting ${book.settings.startDate}; ${book.openingHoldings.length} opening positions and ${book.transactions.length} transactions. Restore replaces this browser’s tracked portfolio. Export your current portfolio first if you want to keep it.`);
+      message("portfolioBackupPreview", `Ready to restore: ${book.settings.baseCurrency}, starting ${book.settings.startDate}; ${book.openingHoldings.length} opening positions and ${book.transactions.length} transactions. Restore replaces ${store.mode === "cloud" ? "your private cloud portfolio on all devices" : "this browser’s tracked portfolio"}. Export your current portfolio first if you want to keep it.`);
       el("portfolioRestore").hidden = false;
     });
   }
@@ -281,13 +283,19 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
   }
 
   async function refreshFromStorage() {
-    if (!loaded || busy) return;
+    if (busy) return;
+    if (!loaded) return initialize();
     try {
       const book = await store.read();
       if (!book || book.updatedAt === getActivePortfolioBook()?.updatedAt) return;
-      apply(book);
+      if (!getActivePortfolioBook()) apply(book);
+      else {
+        setActivePortfolioBook(book);
+        refreshPortfolioEditor();
+        renderRows();
+      }
       // Keep typed input, but preserve its old revision so it cannot overwrite newer data.
-      message("portfolioBookStatus", "Portfolio updated from another tab. Cancel and reopen any unfinished transaction or opening-position edit.");
+      message("portfolioBookStatus", "Portfolio updated from another tab or device. Cancel and reopen any unfinished transaction, reporting setting, or opening-position edit.");
       onChange();
     } catch (error) { message("portfolioBookStatus", error.message); }
   }
@@ -520,3 +528,4 @@ export async function initializePortfolioBook(onChange) {
   return controller.initialize();
 }
 export function openPortfolioTransactionEditor() { controller?.openTransactionEditor(); }
+export function reloadPortfolioBook() { return controller?.refreshFromStorage(); }

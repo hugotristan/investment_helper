@@ -1,5 +1,6 @@
 import { loadPriceSnapshot, readSnapshotHistory, readSnapshotQuote } from "./price-snapshot.js";
 import { parseYahooChart, parseYahooQuote } from "./yahoo-chart.js";
+import { usesCloudMarket } from "./cloud-mode.js";
 
 export const STOCK_HISTORY_CACHE_KEY = "investment-helper-stock-history-v1";
 const DAY = 86400000;
@@ -27,7 +28,7 @@ export async function loadStockHistory(ticker, { snapshot, now = Date.now(), sto
   }
   const saved = readCachedStockHistory(ticker, { now, storage });
   const best = newerHistory(published, saved);
-  if (published && now - Date.parse(published.historyAsOf) <= 7 * DAY) return best;
+  if (!usesCloudMarket() && published && now - Date.parse(published.historyAsOf) <= 7 * DAY) return best;
   const checkedAt = memory.get(ticker)?.checkedAt;
   if (saved && Number.isFinite(checkedAt) && checkedAt <= now && now - checkedAt < FRESH_MS
     || Number.isFinite(checkedAt) && checkedAt <= now && now - checkedAt < RETRY_MS) return best;
@@ -107,6 +108,20 @@ export function normalizeStockHistory(input, ticker, { now = Date.now() } = {}) 
 }
 
 async function fetchStockHistory(ticker, now) {
+  if (usesCloudMarket()) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 16000);
+    try {
+      const response = await fetch(`/api/market/history?ticker=${encodeURIComponent(ticker)}`, {
+        cache: "no-store", credentials: "same-origin", headers: { Accept: "application/json" }, signal: controller.signal
+      });
+      if (!response.ok) return null;
+      const serialized = await response.text();
+      if (serialized.length > MAX_BYTES || new TextEncoder().encode(serialized).byteLength > MAX_BYTES) return null;
+      return normalizeStockHistory(JSON.parse(serialized), ticker, { now });
+    } catch { return null; }
+    finally { clearTimeout(timeout); }
+  }
   const direct = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=5y&interval=1d&events=splits`;
   const relay = `https://api.allorigins.win/raw?url=${encodeURIComponent(direct)}`;
   for (const [index, url] of [direct, relay].entries()) {

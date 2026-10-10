@@ -5,6 +5,7 @@ import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
 import { persist, state } from "../storage.js";
 import { getPortfolioHoldings, parsePortfolioPositions } from "./portfolio.js";
+import { cloudSession } from "../data/cloud-portfolio-store.js";
 
 export { getPortfolioHoldings };
 
@@ -39,6 +40,7 @@ function editableHoldings() { return adapter ? adapter.read() : getPortfolioHold
 
 async function saveHoldings(holdings, revision) {
   if (adapter) { await adapter.write(holdings, revision); return; }
+  if (cloudSession.isCloud) throw new Error("Start portfolio tracking or restore your existing backup before adding holdings. Cloud data has not been changed.");
   const previous = state.holdings;
   state.holdings = holdings;
   try { persist(); } catch (error) { state.holdings = previous; throw error; }
@@ -106,7 +108,7 @@ async function saveHolding(event) {
     await saveHoldings(id ? current.map((row) => row.id === id ? holding : row) : current.concat(holding), expectedRevision);
     clearForm();
     renderHoldingEditor();
-    setMessage(`${holding.ticker} ${id ? "updated" : "added"}. Your holdings are saved in this browser.`);
+    setMessage(`${holding.ticker} ${id ? "updated" : "added"}. Your holdings are ${cloudSession.isCloud ? "synced across your devices" : "saved in this browser"}.`);
     notifyChange();
   } catch (error) {
     setMessage(error.message || "Could not save this holding. Check market data and browser storage, then try again.");

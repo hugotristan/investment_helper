@@ -3,12 +3,43 @@ import { validateWatchlistTicker } from "../data/market.js";
 import { resolveTickerInput } from "../data/ticker-search.js";
 import { isBlockedAssetTicker, parseTickers } from "../shared/symbols.js";
 import { escapeHtml, unique } from "../shared/text.js";
-import { persist, state } from "../storage.js";
+import { loadPrivateWatchlist, savePrivateWatchlist, state } from "../storage.js";
+import { cloudSession } from "../data/cloud-portfolio-store.js";
 import { els } from "../ui/dom.js";
 
 let onWatchlistChange = () => {};
 let watchlistExpanded = false;
 let isWatchlistValidating = false;
+let watchlistReady = !cloudSession.isCloud;
+let watchlistDirty = false;
+
+export async function initializeWatchlist() {
+  if (!cloudSession.isCloud) return true;
+  try {
+    await loadPrivateWatchlist();
+    watchlistReady = true;
+    watchlistDirty = false;
+    if (els.tickerInput) els.tickerInput.value = state.tickerInput;
+    if (els.watchlistMessage) els.watchlistMessage.textContent = "Watchlist synced across your devices.";
+    renderWatchlist();
+    return true;
+  } catch (error) {
+    const previouslyLoaded = watchlistReady;
+    watchlistReady = false;
+    if (!previouslyLoaded) state.tickerInput = "";
+    if (els.watchlistMessage) els.watchlistMessage.textContent = error.message;
+    renderWatchlist();
+    return false;
+  }
+}
+
+export async function refreshWatchlistFromCloud() {
+  if (!cloudSession.isCloud || isWatchlistValidating || watchlistDirty || els.watchlistAddInput?.value?.trim()) return false;
+  const before = state.tickerInput;
+  const loaded = await initializeWatchlist();
+  if (loaded && before !== state.tickerInput) onWatchlistChange();
+  return loaded;
+}
 
 export function renderWatchlist() {
   const tickers = parseTickers(state.tickerInput);
@@ -16,14 +47,25 @@ export function renderWatchlist() {
   const visible = watchlistExpanded ? tickers : tickers.slice(0, previewCount);
   els.watchlistCount.textContent = `${tickers.length} ticker${tickers.length === 1 ? "" : "s"}`;
   els.watchlistChips.innerHTML = visible.length
-    ? visible.map((ticker) => `<button type="button" class="ticker-chip" data-remove-ticker="${escapeHtml(ticker)}" aria-label="Remove ${escapeHtml(ticker)} from watchlist" ${isWatchlistValidating ? "disabled" : ""}><span>${escapeHtml(ticker)}</span><span class="ticker-chip-remove" aria-hidden="true">×</span></button>`).join("")
+    ? visible.map((ticker) => `<button type="button" class="ticker-chip" data-remove-ticker="${escapeHtml(ticker)}" aria-label="Remove ${escapeHtml(ticker)} from watchlist" ${isWatchlistValidating || !watchlistReady ? "disabled" : ""}><span>${escapeHtml(ticker)}</span><span class="ticker-chip-remove" aria-hidden="true">×</span></button>`).join("")
     : `<p class="watchlist-empty">Add tickers to build your watchlist.</p>`;
   els.watchlistToggle.hidden = tickers.length <= previewCount;
   els.watchlistToggle.textContent = watchlistExpanded ? "Show less" : `Show all ${tickers.length} tickers`;
   els.watchlistToggle.setAttribute("aria-expanded", String(watchlistExpanded));
+  for (const control of [els.watchlistAddInput, els.watchlistApplyButton, els.tickerInput, els.watchlistAddForm?.querySelector("button")]) {
+    if (control) control.disabled = isWatchlistValidating || !watchlistReady;
+  }
+  const discard = globalThis.document?.getElementById("watchlistDiscardEdits");
+  if (discard) {
+    const draft = watchlistDirty || Boolean(els.watchlistAddInput?.value?.trim());
+    discard.hidden = !cloudSession.isCloud || (!draft && watchlistReady);
+    discard.disabled = isWatchlistValidating;
+    discard.textContent = draft ? "Discard edits and reload" : "Reload saved watchlist";
+  }
 }
 
 export async function addTickerToWatchlist(ticker) {
+  if (!watchlistReady) return { ok: false, changed: false, message: "Reload cloud data before changing the watchlist." };
   if (parseTickers(state.tickerInput).includes(ticker)) return { ok: true, changed: false, message: `${ticker} is already on your watchlist.` };
   if (isWatchlistValidating) return { ok: false, changed: false, message: "Another ticker check is running. Try again shortly." };
   await saveWatchlistInput(ticker, false, false);
@@ -31,16 +73,16 @@ export async function addTickerToWatchlist(ticker) {
   return { ok, changed: ok, message: els.watchlistMessage.textContent };
 }
 
-function updateWatchlist(tickers, notify = true) {
-  state.tickerInput = tickers.join(", ");
+async function updateWatchlist(tickers, notify = true) {
+  await savePrivateWatchlist(tickers);
   els.tickerInput.value = state.tickerInput;
+  watchlistDirty = false;
   renderWatchlist();
-  persist();
   if (notify) onWatchlistChange();
 }
 
 async function saveWatchlistInput(value, replace, notify = true) {
-  if (isWatchlistValidating) return;
+  if (isWatchlistValidating || !watchlistReady) return;
   setWatchlistValidating(true);
   try {
     if (value.length > 2000) { els.watchlistMessage.textContent = "Enter up to 90 stock or ETF tickers."; return; }
@@ -84,11 +126,12 @@ async function saveWatchlistInput(value, replace, notify = true) {
         return;
       }
     }
-    updateWatchlist(next, notify);
+    await updateWatchlist(next, notify);
     if (!replace) els.watchlistAddInput.value = "";
     els.watchlistMessage.textContent = replace ? "Watchlist saved." : `${additions.join(", ")} added. Watchlist saved.`;
-  } catch {
-    els.watchlistMessage.textContent = "Could not save the watchlist. Try again. No new scan was requested.";
+  } catch (error) {
+    if (cloudSession.isCloud && error.code) watchlistReady = false;
+    els.watchlistMessage.textContent = error.message || "Could not save the watchlist. Try again. No new scan was requested.";
   } finally {
     setWatchlistValidating(false);
     (replace ? els.watchlistApplyButton : els.watchlistAddInput).focus();
@@ -108,7 +151,22 @@ function setWatchlistValidating(busy) {
 export function bindWatchlistEvents(onChange) {
   onWatchlistChange = onChange;
   els.tickerInput.addEventListener("input", () => {
+    watchlistDirty = els.tickerInput.value !== state.tickerInput;
     els.watchlistMessage.textContent = "Unsaved changes. Choose Save tickers to check new symbols and save.";
+    renderWatchlist();
+  });
+  els.watchlistAddInput.addEventListener("input", renderWatchlist);
+  globalThis.document?.getElementById("watchlistDiscardEdits")?.addEventListener("click", async () => {
+    if (isWatchlistValidating) return;
+    setWatchlistValidating(true);
+    try {
+      const previous = state.tickerInput;
+      await cloudSession.initialize({ retry: true });
+      const loaded = await initializeWatchlist();
+      els.watchlistAddInput.value = "";
+      if (loaded && previous !== state.tickerInput) onWatchlistChange();
+    } catch (error) { els.watchlistMessage.textContent = error.message; }
+    finally { setWatchlistValidating(false); }
   });
   els.watchlistApplyButton.addEventListener("click", () => {
     saveWatchlistInput(els.tickerInput.value, true);
@@ -122,14 +180,21 @@ export function bindWatchlistEvents(onChange) {
     watchlistExpanded = !watchlistExpanded;
     renderWatchlist();
   });
-  els.watchlistChips.addEventListener("click", (event) => {
+  els.watchlistChips.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-remove-ticker]");
-    if (!button || isWatchlistValidating) return;
+    if (!button || isWatchlistValidating || !watchlistReady) return;
     const ticker = button.dataset.removeTicker;
     const buttons = Array.from(els.watchlistChips.querySelectorAll("[data-remove-ticker]"));
     const index = buttons.indexOf(button);
-    updateWatchlist(parseTickers(state.tickerInput).filter((item) => item !== ticker));
-    els.watchlistMessage.textContent = `${ticker} removed. Watchlist saved.`;
+    setWatchlistValidating(true);
+    try {
+      await updateWatchlist(parseTickers(state.tickerInput).filter((item) => item !== ticker));
+      els.watchlistMessage.textContent = `${ticker} removed. Watchlist saved.`;
+    } catch (error) {
+      if (cloudSession.isCloud && error.code) watchlistReady = false;
+      els.watchlistMessage.textContent = error.message || "Could not remove the ticker. Your watchlist was kept.";
+    }
+    finally { setWatchlistValidating(false); }
     const remaining = els.watchlistChips.querySelectorAll("[data-remove-ticker]");
     (remaining[Math.min(index, remaining.length - 1)] || els.watchlistAddInput).focus();
   });
