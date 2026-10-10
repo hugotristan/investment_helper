@@ -14,7 +14,7 @@ export function cloudEnvironment(doc = globalThis.document) {
 }
 
 export function createCloudSession({ cloud = cloudEnvironment(), fetch: request = globalThis.fetch, timeoutMs = 12000 } = {}) {
-  let session = { mode: cloud ? "cloud" : "browser", status: cloud ? "connecting" : "ready", userId: null, message: "" };
+  let session = { mode: cloud ? "cloud" : "browser", status: cloud ? "connecting" : "ready", userId: null, authMode: null, message: "" };
   let initializing;
   const listeners = new Set();
   const failures = new Map();
@@ -41,7 +41,9 @@ export function createCloudSession({ cloud = cloudEnvironment(), fetch: request 
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
       const responseUser = response.headers?.get?.("X-Portfolio-User-Id");
       if (path !== "/api/session" && responseUser && responseUser !== session.userId) throw new CloudStorageError("ACCOUNT_CHANGED", "The signed-in account changed. Reload the app before accessing portfolio data.");
-      if (response.status === 401 || response.status === 403) throw new CloudStorageError("UNAUTHORIZED", "Sign in again to access your private cloud data. No changes were saved.");
+      if (response.status === 401 || response.status === 403) throw new CloudStorageError("UNAUTHORIZED", session.authMode === "chatgpt"
+        ? "Your session expired. Sign in again to access your private cloud data."
+        : "Your session expired. Unlock the app again to access your private cloud data.");
       if (response.status === 409) throw new CloudStorageError("CONFLICT", "Your cloud data changed on another device. Reload its latest data before saving these edits.");
       if (response.status === 413) throw new CloudStorageError("TOO_LARGE", "The portfolio exceeds the cloud storage limit of 1 MiB. Your saved portfolio was kept.");
       if (!response.ok) throw new CloudStorageError("UNAVAILABLE", method === "PUT" ? "The cloud save could not be confirmed. Reload cloud data before retrying."
@@ -63,7 +65,8 @@ export function createCloudSession({ cloud = cloudEnvironment(), fetch: request 
     initializing ||= (async () => {
       update({ status: "connecting", message: "Connecting to private cloud storage…" });
       const value = await api("/api/session");
-      if (value.cloud !== true || typeof value.userId !== "string" || !value.userId.trim() || value.storageAvailable !== true) {
+      if (value.cloud !== true || typeof value.userId !== "string" || !value.userId.trim() || value.storageAvailable !== true
+        || (value.authMode !== undefined && !["password", "chatgpt"].includes(value.authMode))) {
         const error = new CloudStorageError("UNAVAILABLE", "Private cloud storage is not ready. Your browser data was kept; reload to retry.");
         update({ status: "error", errorCode: error.code, message: error.message });
         throw error;
@@ -75,7 +78,7 @@ export function createCloudSession({ cloud = cloudEnvironment(), fetch: request 
       }
       failures.delete("/api/session");
       if (retry) for (const [key, failure] of failures) if (failure.errorCode === "UNAUTHORIZED") failures.delete(key);
-      update({ status: "ready", errorCode: null, userId: value.userId, message: "" });
+      update({ status: "ready", errorCode: null, userId: value.userId, authMode: value.authMode ?? "chatgpt", message: "" });
       return { ...session };
     })();
     return initializing;

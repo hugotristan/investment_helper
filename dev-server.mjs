@@ -3,25 +3,30 @@ import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createApp } from "./server/worker.mjs";
 import { createLocalDatabase } from "./server/local-database.mjs";
+import { generatePasswordSecrets } from "./server/auth.mjs";
 
 const root = import.meta.dirname;
 const port = Number(process.env.PORT || 4180);
 await mkdir(resolve(root, ".sites-runtime"), { recursive: true });
 const database = createLocalDatabase(resolve(root, ".sites-runtime/preview.sqlite"));
 const types = { html: "text/html", css: "text/css", js: "text/javascript", json: "application/json", svg: "image/svg+xml" };
-const app = createApp({});
+// Password preview uses the actual built asset gate and separate local data.
+const passwordPreview = process.env.PREVIEW_PASSWORD ? {
+  INVESTMENT_AUTH_MODE: "password", ...await generatePasswordSecrets(process.env.PREVIEW_PASSWORD)
+} : null;
+const app = passwordPreview ? (await import("./dist/server/index.js")).default : createApp({});
 createServer(async (incoming, outgoing) => {
   try {
     const origin = `http://127.0.0.1:${port}`;
     const url = new URL(incoming.url, origin);
     let response;
-    if (url.pathname.startsWith("/api/")) {
+    if (passwordPreview || url.pathname.startsWith("/api/")) {
       const headers = new Headers(incoming.headers);
       // Synthetic local identity is never bundled or accepted by the hosted Worker.
       headers.set("oai-authenticated-user-id", "local-preview-owner");
       const request = new Request(url, { method: incoming.method, headers,
         ...(!["GET", "HEAD"].includes(incoming.method) ? { body: incoming, duplex: "half" } : {}) });
-      response = await app.fetch(request, { DB: database });
+      response = await app.fetch(request, { DB: database, ...passwordPreview });
     } else {
       const name = decodeURIComponent(url.pathname) === "/" ? "index.html" : decodeURIComponent(url.pathname).slice(1);
       const allowed = ["index.html", "styles.css", "app.js"].includes(name) || /^(?:js\/[^.][\w/.-]*\.js|data\/[\w-]+\.json)$/.test(name);

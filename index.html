@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261010-cloud-storage">
+    <link rel="stylesheet" href="styles.css?v=20261010-password-login">
   </head>
   <body>
     <div class="app-layout">
@@ -31,7 +31,14 @@
             <a href="#sources" data-page-link="sources">Data sources</a>
           </nav>
         </details>
-        <div class="sidebar-footer"><p id="cloudStorageStatus" class="workspace-badge" role="status">Saved in this browser</p><p id="cloudStorageMessage" class="cloud-storage-message" role="status" aria-live="polite"></p><button id="cloudReload" class="ghost cloud-reload" type="button" hidden>Reload cloud data</button><a id="cloudSignOut" class="cloud-signout" href="/signout-with-chatgpt" target="_top" hidden>Sign out</a></div>
+        <div class="sidebar-footer">
+          <p id="cloudStorageStatus" class="workspace-badge" role="status">Saved in this browser</p>
+          <p id="cloudStorageMessage" class="cloud-storage-message" role="status" aria-live="polite"></p>
+          <button id="cloudReload" class="ghost cloud-reload" type="button" hidden>Reload cloud data</button>
+          <a id="cloudSignIn" class="cloud-signout" href="/login" target="_top" hidden>Unlock app</a>
+          <form id="cloudPasswordSignOut" class="cloud-password-signout" action="/logout" method="post" target="_top" hidden><button type="submit">Lock app</button></form>
+          <a id="cloudSignOut" class="cloud-signout" href="/signout-with-chatgpt" target="_top" hidden>Sign out</a>
+        </div>
       </aside>
       <div class="workspace">
         <header class="topbar">
@@ -287,8 +294,8 @@
           "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261010-portfolio-performance",
           "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261009-holdings-disclosures",
           "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261009-eur-cash",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261010-cloud-storage",
-          "./js/storage.js": "./js/storage.js?v=20261010-cloud-storage",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261010-password-login",
+          "./js/storage.js": "./js/storage.js?v=20261010-password-login",
           "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261009-eur-cash",
           "./js/data/market.js": "./js/data/market.js?v=20261010-stock-coverage",
           "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261010-stock-coverage",
@@ -296,13 +303,13 @@
           "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261010-stock-coverage",
           "./js/features/detail.js": "./js/features/detail.js?v=20261010-stock-coverage",
           "./js/features/questions.js": "./js/features/questions.js?v=20261010-stock-coverage",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261010-cloud-storage",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261010-cloud-storage",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261010-cloud-storage",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261010-password-login",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261010-password-login",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261010-password-login",
           "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261010-stock-coverage"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261010-cloud-storage"></script>
+    <script type="module" src="app.js?v=20261010-password-login"></script>
   </body>
 </html>

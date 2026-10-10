@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 import { createPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 
@@ -121,9 +122,9 @@ test("a native account failure clears active private data and hides every privat
   state.tickerInput = "MSFT";
   state.holdings = [{ ticker: "MSFT", shares: 3 }];
   let notify;
-  const session = { isCloud: true, subscribe(listener) { notify = listener; listener({ mode: "cloud", status: "ready" }); } };
+  const session = { isCloud: true, subscribe(listener) { notify = listener; listener({ mode: "cloud", status: "ready", authMode: "chatgpt" }); } };
   initializeCloudSync({ document: doc, window: globalThis.window, session, store: {}, reloadPortfolio: async () => {}, reloadWatchlist: async () => {} });
-  notify({ mode: "cloud", status: "error", errorCode: "ACCOUNT_CHANGED", message: "Reload the app." });
+  notify({ mode: "cloud", status: "error", authMode: "chatgpt", errorCode: "ACCOUNT_CHANGED", message: "Reload the app." });
   assert.equal(getActivePortfolioBook(), null);
   assert.equal(state.tickerInput, "");
   assert.deepEqual(state.holdings, []);
@@ -131,4 +132,51 @@ test("a native account failure clears active private data and hides every privat
   assert.equal(node("cloudStorageStatus").textContent, "Cloud sync unavailable");
   assert.equal(node("cloudStorageMessage").textContent, "Reload the app.");
   assert.equal(node("cloudSignOut").hidden, false);
+});
+
+test("password sessions expose only a server POST lock action and leave the GitHub copy unchanged", async () => {
+  const session = { isCloud: true, subscribe(listener) { listener({ mode: "cloud", status: "ready", authMode: "password" }); } };
+  initializeCloudSync({ document: doc, window: globalThis.window, session, store: {}, reloadPortfolio: async () => {}, reloadWatchlist: async () => {} });
+  assert.equal(node("cloudPasswordSignOut").hidden, false);
+  assert.equal(node("cloudSignOut").hidden, true);
+  assert.equal(node("cloudSignIn").hidden, true);
+  const source = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.match(source, /<form\b[^>]*id="cloudPasswordSignOut"[^>]*action="\/logout"[^>]*method="post"[^>]*target="_top"[^>]*hidden>/);
+  assert.match(source, /<a\b[^>]*id="cloudSignIn"[^>]*href="\/login"[^>]*target="_top"[^>]*hidden>/);
+  const browserSession = { isCloud: false, subscribe(listener) { listener({ mode: "browser", status: "ready", authMode: null }); } };
+  initializeCloudSync({ document: doc, window: globalThis.window, session: browserSession });
+  for (const id of ["cloudPasswordSignOut", "cloudSignOut", "cloudSignIn", "cloudReload"]) assert.equal(node(id).hidden, true);
+});
+
+test("an expired password session clears private data and offers a top-level unlock link", async () => {
+  setActivePortfolioBook(createPortfolioBook({ baseCurrency: "EUR", startDate: "2026-10-01", now: Date.parse("2026-10-10T12:00:00.000Z") }));
+  state.tickerInput = "MSFT";
+  state.myPortfolioInput = "MSFT:3";
+  state.holdings = [{ ticker: "MSFT", shares: 3 }];
+  let notify;
+  const session = { isCloud: true, subscribe(listener) { notify = listener; listener({ mode: "cloud", status: "ready", authMode: "password" }); } };
+  initializeCloudSync({ document: doc, window: globalThis.window, session, store: {}, reloadPortfolio: async () => {}, reloadWatchlist: async () => {} });
+  notify({ mode: "cloud", status: "error", authMode: "password", errorCode: "UNAUTHORIZED", message: "Your session expired. Unlock the app again." });
+  assert.equal(getActivePortfolioBook(), null);
+  assert.equal(state.tickerInput, "");
+  assert.equal(state.myPortfolioInput, "");
+  assert.deepEqual(state.holdings, []);
+  assert.equal(doc.documentElement.dataset.privateBlocked, "true");
+  assert.equal(node("cloudSignIn").hidden, false);
+  assert.equal(node("cloudSignIn").href, "/login");
+  assert.equal(node("cloudSignIn").textContent, "Unlock app");
+  for (const id of ["cloudSignOut", "cloudPasswordSignOut", "cloudReload"]) assert.equal(node(id).hidden, true);
+  notify({ mode: "cloud", status: "ready", authMode: "password", errorCode: null, message: "" });
+  assert.equal(doc.documentElement.dataset.privateBlocked, "false");
+  assert.equal(node("cloudSignIn").hidden, true);
+  assert.equal(node("cloudPasswordSignOut").hidden, false);
+});
+
+test("a password session that expired before initialization still offers the unlock route", () => {
+  const session = { isCloud: true, subscribe(listener) { listener({ mode: "cloud", status: "error", authMode: null, errorCode: "UNAUTHORIZED", message: "Your session expired." }); } };
+  initializeCloudSync({ document: doc, window: globalThis.window, session, store: {}, reloadPortfolio: async () => {}, reloadWatchlist: async () => {} });
+  assert.equal(node("cloudSignIn").hidden, false);
+  assert.equal(node("cloudSignIn").href, "/login");
+  assert.equal(node("cloudSignOut").hidden, true);
+  assert.equal(node("cloudPasswordSignOut").hidden, true);
 });

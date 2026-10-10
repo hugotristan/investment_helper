@@ -12,6 +12,8 @@ export function initializeCloudSync({ document: doc = globalThis.document, windo
   const detail = doc.getElementById("cloudStorageMessage");
   const reload = doc.getElementById("cloudReload");
   const signout = doc.getElementById("cloudSignOut");
+  const passwordSignout = doc.getElementById("cloudPasswordSignOut");
+  const signin = doc.getElementById("cloudSignIn");
   const migration = doc.getElementById("cloudMigration");
   const upload = doc.getElementById("cloudUploadBrowser");
   let busy = false;
@@ -36,8 +38,15 @@ export function initializeCloudSync({ document: doc = globalThis.document, windo
     if (status) status.textContent = value.mode === "browser" ? "Saved in this browser" : value.status === "ready" ? "Cloud sync" : value.status === "connecting" ? "Connecting to cloud…" : "Cloud sync unavailable";
     if (status) status.dataset.syncState = value.status;
     say(value.message);
-    if (reload) { reload.hidden = !session.isCloud; reload.disabled = busy; }
-    if (signout) signout.hidden = !session.isCloud;
+    const expired = value.errorCode === "UNAUTHORIZED";
+    if (reload) { reload.hidden = !session.isCloud || expired; reload.disabled = busy; }
+    if (signout) signout.hidden = !session.isCloud || expired || value.authMode !== "chatgpt";
+    if (passwordSignout) passwordSignout.hidden = !session.isCloud || expired || value.authMode !== "password";
+    if (signin) {
+      signin.hidden = !session.isCloud || !expired;
+      signin.textContent = value.authMode === "chatgpt" ? "Sign in again" : "Unlock app";
+      signin.href = value.authMode === "chatgpt" ? "/" : "/login";
+    }
   });
   if (!session.isCloud) return;
 

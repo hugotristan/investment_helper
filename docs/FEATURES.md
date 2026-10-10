@@ -1,5 +1,13 @@
 # Feature changes
 
+## Password-only cloud access
+
+**What changed:** The Sites app opens with a personal password, without a ChatGPT account. Each unlocked browser stays signed in for 30 days and has a Lock app control. Existing cloud portfolio and watchlist data keep their original workspace identity and revisions.
+
+**How:** A server-side gate protects pages, app assets and APIs with signed HttpOnly cookies. Salted password hashes and random signing keys stay in Sites runtime secrets. Login/logout require same-origin POST; D1 throttles attempts across Worker instances. The first authenticated request adopts only an unambiguous existing workspace. Expired login clears and hides private frontend data and shows an unlock link. Revision conflict handling remains in place.
+
+**Validation:** Authentication checks cover incorrect passwords, forged/expired/rotated cookies, spoofed platform headers, CSRF, bounded forms, persistent throttling and preservation of existing records. Frontend checks cover password sign-out and expired-session privacy. Publication is checked before enabling the public entrance.
+
 ## Private cloud backend and portfolio sync
 
 **What changed:** Investment Helper has its own private OpenAI Site. Portfolio transactions and the watchlist now load across devices signed in with the owner ChatGPT account. The GitHub Pages copy retains browser-local storage. Existing portfolios move through the existing export/preview/restore backup flow. Cloud connection state, account sign-out and safe reload controls are shown in the sidebar.

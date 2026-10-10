@@ -8,7 +8,7 @@ const copy = (value) => value === null ? null : structuredClone(value);
 const initialBook = () => createPortfolioBook({ holdings: [{ id: "position", kind: "position", ticker: "MSFT", label: "Microsoft", shares: 1, averageCost: 300, currency: "USD" }], baseCurrency: "EUR", startDate: "2026-10-01", now: NOW });
 const editBook = (book, offset = 1) => ({ ...copy(book), updatedAt: new Date(NOW + offset).toISOString(), legacyPortfolioInput: `revision ${offset}` });
 const response = (body, status = 200, userId = "user-a") => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "X-Portfolio-User-Id": userId } });
-function fixture({ book = null, tickers = null, browserBook = initialBook(), before, cacheError = false } = {}) {
+function fixture({ book = null, tickers = null, browserBook = initialBook(), before, cacheError = false, authMode } = {}) {
   let account = "user-a";
   let portfolio = { book: copy(book), revision: book ? 1 : 0, updatedAt: book ? book.updatedAt : null };
   let watchlist = { tickers: copy(tickers), revision: tickers ? 1 : 0, updatedAt: tickers ? new Date(NOW).toISOString() : null };
@@ -18,10 +18,10 @@ function fixture({ book = null, tickers = null, browserBook = initialBook(), bef
   let browserWrites = 0;
   const session = createCloudSession({ cloud: true, fetch: async (path, options) => {
     const body = options.body ? JSON.parse(options.body) : null;
-    calls.push({ path, method: options.method, body, expectedUser: options.headers["X-Expected-User-Id"] });
+    calls.push({ path, method: options.method, body, expectedUser: options.headers["X-Expected-User-Id"], credentials: options.credentials });
     const interception = await before?.({ path, options, body, portfolio, watchlist });
     if (interception) return interception;
-    if (path === "/api/session") return response({ cloud: true, userId: account, storageAvailable: true }, 200, account);
+    if (path === "/api/session") return response({ cloud: true, userId: account, storageAvailable: true, ...(authMode ? { authMode } : {}) }, 200, account);
     if (options.headers["X-Expected-User-Id"] !== account) return response({ error: "ACCOUNT_CHANGED" }, 409, account);
     const record = path === "/api/portfolio" ? portfolio : watchlist;
     if (options.method === "PUT") {
@@ -58,6 +58,39 @@ test("a missing or unauthenticated Sites API fails closed and never falls back t
     assert.equal(f.browserWrites, 0);
     assert.equal(f.cacheWrites.length, 0);
   }
+});
+
+test("password authentication keeps the existing owner assertion and uses only same-origin cookies", async () => {
+  const f = fixture({ book: initialBook(), authMode: "password" });
+  const saved = await f.store.read();
+  assert.equal(f.session.state.authMode, "password");
+  assert.equal(f.session.state.userId, "user-a");
+  await f.store.write(editBook(saved), { expectedUpdatedAt: saved.updatedAt });
+  assert.equal(f.calls.find((call) => call.method === "PUT").expectedUser, "user-a");
+  assert.ok(f.calls.every((call) => call.credentials === "same-origin"));
+  const legacy = fixture();
+  await legacy.session.initialize();
+  assert.equal(legacy.session.state.authMode, "chatgpt");
+});
+
+test("expired password sessions preserve saved data, block further access, and recover after unlocking", async () => {
+  let expired = false;
+  const f = fixture({ book: initialBook(), authMode: "password", before: ({ path }) => path === "/api/portfolio" && expired ? response({}, 401) : undefined });
+  const saved = await f.store.read();
+  expired = true;
+  await assert.rejects(f.store.write(editBook(saved), { expectedUpdatedAt: saved.updatedAt }), { code: "UNAUTHORIZED" });
+  assert.equal(f.session.state.authMode, "password");
+  assert.match(f.session.state.message, /Unlock the app again/);
+  assert.deepEqual(f.portfolio.book, initialBook());
+  assert.equal(f.cacheWrites.length, 1);
+  const count = f.calls.length;
+  await assert.rejects(f.store.read(), { code: "UNAUTHORIZED" });
+  assert.equal(f.calls.length, count);
+  expired = false;
+  await f.session.initialize({ retry: true });
+  assert.deepEqual(await f.store.read(), initialBook());
+  assert.equal(f.session.state.errorCode, null);
+  assert.equal(f.session.state.authMode, "password");
 });
 
 test("an empty cloud portfolio stays empty until an explicit upload or restore", async () => {

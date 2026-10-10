@@ -31,7 +31,10 @@ await mkdir(resolve(root, ".sites-runtime"), { recursive: true });
 await mkdir(resolve(root, "dist/server"), { recursive: true });
 await mkdir(resolve(root, "dist/.openai"), { recursive: true });
 const entry = resolve(root, ".sites-runtime/sites-entry.mjs");
-await writeFile(entry, `import { createApp } from "../server/worker.mjs";\nexport default createApp(${JSON.stringify(assets)});\n`);
+// The hosted bundle always requires the password gate, including when secrets
+// or runtime mode settings are accidentally missing. Local/source tests retain
+// the native identity mode for compatibility.
+await writeFile(entry, `import { createApp } from "../server/worker.mjs";\nexport default createApp(${JSON.stringify(assets)}, { authMode: "password" });\n`);
 await build({ entryPoints: [entry], outfile: resolve(root, "dist/server/index.js"), bundle: true, format: "esm", platform: "browser", target: "es2022", minify: true, legalComments: "none" });
 await writeFile(resolve(root, "dist/.openai/hosting.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 console.log(`Built private Sites Worker with ${publicFiles.length} browser assets.`);

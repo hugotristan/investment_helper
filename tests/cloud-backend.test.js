@@ -66,13 +66,13 @@ test("development D1 adapter applies generated migrations once and preserves dat
   try {
     const saved = await response(app, { DB }, "/api/portfolio", { method: "PUT", value: { book: makeBook(), expectedRevision: 0 } });
     assert.equal(saved.status, 200);
-    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 1);
+    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 2);
     assert.equal((await DB.prepare("SELECT user_id FROM portfolio_books").all()).results[0].user_id, "owner-one");
   } finally { DB.close(); }
   DB = createLocalDatabase(filename);
   try {
     assert.equal((await response(app, { DB }, "/api/portfolio")).data.revision, 1);
-    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 1);
+    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 2);
     assert.equal((await DB.prepare("UPDATE watchlists SET revision = revision WHERE user_id = ?").bind("none").run()).meta.changes, 0);
   } finally { DB.close(); }
 });
@@ -101,7 +101,7 @@ test("health reveals no user data and session requires trusted Sites identity", 
   assert.equal(anonymous.status, 401);
   assert.equal(anonymous.data.code, "SIGN_IN_REQUIRED");
   assert.deepEqual((await response(app, {}, "/api/session")).data,
-    { cloud: true, userId: "owner-one", storageAvailable: false });
+    { cloud: true, authMode: "chatgpt", userId: "owner-one", storageAvailable: false });
   assert.equal((await response(app, {}, "/api/session", { user: "invalid user" })).status, 401);
 });
 

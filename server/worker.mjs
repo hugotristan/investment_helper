@@ -1,12 +1,13 @@
 import { ApiError, checkSameOrigin, readJsonRequest } from "./request-body.mjs";
 import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, validateSaveEnvelope } from "./cloud-store.mjs";
 import { createMarketData, marketTicker } from "./market-data.mjs";
+import { createPasswordAuth } from "./auth.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Vary": "oai-authenticated-user-id",
+  "Vary": "Cookie, oai-authenticated-user-id",
 };
 const contentTypes = { html: "text/html", css: "text/css", js: "text/javascript", json: "application/json",
   svg: "image/svg+xml", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", ico: "image/x-icon", woff2: "font/woff2" };
@@ -29,15 +30,25 @@ function publicAsset(path) {
 export function createApp(assets, options = {}) {
   const market = createMarketData(options);
   const clock = () => typeof options.now === "function" ? options.now() : options.now ?? Date.now();
+  const passwordGate = createPasswordAuth({ now: clock });
   return {
     async fetch(request, env = {}) {
       const url = new URL(request.url);
       let userId = null;
       const userJson = (value, status = 200) => json({ ...value, userId }, status, { "X-Portfolio-User-Id": userId });
       try {
+        // The production bundle pins password mode so missing/changed runtime
+        // flags cannot expose static assets through the legacy native path.
+        const authMode = options.authMode ?? env.INVESTMENT_AUTH_MODE ?? "chatgpt";
+        if (!["password", "chatgpt"].includes(authMode)) throw new ApiError(503, "AUTH_UNAVAILABLE", "Private access needs configuration.");
         if (url.pathname === "/api/health") {
           const denied = methodAllowed(request, ["GET"]);
           return denied || json({ ok: true, cloud: true, storageAvailable: storageAvailable(env) });
+        }
+        if (authMode === "password") {
+          const access = await passwordGate(request, env);
+          if (access.response) return access.response;
+          userId = access.userId;
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
           const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx"].includes(url.pathname);
@@ -45,12 +56,12 @@ export function createApp(assets, options = {}) {
           const methods = ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
           const denied = methodAllowed(request, methods);
           if (denied) return denied;
-          userId = sitesUserId(request);
+          userId ||= sitesUserId(request);
           const expectedUserId = request.headers.get("x-expected-user-id");
           if (expectedUserId !== null && expectedUserId !== userId || request.method === "PUT" && expectedUserId === null) {
             throw new ApiError(409, "ACCOUNT_CHANGED", "Your signed-in account changed. Reload the app before opening or saving data.");
           }
-          if (url.pathname === "/api/session") return userJson({ cloud: true, storageAvailable: storageAvailable(env) });
+          if (url.pathname === "/api/session") return userJson({ cloud: true, authMode, storageAvailable: storageAvailable(env) });
           if (url.pathname === "/api/market/history") {
             if (url.searchParams.getAll("ticker").length !== 1 || [...url.searchParams.keys()].some((key) => key !== "ticker")) {
               throw new ApiError(400, "INVALID_TICKER", "Request one ticker without additional options.");

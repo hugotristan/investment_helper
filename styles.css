@@ -703,7 +703,9 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .cloud-storage-message:empty { display: none; }
 .cloud-reload { width: 100%; padding: 8px; font-size: .75rem; }
 .cloud-signout { display: inline-block; margin-top: 12px; color: inherit; font-size: .75rem; }
-.cloud-signout[hidden], .cloud-reload[hidden], .cloud-migration[hidden] { display: none; }
+.cloud-password-signout { margin: 12px 0 0; }
+.cloud-password-signout button { padding: 0; border: 0; background: none; color: inherit; font-size: .75rem; cursor: pointer; }
+.cloud-signout[hidden], .cloud-password-signout[hidden], .cloud-reload[hidden], .cloud-migration[hidden] { display: none; }
 .cloud-migration p { margin: 0; line-height: 1.6; }
 .cloud-migration button { margin-top: 12px; }
 [data-private-blocked="true"] [data-page="portfolio"],

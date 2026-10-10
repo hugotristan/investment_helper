@@ -3,10 +3,21 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
+import { generatePasswordSecrets } from "../server/auth.mjs";
+import { createLocalDatabase } from "../server/local-database.mjs";
 
 test("Sites build serves the full frontend and rejects anonymous private API access", async () => {
   execFileSync(process.execPath, ["scripts/build-sites.mjs"], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
   const { default: app } = await import("../dist/server/index.js?test-build");
+  const database = createLocalDatabase();
+  const environment = { DB: database, ...await generatePasswordSecrets("build-check-password") };
+  const loginRequest = new Request("https://investment.example/login", { method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: "https://investment.example" },
+    body: "password=build-check-password" });
+  const login = await app.fetch(loginRequest, environment);
+  assert.equal(login.status, 303);
+  const headers = { Cookie: login.headers.get("set-cookie").split(";")[0] };
+  const authorized = (path) => app.fetch(new Request(`https://investment.example${path}`, { headers }), environment);
   // Workers do not supply a browser/Node file URL through import.meta.url.
   // Loading shared parsers must not eagerly resolve browser snapshot paths.
   execFileSync(process.execPath, ["--experimental-vm-modules", "--input-type=module", "-e", `
@@ -14,6 +25,8 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     import { readFileSync } from "node:fs";
     import { createContext, SourceTextModule } from "node:vm";
     import { gzipSync, gunzipSync } from "node:zlib";
+    import { generatePasswordSecrets } from "./server/auth.mjs";
+    import { createLocalDatabase } from "./server/local-database.mjs";
     // Model Workers' documented automatic Content-Encoding behavior.
     class WorkersResponse extends Response {
       constructor(body, init) {
@@ -31,25 +44,36 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     const response = await worker.namespace.default.fetch(new Request("https://investment.example/api/health"));
     assert.equal(response.status, 200);
     assert.equal((await response.json()).cloud, true);
-    const page = await worker.namespace.default.fetch(new Request("https://investment.example/"));
+    const database = createLocalDatabase();
+    const environment = { DB: database, ...await generatePasswordSecrets("vm-check-password") };
+    const login = await worker.namespace.default.fetch(new Request("https://investment.example/login", { method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Origin: "https://investment.example" }, body: "password=vm-check-password" }), environment);
+    assert.equal(login.status, 303);
+    const page = await worker.namespace.default.fetch(new Request("https://investment.example/", {
+      headers: { Cookie: login.headers.get("set-cookie").split(";")[0] }
+    }), environment);
     const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();
     assert.match(html, /data-cloud-mode="sites"/);
+    database.close();
   `], { cwd: new URL("..", import.meta.url), stdio: "pipe" });
-  const page = await app.fetch(new Request("https://investment.example/"));
+  const page = await authorized("/");
   assert.equal(page.status, 200);
   const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();
   assert.match(html, /data-cloud-mode="sites"/);
   assert.match(html, /cloudStorageStatus/);
-  const startup = await app.fetch(new Request("https://investment.example/app.js"));
+  const startup = await authorized("/app.js");
   assert.equal(startup.status, 200);
   assert.match(gunzipSync(Buffer.from(await startup.arrayBuffer())).toString(), /initializeCloudSync/);
-  const anonymous = await app.fetch(new Request("https://investment.example/api/portfolio"));
+  const anonymous = await app.fetch(new Request("https://investment.example/api/portfolio"), environment);
   assert.equal(anonymous.status, 401);
   assert.match(anonymous.headers.get("cache-control"), /private, no-store/);
   for (const path of ["server/worker.mjs", ".openai/hosting.json", "package.json", ".env", "dev-server.mjs"]) {
-    assert.equal((await app.fetch(new Request(`https://investment.example/${path}`))).status, 404);
+    assert.equal((await authorized(`/${path}`)).status, 404);
   }
+  const unavailable = await app.fetch(new Request("https://investment.example/"), { INVESTMENT_AUTH_MODE: "chatgpt" });
+  assert.equal(unavailable.status, 503, "The hosted bundle cannot bypass password mode without secrets");
   const packed = JSON.parse(await readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"));
   assert.equal(packed.d1, "DB");
   assert.equal(packed.static, undefined);
+  database.close();
 });
