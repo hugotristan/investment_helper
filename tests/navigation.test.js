@@ -11,7 +11,7 @@ function node(dataset = {}) {
     focus() { this.focused = true; } };
 }
 
-const routes = ["dashboard", "screener", "portfolio", "portfolio-performance", "performance", "detail", "research", "signals", "ask", "sources"];
+const routes = ["dashboard", "screener", "portfolio", "portfolio-performance", "reports", "report-allocation", "performance", "detail", "research", "signals", "ask", "sources"];
 const pages = routes.map((page) => node({ page }));
 const links = routes.map((pageLink) => node({ pageLink }));
 const nodes = new Map(["pageTitle", "navMore", "quickSearchForm", "quickSearchInput", "detailTickerInput"].map((id) => [id, node()]));

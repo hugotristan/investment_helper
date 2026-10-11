@@ -6,6 +6,8 @@ const pages = {
   detail: "Stock details",
   portfolio: "Portfolio",
   "portfolio-performance": "Portfolio performance",
+  reports: "Reports",
+  "report-allocation": "Allocation report",
   performance: "Research picks",
   ask: "Stock check",
   signals: "Signals",
@@ -29,7 +31,7 @@ export function syncActivePage() {
   });
   els.pageTitle.textContent = pages[activePage];
   const more = document.getElementById("navMore");
-  if (more && !["dashboard", "screener", "portfolio", "portfolio-performance"].includes(activePage)) more.open = true;
+  if (more && !["dashboard", "screener", "portfolio", "portfolio-performance", "reports"].includes(activePage) && !activePage.startsWith("report-")) more.open = true;
   document.title = `${pages[activePage]} · Investing`;
   if (requested !== activePage) window.history.replaceState(null, "", `#${activePage}`);
 }

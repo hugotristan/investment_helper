@@ -20,6 +20,7 @@
           <a href="#portfolio" data-page-link="portfolio"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7h18v14H3zM8 7V3h8v4M3 12h18M10 12v3h4v-3"/></svg></span><span class="nav-label">Portfolio</span></a>
           <a href="#portfolio-performance" data-page-link="portfolio-performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/></svg></span><span class="nav-label">Performance</span></a>
         </nav>
+        <nav class="page-nav" aria-label="Portfolio reports"><a href="#reports" data-page-link="reports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"/></svg></span><span class="nav-label">Reports</span></a></nav>
         <details class="nav-more" id="navMore">
           <summary>More</summary>
           <nav class="page-nav secondary-nav" aria-label="Additional tools">
@@ -258,6 +259,17 @@
               </details>
           </section>
 
+          <section class="view-page" data-page="reports" aria-label="Reports" hidden>
+            <section class="panel"><h2>Portfolio reports</h2><div class="report-directory" id="reportDirectory">
+              <a href="#report-allocation"><span>Allocation</span><small>Holdings, groups, and stocks / ETFs in EUR</small><span aria-hidden="true">↗</span></a>
+              <a href="#portfolio-performance"><span>Portfolio performance</span><small>Value history and monthly returns</small><span aria-hidden="true">↗</span></a>
+            </div></section>
+          </section>
+          <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
+            <section class="panel"><div class="section-heading"><h2>Allocation</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><label>View<select id="reportAllocationView"><option value="holdings">Holdings</option><option value="groups">Groups</option><option value="types">Stocks / ETFs</option></select></label><button id="reportAllocationExport" class="ghost" type="button" disabled>Export CSV</button></div><div id="reportAllocationBody"></div>
+            </section>
+          </section>
           <section class="view-page" data-page="portfolio-performance" aria-label="Portfolio performance" hidden>
             <section class="panel">
               <div class="section-heading"><h2>Your portfolio</h2><a href="#portfolio">Transactions ↗</a></div>
