@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261011-analyst">
+    <link rel="stylesheet" href="styles.css?v=20261011-insights">
   </head>
   <body>
     <div class="app-layout">
@@ -21,7 +21,7 @@
           <a href="#portfolio-performance" data-page-link="portfolio-performance"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18M7 16v-5M12 16V7M17 16v-8"/></svg></span><span class="nav-label">Performance</span></a>
         </nav>
         <nav class="page-nav" aria-label="Portfolio reports"><a href="#reports" data-page-link="reports"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h8"/></svg></span><span class="nav-label">Reports</span></a></nav>
-        <nav class="page-nav" aria-label="Portfolio analyst"><a href="#analyst" data-page-link="analyst"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5"/></svg></span><span class="nav-label">AI analyst</span></a></nav>
+        <nav class="page-nav" aria-label="Portfolio insights"><a href="#analyst" data-page-link="analyst"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v12H9l-5 4zM8 8h8M8 12h5"/></svg></span><span class="nav-label">Insights</span></a></nav>
         <details class="nav-more" id="navMore">
           <summary>More</summary>
           <nav class="page-nav secondary-nav" aria-label="Additional tools">
@@ -62,25 +62,33 @@
           </div>
         </header>
         <main class="app-shell">
-          <section class="view-page" data-page="analyst" aria-label="AI analyst" hidden>
-            <section class="panel analyst-panel">
-              <div class="panel-heading"><div><h2>Ask about your portfolio</h2><p class="panel-description">EUR gains, monthly returns, allocation, and ETF exposure.</p></div></div>
-              <form id="analystForm" class="analyst-form">
-                <label for="analystQuestion">Your question</label>
-                <textarea id="analystQuestion" rows="3" maxlength="1200" required placeholder="Why does my EUR gain differ from my USD gain?"></textarea>
-                <div class="analyst-examples" aria-label="Example questions">
-                  <button type="button" class="ghost" data-analyst-question="How concentrated is my portfolio, including the companies inside VWCE?">Check concentration</button>
-                  <button type="button" class="ghost" data-analyst-question="Explain the difference between my EUR gain and my USD gain.">Explain EUR gains</button>
-                  <button type="button" class="ghost" data-analyst-question="How did my portfolio perform in the latest recorded month, excluding deposits and withdrawals?">Review latest month</button>
-                </div>
-                <label class="analyst-notes"><input id="analystIncludeNotes" type="checkbox">Include my position notes</label>
-                <p class="data-note">Asking sends your question and portfolio figures to OpenAI. Notes are optional.</p>
-                <div class="analyst-actions"><button id="analystAsk" type="submit" disabled>Ask analyst</button><button id="analystRefresh" type="button" class="ghost">Refresh figures</button><a id="analystCloudLink" href="https://investment-helper.ingrvi.chatgpt.site/#analyst" hidden>Open cloud app ↗</a></div>
-                <p id="analystStatus" class="analyst-status" role="status" aria-live="polite">Open this page to check the analyst connection.</p>
-              </form>
-              <details class="secondary-details"><summary>Portfolio figures</summary><div id="analystFiguresBody">Figures load when you open this page.</div></details>
+          <section class="view-page" data-page="analyst" aria-label="Portfolio insights" hidden>
+            <section class="panel analyst-panel" id="insightsPanel">
+              <div class="panel-heading"><div><h2>Your portfolio, explained</h2><p class="panel-description">Calculated from your saved holdings and transactions.</p></div><button id="insightsRefresh" type="button" class="ghost">Refresh figures</button></div>
+              <div class="insights-topics" aria-label="Insight topics">
+                <button type="button" class="ghost" data-insight-topic="overview" aria-pressed="true">Summary</button>
+                <button type="button" class="ghost" data-insight-topic="allocation" aria-pressed="false">Allocation</button>
+                <button type="button" class="ghost" data-insight-topic="gains" aria-pressed="false">EUR gains</button>
+                <button type="button" class="ghost" data-insight-topic="monthly" aria-pressed="false">Monthly returns</button>
+                <button type="button" class="ghost" data-insight-topic="fees" aria-pressed="false">Income &amp; fees</button>
+              </div>
+              <div id="insightsBody" class="insights-body">Figures load when you open this page.</div>
+              <p id="insightsStatus" class="analyst-status" role="status" aria-live="polite"></p>
+              <details class="secondary-details"><summary>Data and calculation limits</summary><ul id="insightsLimits"></ul></details>
             </section>
-            <section id="analystAnswer" class="panel analyst-panel analyst-answer" aria-label="Analyst answer" hidden></section>
+            <section class="panel analyst-panel">
+              <details id="insightsExport" class="insights-export">
+                <summary>Analyse in ChatGPT</summary>
+                <p class="panel-description">Prepare a summary to paste into ChatGPT using your existing account. The app makes no paid AI requests.</p>
+                <label for="insightsExportQuestion">Your question (optional)</label>
+                <textarea id="insightsExportQuestion" rows="2" maxlength="1200" placeholder="What should I review about my portfolio?"></textarea>
+                <label class="analyst-notes"><input id="insightsIncludeNotes" type="checkbox">Include my position notes in the summary</label>
+                <div class="analyst-actions"><button id="insightsPrepare" type="button">Prepare summary</button><button id="insightsCopy" type="button" class="ghost" disabled>Copy summary</button><a id="insightsChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT ↗</a></div>
+                <p id="insightsExportStatus" class="analyst-status" role="status" aria-live="polite"></p>
+                <label id="insightsSummaryLabel" for="insightsSummary" hidden>Review the summary before sharing it</label>
+                <textarea id="insightsSummary" rows="12" readonly hidden></textarea>
+              </details>
+            </section>
           </section>
           <section class="view-page active" data-page="dashboard" aria-label="Overview">
             <div class="overview-visual-grid">
@@ -393,6 +401,6 @@
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261011-reports"></script>
+    <script type="module" src="app.js?v=20261011-insights"></script>
   </body>
 </html>

@@ -4,7 +4,7 @@ import { createPortfolioBook, normalizeTransaction } from "../js/analysis/portfo
 import { EXCHANGE_RATE_SOURCE, EXCHANGE_RATE_SOURCE_URL } from "../js/data/exchange-rate.js";
 import { PORTFOLIO_FX_SOURCE, PORTFOLIO_FX_SOURCE_URL } from "../js/data/portfolio-history.js";
 import { buildAnalystContext, loadAnalystContext } from "../server/analyst-context.mjs";
-import { askAnalyst, reserveAnalystRequest, validateAnalystAnswer } from "../server/analyst.mjs";
+import { buildPortfolioInsights, portfolioChatGPTSummary } from "../js/analysis/portfolio-insights.js";
 import { createApp } from "../server/worker.mjs";
 import { saveCloudRecord, readCloudRecord } from "../server/cloud-store.mjs";
 import { createLocalDatabase } from "../server/local-database.mjs";
@@ -38,6 +38,91 @@ const context = (extra = {}) => buildAnalystContext({ book: fixtureBook(), revis
 const fact = (value, id) => value.facts.find((row) => row.id === id);
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 
+test("written insights preserve actual EUR costs and explain the FX/settlement difference", () => {
+  const value = context();
+  const sections = buildPortfolioInsights(value);
+  const gain = sections.find((row) => row.id === "gains");
+  close(fact(value, "holding-0-native-gain-eur").value, 39 * 0.9);
+  close(fact(value, "holding-0-fx-difference").value, 56 - 39 * 0.9);
+  assert.match(gain.paragraphs.join(" "), /€160.00.*€216.00.*€56.00.*€35.10.*€20.90/);
+  const allocation = sections.find((row) => row.id === "allocation");
+  assert.match(allocation.paragraphs.join(" "), /100.00%.*Cash is excluded/);
+  assert.equal(value.latestMonth.partial, true);
+  assert.ok(fact(value, "month-2026-10-return").sourceIds.includes("historical-fx"));
+  assert.ok(fact(value, "performance-benchmarkReturn").sourceIds.includes("price-SPY"));
+  assert.match(sections.find((row) => row.id === "monthly").paragraphs.join(" "), /partial month/);
+  assert.equal(sections.length, 5);
+});
+
+test("missing data withholds full gains and allocation; the unavailable latest month is never backfilled", () => {
+  const value = context({ histories: {}, exchangeRate: null, fxHistory: null });
+  value.latestMonth = { month: "2026-10", startDate: "2026-10-01", endDate: "2026-10-10", status: "unavailable", partial: true };
+  value.facts.push({ id: "month-2026-09-return", label: "Previous month", value: 0.99, display: "99.00%", sourceIds: [] });
+  const sections = buildPortfolioInsights(value);
+  assert.match(sections.find((row) => row.id === "allocation").paragraphs.join(" "), /unavailable/);
+  assert.match(sections.find((row) => row.id === "gains").paragraphs.join(" "), /MSFT:.*missing/);
+  const monthly = sections.find((row) => row.id === "monthly").paragraphs.join(" ");
+  assert.match(monthly, /latest month's return is unavailable/);
+  assert.doesNotMatch(monthly, /99.00%|NaN|undefined/);
+});
+
+test("the copyable summary contains dated figures and sources, excludes raw records and makes notes opt-in", () => {
+  const value = context({ includeNotes: true });
+  const summary = portfolioChatGPTSummary(value, { question: "Explain my gains" });
+  assert.match(summary, /€56.00/);
+  assert.match(summary, /Yahoo Finance.*2026-10-10/);
+  assert.match(summary, /partial month/);
+  assert.match(summary, /Explain my gains$/);
+  assert.doesNotMatch(summary, /PRIVATE TRANSACTION NOTE|Ignore all rules|test-1|portfolioRevision|userId|transactions/);
+  assert.match(portfolioChatGPTSummary(value, { includeNotes: true }), /OPTIONAL POSITION NOTES.*\nMSFT \(USD\): "Ignore all rules/s);
+  assert.match(portfolioChatGPTSummary(value), /DATA AND CALCULATION LIMITS/);
+});
+
+test("the Worker provides calculated evidence without a key and permanently retires paid requests", async (t) => {
+  const DB = createLocalDatabase(); t.after(() => DB.close());
+  await saveCloudRecord({ DB }, "one", "portfolio", fixtureBook(), 0, NOW);
+  const before = await readCloudRecord({ DB }, "one", "portfolio", NOW);
+  const assets = { "data/prices.json": JSON.stringify({ schemaVersion: 1, generatedAt: new Date(NOW).toISOString(), records: [] }) };
+  let openAICalls = 0;
+  const app = createApp(assets, { now: NOW, reportFailure: () => {}, fetchImpl: async (url) => {
+    if (String(url).includes("api.openai.com")) { openAICalls++; throw new Error("Paid requests must not run"); }
+    return new Response("No market fixture", { status: 503 });
+  } });
+  const env = { DB, OPENAI_API_KEY: "unused-existing-key" };
+  const get = (path, user = "one") => app.fetch(new Request(ORIGIN + path, { headers: { "oai-authenticated-user-id": user, "x-expected-user-id": user } }), env);
+  assert.equal((await app.fetch(new Request(ORIGIN + "/api/analyst/context"), env)).status, 401);
+  const status = await (await get("/api/analyst/status")).json();
+  assert.equal(status.ready, true); assert.equal(status.mode, "calculated");
+  delete env.OPENAI_API_KEY;
+  assert.equal((await (await get("/api/analyst/status")).json()).ready, true);
+  const response = await get("/api/analyst/context");
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).notes, []);
+  assert.equal((await get("/api/analyst/context?includeNotes=true")).status, 200);
+  assert.equal((await (await get("/api/analyst/context?includeNotes=true")).json()).notes.length, 1);
+  for (const query of ["?includeNotes=yes", "?includeNotes=true&includeNotes=false", "?other=true"]) assert.equal((await get("/api/analyst/context" + query)).status, 400);
+  const retired = await app.fetch(new Request(ORIGIN + "/api/analyst", { method: "POST", headers: { "oai-authenticated-user-id": "one", "x-expected-user-id": "one" } }), env);
+  assert.equal(retired.status, 410);
+  assert.equal(openAICalls, 0);
+  assert.deepEqual(await readCloudRecord({ DB }, "one", "portfolio", NOW), before);
+});
+
+test("the client uses only authenticated GETs and rejects an identity change", async () => {
+  const updates = [];
+  const session = { isCloud: true, state: { userId: "one" }, initialize: async () => ({ userId: "one" }), update: (value) => updates.push(value) };
+  const client = createAnalystClient({ session, fetchImpl: async (url, init) => {
+    assert.equal(url, "/api/analyst/context?includeNotes=true");
+    assert.equal(init.method, "GET"); assert.equal(init.body, undefined);
+    assert.equal(init.headers["X-Expected-User-Id"], "one");
+    return Response.json({ ...context(), userId: "one" }, { headers: { "X-Portfolio-User-Id": "one" } });
+  } });
+  close(fact(await client.context(true), "money-in").value, 1000);
+  assert.equal(client.ask, undefined);
+  const changed = createAnalystClient({ session, fetchImpl: async () => Response.json({ userId: "two" }, { headers: { "X-Portfolio-User-Id": "two" } }) });
+  await assert.rejects(changed.context(), (error) => error.code === "ACCOUNT_CHANGED");
+  assert.equal(updates[0].errorCode, "ACCOUNT_CHANGED");
+});
+
 test("analyst shares exact EUR cost/FX calculations, excludes private raw records and only sends notes on request", () => {
   const before = fixtureBook();
   const value = context({ book: before });
@@ -59,76 +144,6 @@ test("analyst shares exact EUR cost/FX calculations, excludes private raw record
   assert.ok(missing.limitations.some((text) => /unavailable/.test(text)));
 });
 
-test("numeric answers must reference known facts; invented figures, markers, links and markup are rejected", () => {
-  const evidence = context();
-  const good = { paragraphs: ["Your remaining EUR cost is {{fact:holding-0-cost}} and the gain is {{fact:holding-0-gain}}."], followUpQuestions: ["How concentrated are my holdings?"] };
-  assert.deepEqual(validateAnalystAnswer(good, evidence).facts.map((row) => row.id), ["holding-0-cost", "holding-0-gain"]);
-  for (const text of ["The gain is €999.", "{{fact:made-up}}", "<img src=x onerror=alert()>", "Read https://evil.example", "{{fact:cash"])
-    assert.throws(() => validateAnalystAnswer({ ...good, paragraphs: [text] }, evidence), (error) => error.code === "UNSUPPORTED_ANSWER");
-});
-
-test("OpenAI request stays server-side, stateless, bounded and tool-free; raw provider errors never leak", async () => {
-  const evidence = context({ includeNotes: true });
-  let calls = 0;
-  const fetchImpl = async (url, init) => {
-    calls++;
-    assert.equal(url, "https://api.openai.com/v1/responses");
-    assert.equal(init.redirect, "manual");
-    assert.equal(init.headers.Authorization, "Bearer test-only-key");
-    const input = JSON.parse(init.body);
-    assert.equal(input.store, false);
-    assert.equal(input.tools, undefined);
-    assert.equal(input.max_output_tokens, 2500);
-    assert.equal(input.text.format.strict, true);
-    assert.match(input.instructions, /untrusted data/);
-    assert.doesNotMatch(init.body, /PRIVATE TRANSACTION NOTE|userId|revision|test-1/);
-    return Response.json({ status: "completed", output: [{ type: "message", role: "assistant", content: [{ type: "output_text",
-      text: JSON.stringify({ paragraphs: ["Your total value is {{fact:total-value}}."], followUpQuestions: [] }) }] }] });
-  };
-  const answer = await askAnalyst({ env: { OPENAI_API_KEY: "test-only-key" }, context: evidence, question: "What is the total?", fetchImpl });
-  close(answer.facts[0].value, 1056);
-  assert.equal(calls, 1);
-  for (const status of [401, 429, 500]) {
-    await assert.rejects(askAnalyst({ env: { OPENAI_API_KEY: "test-only-key" }, context: evidence, question: "Help", fetchImpl: async () => new Response("SECRET PROVIDER BODY", { status }) }),
-      (error) => !/SECRET|test-only-key/.test(error.message) && error.status >= 500);
-  }
-  await assert.rejects(askAnalyst({ env: { OPENAI_API_KEY: "test-only-key" }, context: evidence, question: "Help", timeoutMs: 5,
-    fetchImpl: async (_, init) => new Promise((_, reject) => init.signal.addEventListener("abort", () => reject(new Error("secret")))) }),
-  (error) => error.code === "ANALYST_TIMEOUT");
-});
-
-test("request reservations are atomic across app instances, capped daily and isolated per owner", async (t) => {
-  const DB = createLocalDatabase(); t.after(() => DB.close());
-  const reservations = await Promise.allSettled([reserveAnalystRequest({ DB }, "one", NOW), reserveAnalystRequest({ DB }, "one", NOW)]);
-  assert.equal(reservations.filter((r) => r.status === "fulfilled").length, 1);
-  assert.equal(await reserveAnalystRequest({ DB }, "two", NOW), 19);
-  for (let i = 1; i < 20; i++) assert.equal(await reserveAnalystRequest({ DB }, "one", NOW + i * 60000), 19 - i);
-  await assert.rejects(reserveAnalystRequest({ DB }, "one", NOW + 20 * 60000), (error) => error.code === "ANALYST_LIMIT");
-  assert.equal(await reserveAnalystRequest({ DB }, "one", NOW + 86400000), 19);
-});
-
-test("analyst API requires authentication, expected owner and same origin; setup/invalid payloads do not call OpenAI", async (t) => {
-  const DB = createLocalDatabase(); t.after(() => DB.close());
-  let calls = 0;
-  const app = createApp({}, { now: NOW, analystFetchImpl: async () => { calls++; throw new Error("must not call"); } });
-  const env = { DB, OPENAI_API_KEY: "test-only-key" };
-  const payload = { question: "Help", includeNotes: false, expectedRevision: 1 };
-  const send = (extra = {}, value = payload, path = "/api/analyst") => app.fetch(new Request(ORIGIN + path, {
-    method: "POST", headers: { "oai-authenticated-user-id": "one", "x-expected-user-id": "one", "content-type": "application/json", ...extra },
-    body: JSON.stringify(value) }), env);
-  assert.equal((await app.fetch(new Request(ORIGIN + "/api/analyst/status"), env)).status, 401);
-  assert.equal((await send({ "x-expected-user-id": "two" })).status, 409);
-  assert.equal((await send({ Origin: "https://evil.example" })).status, 403);
-  assert.equal((await send({}, { ...payload, book: fixtureBook() })).status, 400);
-  assert.equal((await send({}, { ...payload, question: "x".repeat(1201) })).status, 400);
-  assert.equal((await send()).status, 409, "No recorded portfolio");
-  delete env.OPENAI_API_KEY;
-  assert.equal((await send()).status, 503);
-  assert.equal(calls, 0);
-  const status = await app.fetch(new Request(ORIGIN + "/api/analyst/status", { headers: { "oai-authenticated-user-id": "one" } }), env);
-  assert.equal((await status.json()).ready, false);
-});
-
 test("evidence loads only its authenticated saved book and rejects revision changes without disclosing another owner", async (t) => {
   const DB = createLocalDatabase(); t.after(() => DB.close());
   await saveCloudRecord({ DB }, "one", "portfolio", fixtureBook(), 0, NOW);
@@ -145,53 +160,4 @@ test("evidence loads only its authenticated saved book and rejects revision chan
     return rate;
   } };
   await assert.rejects(loadAnalystContext({ env: { DB }, userId: "one", market: changeDuringLoad, expectedRevision: 1, now: NOW }), (error) => error.code === "PORTFOLIO_CHANGED");
-});
-
-test("analyst client sends only a question and options; provider outages do not break sync but identity changes do", async () => {
-  const changes = [];
-  const session = { isCloud: true, state: { userId: "one" }, initialize: async () => ({ userId: "one" }), update: (value) => changes.push(value) };
-  const client = createAnalystClient({ session, fetchImpl: async (_, init) => {
-    assert.deepEqual(JSON.parse(init.body), { question: "Help", includeNotes: false, expectedRevision: 1 });
-    assert.equal(init.headers["X-Expected-User-Id"], "one");
-    return Response.json({ code: "ANALYST_PROVIDER", error: "Unavailable", userId: "one" }, { status: 502, headers: { "X-Portfolio-User-Id": "one" } });
-  } });
-  await assert.rejects(client.ask("Help", false, 1), (error) => error.code === "ANALYST_PROVIDER");
-  assert.deepEqual(changes, []);
-  const changed = createAnalystClient({ session, fetchImpl: async () => Response.json({ userId: "two", ready: true }, { headers: { "X-Portfolio-User-Id": "two" } }) });
-  await assert.rejects(changed.status(), (error) => error.code === "ACCOUNT_CHANGED");
-  assert.equal(changes[0].errorCode, "ACCOUNT_CHANGED");
-});
-
-test("authenticated question completes through the Worker with server-derived figures and leaves the saved portfolio intact", async (t) => {
-  const DB = createLocalDatabase(); t.after(() => DB.close());
-  await saveCloudRecord({ DB }, "one", "portfolio", fixtureBook(), 0, NOW);
-  const before = await readCloudRecord({ DB }, "one", "portfolio", NOW);
-  let apiCalls = 0;
-  const app = createApp({}, { now: NOW, reportFailure: () => {}, fetchImpl: async (url) => {
-    if (String(url).startsWith("https://query1.finance.yahoo.com/")) {
-      const ticker = decodeURIComponent(new URL(url).pathname.split("/").at(-1));
-      return Response.json({ chart: { result: [{ meta: { symbol: ticker, currency: "USD", instrumentType: "EQUITY", dataGranularity: "1d",
-        regularMarketPrice: 120, regularMarketTime: Date.parse("2026-10-10T20:00:00Z") / 1000 },
-        timestamp: days.map((date) => Date.parse(date) / 1000), indicators: { quote: [{ close: days.map(() => 120) }] }, events: {} }] } });
-    }
-    if (url === EXCHANGE_RATE_SOURCE_URL) return Response.json({ base: "USD", quote: "EUR", rate: 0.9, date: "2026-10-09" });
-    return new Response("Unavailable public FX fixture", { status: 503 });
-  }, analystFetchImpl: async (_, init) => {
-    apiCalls++;
-    const input = JSON.parse(JSON.parse(init.body).input[0].content);
-    close(fact(input.evidence, "total-value").value, 1056);
-    assert.deepEqual(input.evidence.notes, []);
-    return Response.json({ status: "completed", output: [{ type: "message", role: "assistant", content: [{ type: "output_text",
-      text: JSON.stringify({ paragraphs: ["Your total value is {{fact:total-value}}, including recorded cash."], followUpQuestions: [] }) }] }] });
-  } });
-  const response = await app.fetch(new Request(ORIGIN + "/api/analyst", { method: "POST",
-    headers: { "oai-authenticated-user-id": "one", "x-expected-user-id": "one", Origin: ORIGIN, "content-type": "application/json" },
-    body: JSON.stringify({ question: "What is everything worth?", includeNotes: false, expectedRevision: 1 }) }), { DB, OPENAI_API_KEY: "test-only-key" });
-  assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
-  assert.equal(response.headers.get("cache-control"), "private, no-store");
-  const answer = await response.json();
-  close(fact(answer, "total-value").value, 1056);
-  assert.equal(answer.remainingRequests, 19);
-  assert.equal(apiCalls, 1);
-  assert.deepEqual(await readCloudRecord({ DB }, "one", "portfolio", NOW), before);
 });

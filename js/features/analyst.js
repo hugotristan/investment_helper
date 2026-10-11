@@ -1,20 +1,16 @@
 import { analystClient } from "../data/analyst-client.js";
 import { cloudSession } from "../data/cloud-portfolio-store.js";
+import { loadStockHistories } from "../data/stock-history.js";
+import { loadExchangeRate } from "../data/exchange-rate.js";
+import { loadPortfolioFx } from "../data/portfolio-history.js";
+import { getActivePortfolioBook } from "../portfolio-state.js";
+import { projectPortfolioBook } from "../analysis/portfolio-ledger.js";
+import { buildAnalystContext } from "../analysis/portfolio-context.js";
+import { buildPortfolioInsights, portfolioChatGPTSummary } from "../analysis/portfolio-insights.js";
 import { escapeHtml } from "../shared/text.js";
 
-const el = (id) => document.getElementById(id);
 const date = (value) => value ? String(value).slice(0, 10) : "Date unavailable";
 const internalRoutes = new Set(["#portfolio", "#report-allocation", "#report-investments", "#portfolio-performance", "#sources", "#report-etf"]);
-let initialized = false, busy = false, context = null, status = null, epoch = 0;
-
-function controls() {
-  el("analystAsk").disabled = busy || !status?.ready || !context || document.documentElement.dataset.privateBlocked === "true";
-  el("analystRefresh").disabled = busy;
-  el("analystQuestion").disabled = busy;
-  el("analystIncludeNotes").disabled = busy;
-  document.querySelectorAll("[data-analyst-question]").forEach((button) => { button.disabled = busy; });
-  el("analystForm").setAttribute("aria-busy", String(busy));
-}
 function sourceUrl(url) {
   if (internalRoutes.has(url)) return url;
   try {
@@ -24,98 +20,126 @@ function sourceUrl(url) {
   } catch { /* Unknown links are displayed as text. */ }
   return null;
 }
-function factsHtml(facts, sources, prefix) {
-  return `<dl class="analyst-facts">${facts.map((fact, index) => {
+function factsHtml(facts, sources) {
+  return `<dl class="analyst-facts">${facts.map((fact) => {
     const linked = fact.sourceIds.map((id) => sources.find((source) => source.id === id)).filter(Boolean);
-    return `<div id="${prefix}-${escapeHtml(fact.id)}" tabindex="-1"><dt><span class="analyst-fact-number">${index + 1}</span>${escapeHtml(fact.label)}</dt>
-      <dd><strong>${escapeHtml(fact.display)}</strong><small>${escapeHtml(date(fact.asOf))} · ${internalRoutes.has(fact.route) ? `<a href="${escapeHtml(fact.route)}">Open report</a>` : "Recorded figure"}</small>
+    return `<div><dt>${escapeHtml(fact.label)}</dt><dd><strong>${escapeHtml(fact.display)}</strong><small>${escapeHtml(date(fact.asOf))}</small>
       <small>${linked.map((source) => { const url = sourceUrl(source.url); return url ? `<a href="${escapeHtml(url)}"${url.startsWith("https:") ? ' target="_blank" rel="noopener noreferrer"' : ""}>${escapeHtml(source.name)}</a> · ${escapeHtml(date(source.asOf))}` : escapeHtml(source.name); }).join("; ")}</small></dd></div>`;
   }).join("")}</dl>`;
 }
-function renderAnswer(answer, question) {
-  const byId = new Map(answer.facts.map((fact, index) => [fact.id, { ...fact, index }]));
-  const paragraphs = answer.paragraphs.map((text) => escapeHtml(text).replace(/\{\{fact:([A-Za-z0-9.-]+)\}\}/g, (_, id) => {
-    const fact = byId.get(id);
-    return fact ? `<button type="button" class="analyst-citation" data-analyst-fact="${escapeHtml(id)}" aria-label="${escapeHtml(`${fact.display}; see supporting figure ${fact.index + 1}`)}">${escapeHtml(fact.display)}<sup>${fact.index + 1}</sup></button>` : "Figure unavailable";
-  }));
-  el("analystAnswer").innerHTML = `<div class="analyst-answer-heading"><h2>Answer</h2><button id="analystClear" type="button" class="ghost">Clear answer</button></div>
-    <p class="analyst-asked">${escapeHtml(question)}</p>${paragraphs.map((text) => `<p>${text}</p>`).join("")}
-    <p class="data-note">Portfolio revision ${escapeHtml(answer.portfolioRevision)} · Figures checked ${escapeHtml(date(answer.generatedAt))}.</p>
-    ${answer.facts.length ? `<details id="analystEvidence" class="secondary-details"><summary>Supporting figures (${answer.facts.length})</summary>${factsHtml(answer.facts, answer.sources, "analyst-fact")}</details>` : ""}
-    <details class="secondary-details"><summary>Data and calculation limits</summary><ul>${answer.limitations.map((text) => `<li>${escapeHtml(text)}</li>`).join("")}</ul></details>
-    ${answer.followUpQuestions.length ? `<div class="analyst-examples">${answer.followUpQuestions.map((text) => `<button type="button" class="ghost" data-analyst-question="${escapeHtml(text)}">${escapeHtml(text)}</button>`).join("")}</div>` : ""}`;
-  el("analystAnswer").hidden = false;
-  el("analystClear").addEventListener("click", () => { el("analystAnswer").innerHTML = ""; el("analystAnswer").hidden = true; el("analystQuestion").focus(); });
-}
-async function refresh() {
-  if (busy || !analystClient.isCloud) return;
-  const ticket = ++epoch;
-  busy = true; context = null; controls();
-  el("analystStatus").textContent = "Checking the connection and portfolio figures…";
-  el("analystFiguresBody").textContent = "Loading…";
-  try {
-    const [nextStatus, nextContext] = await Promise.all([analystClient.status(), analystClient.context()]);
-    if (ticket !== epoch) return;
-    status = nextStatus; context = nextContext;
-    el("analystStatus").textContent = status.message;
-    const selected = context.facts.filter((fact) => ["money-in", "total-value", "holdings-value", "cash", "usd-eur"].includes(fact.id));
-    el("analystFiguresBody").innerHTML = factsHtml(selected, context.sources, "analyst-preview")
-      + `<p class="data-note">Recorded revision ${escapeHtml(context.portfolioRevision)}. Missing values are withheld.</p>`;
-  } catch (error) {
-    if (ticket !== epoch) return;
-    status = null;
-    el("analystStatus").textContent = error.message;
-    el("analystFiguresBody").textContent = "Portfolio figures could not be loaded.";
-  } finally { if (ticket === epoch) { busy = false; controls(); } }
+async function localContext(includeNotes) {
+  const book = getActivePortfolioBook();
+  if (!book) throw new Error("Start portfolio tracking in Portfolio to see your insights.");
+  const projection = projectPortfolioBook(book);
+  const tickers = [...new Set([...projection.holdings.map((holding) => holding.ticker).slice(0, 40),
+    ...book.transactions.map((entry) => entry.ticker).filter(Boolean)])].slice(0, 59);
+  const [histories, exchangeRate, fxHistory] = await Promise.all([loadStockHistories([...tickers, "SPY"]), loadExchangeRate(), loadPortfolioFx()]);
+  if (getActivePortfolioBook() !== book) throw new Error("Your portfolio changed while loading. Refresh the figures.");
+  return buildAnalystContext({ book, revision: book.updatedAt, histories, exchangeRate, fxHistory, includeNotes });
 }
 
-export function initializeAnalyst() {
-  if (initialized || !el("analystForm")) return;
-  initialized = true;
-  if (!analystClient.isCloud) {
-    el("analystStatus").textContent = "The AI analyst is available in the cloud app. This copy keeps your portfolio in this browser.";
-    el("analystRefresh").hidden = true;
-    el("analystCloudLink").hidden = false;
-    controls();
-    return;
+export function createPortfolioInsightsController({ document: doc = globalThis.document, window: win = globalThis.window,
+  client = analystClient, session = cloudSession, loadLocalContext = localContext, clipboard = globalThis.navigator?.clipboard } = {}) {
+  const el = (id) => doc.getElementById(id);
+  let context = null, sections = [], topic = "overview", busy = false, epoch = 0;
+  const blocked = () => doc.documentElement.dataset.privateBlocked === "true";
+  const setStatus = (text) => { el("insightsStatus").textContent = text; };
+  function controls() {
+    el("insightsRefresh").disabled = busy || blocked();
+    el("insightsPrepare").disabled = busy || blocked();
+    el("insightsCopy").disabled = busy || blocked() || !el("insightsSummary").value;
+    el("insightsIncludeNotes").disabled = busy || blocked();
+    el("insightsExportQuestion").disabled = busy || blocked();
+    el("insightsPanel").setAttribute("aria-busy", String(busy));
   }
-  el("analystRefresh").addEventListener("click", refresh);
-  document.querySelector('[data-page="analyst"]').addEventListener("click", (event) => {
-    const question = event.target.closest("[data-analyst-question]");
-    if (question && !busy) { el("analystQuestion").value = question.dataset.analystQuestion; el("analystQuestion").focus(); }
-    const citation = event.target.closest("[data-analyst-fact]");
-    if (citation) { el("analystEvidence").open = true; const target = el(`analyst-fact-${citation.dataset.analystFact}`); target?.focus(); target?.scrollIntoView({ block: "center", behavior: "instant" }); }
-  });
-  el("analystForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const question = el("analystQuestion").value.trim();
-    if (busy || !status?.ready || !context || !question) return;
+  function clearSummary() {
+    el("insightsSummary").value = "";
+    el("insightsSummaryLabel").hidden = true;
+    el("insightsSummary").hidden = true;
+    el("insightsChatGPTLink").hidden = true;
+    el("insightsExportStatus").textContent = "";
+    controls();
+  }
+  function render() {
+    const selected = sections.find((section) => section.id === topic);
+    doc.querySelectorAll("[data-insight-topic]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.insightTopic === topic)));
+    if (!selected || !context) return;
+    el("insightsBody").innerHTML = `<h3>${escapeHtml(selected.title)}</h3>${selected.paragraphs.map((text) => `<p>${escapeHtml(text)}</p>`).join("")}
+      <a class="insights-report-link" href="${selected.route}">Open ${topic === "overview" ? "portfolio" : "report"} ↗</a>
+      ${selected.facts.length ? `<details class="secondary-details"><summary>Supporting figures (${selected.facts.length})</summary>${factsHtml(selected.facts, context.sources)}</details>` : ""}`;
+    el("insightsLimits").innerHTML = context.limitations.map((text) => `<li>${escapeHtml(text)}</li>`).join("");
+  }
+  const load = (notes) => client.isCloud ? client.context(notes) : loadLocalContext(notes);
+  async function refresh({ summary = false } = {}) {
+    if (busy || blocked()) return;
     const ticket = ++epoch;
-    busy = true; controls();
-    el("analystStatus").textContent = "Reading the latest figures and answering your question…";
+    busy = true; context = null; sections = []; clearSummary(); controls();
+    el("insightsBody").textContent = "Loading portfolio figures…";
+    el("insightsLimits").innerHTML = "";
+    setStatus("Reading your saved portfolio and dated market data…");
     try {
-      const answer = await analystClient.ask(question, el("analystIncludeNotes").checked, context.portfolioRevision);
-      if (ticket !== epoch) return;
-      renderAnswer(answer, question);
-      el("analystStatus").textContent = `${answer.remainingRequests} questions remaining today. Wait one minute between questions.`;
+      const next = await load(summary && el("insightsIncludeNotes").checked);
+      if (ticket !== epoch || blocked()) return;
+      context = next; sections = buildPortfolioInsights(context); render();
+      setStatus(`Figures checked ${date(context.generatedAt)}. Current quotes and historical daily closes can differ.`);
+      if (summary) {
+        el("insightsSummary").value = portfolioChatGPTSummary(context, { includeNotes: el("insightsIncludeNotes").checked, question: el("insightsExportQuestion").value });
+        el("insightsSummaryLabel").hidden = false;
+        el("insightsSummary").hidden = false;
+        el("insightsChatGPTLink").hidden = false;
+        el("insightsExportStatus").textContent = "Review the summary, copy it, then paste it into ChatGPT. Nothing is sent automatically.";
+      }
     } catch (error) {
       if (ticket !== epoch) return;
-      el("analystStatus").textContent = error.message;
-      if (error.code === "PORTFOLIO_CHANGED") context = null;
-      if (error.code === "ANALYST_SETUP_REQUIRED") status = null;
+      context = null; sections = [];
+      setStatus(error.message);
+      el("insightsBody").textContent = "Portfolio insights could not be loaded. Your saved transactions are available in Portfolio.";
     } finally { if (ticket === epoch) { busy = false; controls(); } }
-  });
-  cloudSession.subscribe((session) => {
-    if (["ACCOUNT_CHANGED", "UNAUTHORIZED"].includes(session.errorCode)) {
-      epoch++; busy = false; context = null; status = null;
-      el("analystAnswer").innerHTML = ""; el("analystAnswer").hidden = true;
-      el("analystFiguresBody").textContent = "Unlock the app to review your portfolio.";
-      el("analystQuestion").value = "";
-      el("analystStatus").textContent = session.message;
-      controls();
+  }
+  async function copy() {
+    if (busy || blocked() || !el("insightsSummary").value) return;
+    const ticket = epoch, text = el("insightsSummary").value;
+    try {
+      if (!clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await clipboard.writeText(text);
+      if (ticket === epoch && !blocked()) el("insightsExportStatus").textContent = "Summary copied. Paste it into ChatGPT when you are ready.";
+    } catch {
+      if (ticket !== epoch || blocked()) return;
+      el("insightsSummary").focus(); el("insightsSummary").select();
+      el("insightsExportStatus").textContent = "Automatic copying is unavailable. The summary is selected; copy it manually.";
     }
-  });
-  const onPage = () => { if (window.location.hash === "#analyst" && !context) refresh(); };
-  window.addEventListener("hashchange", onPage);
-  controls(); onPage();
+  }
+  function invalidate(message = "Refresh the figures to review your latest portfolio.") {
+    epoch++; busy = false; context = null; sections = [];
+    el("insightsBody").textContent = "Figures need refreshing.";
+    el("insightsLimits").innerHTML = "";
+    clearSummary(); setStatus(message);
+    if (win.location.hash === "#analyst" && !blocked()) void refresh();
+  }
+  function initialize() {
+    if (!el("insightsPanel")) return;
+    el("insightsRefresh").addEventListener("click", () => refresh());
+    el("insightsPrepare").addEventListener("click", () => refresh({ summary: true }));
+    el("insightsCopy").addEventListener("click", copy);
+    el("insightsIncludeNotes").addEventListener("change", clearSummary);
+    el("insightsExportQuestion").addEventListener("input", clearSummary);
+    doc.querySelectorAll("[data-insight-topic]").forEach((button) => button.addEventListener("click", () => { topic = button.dataset.insightTopic; render(); }));
+    session.subscribe((value) => {
+      if (["ACCOUNT_CHANGED", "UNAUTHORIZED"].includes(value.errorCode)) {
+        epoch++; busy = false; context = null; sections = [];
+        el("insightsBody").textContent = "Unlock the app to see your insights.";
+        el("insightsLimits").innerHTML = "";
+        el("insightsExportQuestion").value = ""; el("insightsIncludeNotes").checked = false;
+        clearSummary(); setStatus(value.message);
+      }
+    });
+    const onPage = () => { if (win.location.hash === "#analyst") void refresh(); };
+    win.addEventListener("hashchange", onPage);
+    win.addEventListener("focus", onPage);
+    controls(); onPage();
+  }
+  return { initialize, refresh, copy, invalidate };
 }
+let controller;
+export function initializeAnalyst() { controller ||= createPortfolioInsightsController(); controller.initialize(); }
+export function refreshPortfolioInsights() { controller?.invalidate(); }

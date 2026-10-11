@@ -2,6 +2,8 @@
 
 The frontend is plain HTML, CSS and JavaScript. A Cloudflare Worker serves it through OpenAI Sites and fetches public stock histories and currency rates. Cloudflare D1 stores the private portfolio ledger and watchlist. GitHub stores the source code; a Site deployment keeps running independently of your computer.
 
+Portfolio insights use the same JavaScript calculations as Portfolio and Reports. The authenticated evidence endpoint reads the saved portfolio and public market data; it does not change records or call an AI provider. The browser writes plain-language explanations from those figures. A manually prepared ChatGPT summary can include optional position notes and is copied only on an explicit click. Opening ChatGPT sends no portfolio data in the URL. The paid analyst endpoint is retired; no `OPENAI_API_KEY` is required.
+
 ## Access and storage
 
 The Site entrance is publicly reachable and the Worker protects the app with a personal password. ChatGPT sign-in is not required. The password hash and a random session-signing key are runtime secrets, never source or browser assets. Successful login creates a signed, HttpOnly session cookie that lasts 30 days. HTTPS cookies are Secure and scoped to this host; POST sign-out clears the current browser cookie. Changing either secret invalidates existing sessions.

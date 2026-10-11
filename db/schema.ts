@@ -30,7 +30,7 @@ export const passwordLoginAttempts = sqliteTable("password_login_attempts", {
   expiresAt: integer("expires_at").notNull(),
 }, (table) => [check("password_attempts_positive", sql`${table.attempts} >= 1`), index("password_attempts_expiry").on(table.expiresAt)]);
 
-// Only counters are persisted; analyst questions/answers are not stored in D1.
+// Retained for migration history; calculated portfolio insights no longer use counters.
 export const analystUsage = sqliteTable("analyst_usage", {
   userId: text("user_id").primaryKey(),
   day: text("day").notNull(),

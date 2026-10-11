@@ -3,7 +3,6 @@ import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, valida
 import { createMarketAssetReader, createMarketData, marketTicker } from "./market-data.mjs";
 import { createPasswordAuth } from "./auth.mjs";
 import { loadAnalystContext } from "./analyst-context.mjs";
-import { analystStatus, askAnalyst, reserveAnalystRequest, validateAnalystQuestion } from "./analyst.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -65,18 +64,16 @@ export function createApp(assets, options = {}) {
             throw new ApiError(409, "ACCOUNT_CHANGED", "Your signed-in account changed. Reload the app before opening or saving data.");
           }
           if (url.pathname === "/api/session") return userJson({ cloud: true, authMode, storageAvailable: storageAvailable(env) });
-          if (url.pathname === "/api/analyst/status") return userJson(analystStatus(env));
-          if (url.pathname === "/api/analyst/context") return userJson(await loadAnalystContext({ env, userId, market, now: clock() }));
+          if (url.pathname === "/api/analyst/status") return userJson({ ready: true, mode: "calculated", message: "Portfolio insights use recorded figures. No AI API is used." });
+          if (url.pathname === "/api/analyst/context") {
+            if ([...url.searchParams.keys()].some((key) => key !== "includeNotes") || url.searchParams.getAll("includeNotes").length > 1
+              || url.searchParams.has("includeNotes") && !["true", "false"].includes(url.searchParams.get("includeNotes"))) {
+              throw new ApiError(400, "INVALID_OPTIONS", "Choose whether to include position notes.");
+            }
+            return userJson(await loadAnalystContext({ env, userId, market, includeNotes: url.searchParams.get("includeNotes") === "true", now: clock() }));
+          }
           if (url.pathname === "/api/analyst") {
-            checkSameOrigin(request);
-            const input = validateAnalystQuestion(await readJsonRequest(request, 8192));
-            if (!analystStatus(env).ready) throw new ApiError(503, "ANALYST_SETUP_REQUIRED", analystStatus(env).message);
-            const context = await loadAnalystContext({ env, userId, market, ...input, now: clock() });
-            const remainingRequests = await reserveAnalystRequest(env, userId, clock());
-            const answer = await askAnalyst({ env, context, question: input.question, fetchImpl: options.analystFetchImpl,
-              timeoutMs: options.analystTimeoutMs });
-            return userJson({ ...answer, sources: context.sources.filter((source) => answer.facts.some((fact) => fact.sourceIds.includes(source.id))),
-              limitations: context.limitations, generatedAt: context.generatedAt, portfolioRevision: context.portfolioRevision, remainingRequests });
+            return userJson({ code: "ANALYST_RETIRED", error: "Paid AI requests have been removed. Open Portfolio insights and copy a summary for ChatGPT." }, 410);
           }
           if (url.pathname === "/api/market/history") {
             if (url.searchParams.getAll("ticker").length !== 1 || [...url.searchParams.keys()].some((key) => key !== "ticker")) {

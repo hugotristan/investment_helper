@@ -7,7 +7,7 @@ const pages = {
   portfolio: "Portfolio",
   "portfolio-performance": "Portfolio performance",
   reports: "Reports",
-  analyst: "AI analyst",
+  analyst: "Portfolio insights",
   "report-allocation": "Allocation report",
   "report-investments": "Investment performance",
   "report-funding": "Contributions and withdrawals",
