@@ -125,6 +125,8 @@ On Sites, the ledger lives in D1 under one personal workspace behind server-side
 
 Portfolio signals use trend, event risk, concentration, volatility, and model score instead of selling purely because a position is down.
 
+Groups and notes are under **Portfolio → Groups and notes**, or **Group & note** on a holding. Create or rename groups, assign each ticker/currency position to a group, and save a free-text note. Removing a group unassigns its positions without deleting their notes and offers Undo until another save. Organization is stored with the portfolio, included in backups, and synced across unlocked Sites devices. A save checks the loaded portfolio revision; conflicting edits require a reload. Older backups without organization still work.
+
 ## Portfolio Performance
 
 Performance in the main sidebar opens your actual portfolio history. It shows total value including cash, growth since the tracking start, an approximate return adjusted for deposits and withdrawals, and SPY's price return in EUR. A daily value/net-deposit chart has a date slider. Monthly results show end value, net funding, gain, and return; the most recent 12 months are visible and earlier months expand. Gains and costs expands into realized/unrealized EUR gains, recorded income and fees, and individual investments including sold positions. More → Research picks retains the separate recommendation journal.

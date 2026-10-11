@@ -3,6 +3,7 @@ import { calculateHoldings } from "../analysis/holdings.js";
 import { calculatePortfolioTotals } from "../analysis/portfolio-totals.js";
 import { holdingEurReturn } from "../analysis/portfolio-returns.js";
 import { sortPortfolioHoldings } from "../analysis/portfolio-sort.js";
+import { positionKey, positionOrganization } from "../analysis/portfolio-organization.js";
 import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -161,7 +162,10 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
   const rate = normalizeExchangeRate(exchangeRate, { now });
   const displayHoldings = portfolio.holdings.map((holding) => {
     const eur = holdingEurReturn(holding, { eurCostBases: projection?.eurCostBases, exchangeRate: rate });
-    return { ...holding, eur, status: eur.gain === null ? holding.status : gainStatus(eur.gain) };
+    const organization = getActivePortfolioBook()?.organization;
+    const annotation = positionOrganization(organization, holding);
+    return { ...holding, eur, annotation, groupName: organization?.groups.find((group) => group.id === annotation.groupId)?.name || "",
+      status: eur.gain === null ? holding.status : gainStatus(eur.gain) };
   });
   const groups = portfolio.groups.map((group) => {
     const holdings = sortPortfolioHoldings(displayHoldings.filter((holding) => holding.currency === group.currency), sort);
@@ -239,7 +243,7 @@ function renderHoldingCard(holding, money) {
         </div>
         <strong>${Number.isFinite(holding.weight) ? `${holding.weight.toFixed(1)}%` : "Weight unavailable"}</strong>
       </div>
-      <p class="muted-line">${escapeHtml(holding.ticker)} · ${escapeHtml(holding.currency)}</p>
+      <p class="muted-line">${escapeHtml(holding.ticker)} · ${escapeHtml(holding.currency)}${holding.groupName ? ` · ${escapeHtml(holding.groupName)}` : ""}</p>
       <div class="holding-values">${values}</div>
       <p class="data-note">${manual ? "Legacy amount stays as entered. Edit its opening position to add shares and average purchase price." : Number.isFinite(holding.price)
         ? `Price ${escapeHtml(money(holding.price, holding.currency))} · ${holding.source === "quote" ? "quote" : "daily close"} as of ${escapeHtml(holdingDate(holding.asOf))}`
@@ -248,7 +252,8 @@ function renderHoldingCard(holding, money) {
         <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
         ${item?.dataQuality?.eligible ? `<dl class="key-values"><div><dt>Score</dt><dd>${item.score}/100</dd></div><div><dt>1M</dt><dd>${formatPercent(item.oneMonth)}</dd></div><div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>` : ""}
       </details>
-      ${getActivePortfolioBook() ? '<button type="button" class="ghost" data-portfolio-transactions>View transactions</button>' : `<button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>`}
+      ${holding.annotation.note ? `<details class="secondary-details"><summary>Note</summary><p class="portfolio-position-note">${escapeHtml(holding.annotation.note)}</p></details>` : ""}
+      ${getActivePortfolioBook() ? `<div class="holding-actions"><button type="button" class="ghost" data-portfolio-transactions>View transactions</button><button type="button" class="ghost" data-portfolio-note="${escapeHtml(positionKey(holding))}">Group &amp; note</button></div>` : `<button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>`}
     </article>
   `;
 }

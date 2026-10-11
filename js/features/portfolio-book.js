@@ -69,13 +69,13 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     render();
   }
 
-  async function commit(candidate, expectedUpdatedAt) {
+  async function commit(candidate, expectedUpdatedAt, { metadataOnly = false } = {}) {
     const checked = validatePortfolioBook(candidate, { now: now() });
     if (!checked.ok) throw new TypeError(checked.error);
     const saved = await store.write(checked.book, { expectedUpdatedAt });
     apply(saved);
     try { channel?.postMessage({ updatedAt: saved.updatedAt }); } catch { /* Save has committed. */ }
-    try { onChange(); } catch { message("portfolioBookStatus", "Portfolio saved. Refresh to update the holdings view."); }
+    try { onChange({ metadataOnly }); } catch { message("portfolioBookStatus", "Portfolio saved. Refresh to update the holdings view."); }
     return saved;
   }
 
@@ -83,8 +83,18 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     return { ...book, ...changes, updatedAt: new Date(Math.max(now(), Date.parse(book.updatedAt) + 1)).toISOString() };
   }
 
+  async function saveOrganization(organization, expectedUpdatedAt) {
+    return work("portfolioOrganizationStatus", async () => {
+      const book = getActivePortfolioBook();
+      if (!book || doc.documentElement?.dataset?.privateBlocked === "true") throw new TypeError("Unlock and load your portfolio before saving notes.");
+      if (book.updatedAt !== expectedUpdatedAt) throw new TypeError("Your portfolio changed. Reload the group and note editor before saving.");
+      await commit(changed(book, { organization }), expectedUpdatedAt, { metadataOnly: true });
+      message("portfolioOrganizationStatus", "Saved.");
+    });
+  }
+
   async function work(id, action) {
-    if (!loaded || busy) return false;
+    if (!loaded || busy) { message(id, "Wait for the current portfolio operation to finish, then try again."); return false; }
     setBusy(true);
     try { await action(); return true; }
     catch (error) {
@@ -504,7 +514,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
   }
 
   return { initialize, setup, saveTransaction, saveSettings, startHistory, removeTransaction, importBackup, restoreBackup, exportBackup,
-    openTransactionEditor, writeOpeningHoldings, refreshFromStorage, render,
+    openTransactionEditor, writeOpeningHoldings, saveOrganization, refreshFromStorage, render,
     get book() { return getActivePortfolioBook(); }, get pendingBackup() { return pendingBackup; } };
 }
 
@@ -528,3 +538,4 @@ export async function initializePortfolioBook(onChange) {
 }
 export function openPortfolioTransactionEditor() { controller?.openTransactionEditor(); }
 export function reloadPortfolioBook() { return controller?.refreshFromStorage(); }
+export function savePortfolioOrganization(organization, expectedUpdatedAt) { return controller?.saveOrganization(organization, expectedUpdatedAt); }

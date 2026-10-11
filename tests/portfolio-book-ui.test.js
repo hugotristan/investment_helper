@@ -79,6 +79,22 @@ function fill(controller, values) {
   node("transactionCashAmount").listeners.input();
 }
 
+test("group and note saves preserve transactions and reject stale portfolio revisions", async () => {
+  const initial = book();
+  const f = fixture(initial);
+  await f.controller.initialize();
+  const organization = { groups: [{ id: "core", name: "Long-term" }], positions: [
+    { ticker: "AAPL", currency: "USD", groupId: "core", note: "Review after earnings." }
+  ] };
+  assert.equal(await f.controller.saveOrganization(organization, initial.updatedAt), true);
+  assert.deepEqual(f.stored.organization, organization);
+  assert.deepEqual(f.stored.openingHoldings, initial.openingHoldings);
+  assert.deepEqual(f.stored.transactions, initial.transactions);
+  assert.equal(await f.controller.saveOrganization({ groups: [], positions: [] }, initial.updatedAt), false);
+  assert.equal(f.writes, 1);
+  assert.deepEqual(f.stored.organization, organization);
+});
+
 test("setup preserves current holdings and legacy source without changing localStorage snapshot", async () => {
   const f = fixture();
   const previous = structuredClone(state.holdings);

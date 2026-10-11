@@ -119,6 +119,9 @@ test("portfolio round trips validated native settlement data and separates authe
   const DB = await sqliteBinding(t);
   const app = createApp(assets, { now: NOW });
   const book = makeBook();
+  book.organization = { groups: [{ id: "core", name: "Long-term" }], positions: [
+    { ticker: "MSFT", currency: "USD", groupId: "core", note: "Private earnings review." }
+  ] };
   book.transactions = [
     { id: "fund", type: "deposit", date: "2020-01-01", currency: "EUR", amount: 1000, note: "", cashCurrency: "EUR", cashAmount: 1000 },
     { id: "purchase", type: "buy", date: "2020-01-02", currency: "USD", ticker: "MSFT", quantity: 1, price: 330, fee: 1, note: "", cashCurrency: "EUR", cashAmount: 300 },
@@ -129,6 +132,7 @@ test("portfolio round trips validated native settlement data and separates authe
   assert.equal(save.data.revision, 1);
   assert.equal(save.data.updatedAt, new Date(NOW).toISOString());
   assert.equal(save.data.book.transactions[1].cashAmount, 300);
+  assert.deepEqual(save.data.book.organization, book.organization);
   assert.deepEqual((await response(app, { DB }, "/api/portfolio")).data, save.data);
   assert.deepEqual((await response(app, { DB }, "/api/portfolio", { user: "owner-two" })).data,
     { book: null, revision: 0, updatedAt: null, userId: "owner-two" });

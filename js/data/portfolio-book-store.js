@@ -9,7 +9,7 @@ export const PORTFOLIO_BACKUP_VERSION = 1;
 export const MAX_PORTFOLIO_BACKUP_BYTES = 5 * 1024 * 1024;
 export const MAX_PORTFOLIO_TRANSACTIONS = 10000;
 
-const BOOK_KEYS = new Set(["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput"]);
+const BOOK_KEYS = new Set(["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput", "organization"]);
 const SETTINGS_KEYS = new Set(["baseCurrency", "startDate"]);
 const BACKUP_KEYS = new Set(["app", "backupVersion", "exportedAt", "portfolio"]);
 

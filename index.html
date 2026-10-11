@@ -144,6 +144,23 @@
               </div>
               <div id="portfolioReview" class="portfolio-review"><p class="empty-state">Add a holding to track its value and gain.</p></div>
             </section>
+            <details class="panel portfolio-book-disclosure" id="portfolioOrganization" hidden>
+              <summary>Groups and notes</summary>
+              <div class="portfolio-book-content">
+                <form id="portfolioNoteForm" class="portfolio-book-form">
+                  <label for="portfolioNotePosition"><span>Position</span><select id="portfolioNotePosition"></select></label>
+                  <label for="portfolioPositionGroup"><span>Group</span><select id="portfolioPositionGroup"><option value="">Ungrouped</option></select></label>
+                  <label class="portfolio-form-wide" for="portfolioPositionNote"><span>Note</span><textarea id="portfolioPositionNote" rows="3" maxlength="2000" placeholder="Why you bought it, what to watch, or when to review."></textarea></label>
+                  <div class="portfolio-book-actions"><button id="portfolioNoteSave" type="submit">Save group and note</button><button id="portfolioNoteCancel" type="button" class="ghost">Cancel</button></div>
+                </form>
+                <details class="secondary-details"><summary>Manage groups</summary>
+                  <form id="portfolioGroupForm" class="portfolio-new-group"><label for="portfolioNewGroupName"><span>New group</span><input id="portfolioNewGroupName" maxlength="80" required placeholder="For example, Long-term ETFs"></label><button type="submit">Create group</button></form>
+                  <div id="portfolioGroupRows"></div>
+                  <button id="portfolioGroupUndo" type="button" class="ghost" hidden>Undo group removal</button>
+                </details>
+                <p id="portfolioOrganizationStatus" class="portfolio-book-status" role="status" aria-live="polite"></p>
+              </div>
+            </details>
             <details class="panel portfolio-editor" id="portfolioEditor">
               <summary class="control-summary"><strong>Add or edit holdings</strong></summary>
               <div class="control-content">

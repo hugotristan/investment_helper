@@ -11,6 +11,7 @@ import { runStockDetail } from "./js/features/detail.js";
 import { bindPortfolioSorting, buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
 import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js";
+import { initializePortfolioOrganization, refreshPortfolioOrganization } from "./js/features/portfolio-organization.js";
 import { initializeCloudSync } from "./js/features/cloud-sync.js";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
@@ -49,6 +50,7 @@ async function init() {
   hydrateInputs();
   initializePerformance();
   await initializePortfolioBook(portfolioChanged);
+  initializePortfolioOrganization();
   initializePortfolioPerformance();
   initializeTickerSuggestions();
   bindEvents();
@@ -127,8 +129,10 @@ function bindEvents() {
   window.addEventListener("hashchange", syncActivePage);
 }
 
-function portfolioChanged() {
+function portfolioChanged({ metadataOnly = false } = {}) {
+  refreshPortfolioOrganization();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+  if (metadataOnly) return;
   void refreshPortfolioPrices();
   void refreshPortfolioExchangeRate();
   refreshPortfolioPerformance();
