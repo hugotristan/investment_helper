@@ -265,6 +265,7 @@
               <a href="#portfolio-performance"><span>Portfolio performance</span><small>Value history and monthly returns</small><span aria-hidden="true">↗</span></a>
               <a href="#report-investments"><span>Investment performance</span><small>EUR gains for held and sold positions</small><span aria-hidden="true">↗</span></a>
               <a href="#report-funding"><span>Contributions and withdrawals</span><small>Monthly deposits, withdrawals, and net funding</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-transactions"><span>Transactions</span><small>Filter and export your recorded history</small><span aria-hidden="true">↗</span></a>
             </div></section>
           </section>
           <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
@@ -293,6 +294,12 @@
             </div></details>
           </section>
 
+          <section class="view-page" data-page="report-transactions" aria-label="Transaction report" hidden>
+            <section class="panel"><div class="section-heading"><h2>Transactions</h2><a href="#reports">All reports ↗</a></div>
+              <form id="reportTransactionsFilters" class="report-controls"><label>From<input id="reportTransactionsFrom" type="date"></label><label>To<input id="reportTransactionsTo" type="date"></label><label>Type<select id="reportTransactionsType"><option value="">All types</option><option value="buy">Buy</option><option value="sell">Sell</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option><option value="dividend">Dividend</option><option value="fee">Fee</option><option value="opening_cash">Starting cash</option></select></label><label>Ticker or note<input id="reportTransactionsSearch" type="search" placeholder="Search history"></label><button type="submit">Apply filters</button><button id="reportTransactionsReset" class="ghost" type="button">Reset</button><button id="reportTransactionsExport" class="ghost" type="button" disabled>Export CSV</button></form>
+              <div id="reportTransactionsBody"></div><div id="reportTransactionsPagination" class="report-pagination" hidden><button id="reportTransactionsPrevious" class="ghost" type="button">Previous</button><span id="reportTransactionsPage"></span><button id="reportTransactionsNext" class="ghost" type="button">Next</button></div>
+            </section>
+          </section>
           <section class="view-page" data-page="report-funding" aria-label="Contributions and withdrawals" hidden>
             <section class="panel"><div class="section-heading"><h2>Contributions and withdrawals</h2><a href="#reports">All reports ↗</a></div><form id="reportFundingFilters" class="report-controls"><label>From<input id="reportFundingFrom" type="date"></label><label>To<input id="reportFundingTo" type="date"></label><button type="submit">Apply dates</button><button id="reportFundingAll" class="ghost" type="button">All history</button><button id="reportFundingExport" class="ghost" type="button" disabled>Export CSV</button></form><div id="reportFundingBody"></div></section>
           </section>

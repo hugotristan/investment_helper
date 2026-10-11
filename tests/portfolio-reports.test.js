@@ -34,4 +34,5 @@ test("transaction filters preserve historical records and reject reversed dates"
   assert.equal(transactionReport(book(), { search: "old purchase", now: "2026-03-01" }).rows[0].id, "b");
   assert.equal(transactionReport(book(), { type: "deposit", now: "2026-03-01" }).rows.length, 1);
   assert.match(transactionReport(book(), { from: "2026-02-01", to: "2026-01-01", now: "2026-03-01" }).error, /date range/);
+  assert.match(transactionReport(book(), { from: "2026-99-99", now: "2026-03-01" }).error, /date range/);
 });

@@ -18,6 +18,7 @@ import { getRecommendationTickers, initializePerformance, recordRecommendations,
 import { initializePortfolioPerformance, refreshPortfolioPerformance } from "./js/features/portfolio-performance.js";
 import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
+import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, initializeWatchlist, renderWatchlist } from "./js/features/watchlist.js";
@@ -56,6 +57,7 @@ async function init() {
   initializePortfolioPerformance();
   initializeInvestmentReport();
   initializeFundingReport();
+  initializeTransactionReport();
   initializeTickerSuggestions();
   bindEvents();
   initializeCloudSync();
@@ -135,6 +137,7 @@ function bindEvents() {
 
 function portfolioChanged({ metadataOnly = false } = {}) {
   refreshFundingReport();
+  refreshTransactionReport();
   refreshPortfolioOrganization();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
   if (metadataOnly) return;
