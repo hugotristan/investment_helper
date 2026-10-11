@@ -303,7 +303,7 @@ test("server history has existing client provenance, fixed Yahoo endpoint, bound
   const app = createApp(assets, { now: NOW, fetchImpl: async (url, options) => {
     calls.push(String(url));
     assert.equal(Object.hasOwn(options, "credentials"), false);
-    assert.equal(options.redirect, "error");
+    assert.equal(options.redirect, "manual");
     assert.deepEqual(options.headers, { Accept: "application/json" });
     return Response.json(yahooChart());
   } });
@@ -471,6 +471,7 @@ test("default market fetch resolves the current global method with its receiver"
     globalThis.fetch = function (url, init) {
       assert.equal(this, globalThis);
       if (Object.hasOwn(init, "credentials")) throw new TypeError("The credentials field on RequestInitializerDict is not implemented.");
+      if (init.redirect === "error") throw new TypeError("Invalid redirect value: error");
       assert.deepEqual(init.headers, { Accept: "application/json" });
       calls.push(String(url));
       return Promise.resolve(Response.json(yahooChart("MSFT")));
@@ -488,7 +489,7 @@ test("current and historical FX use fixed public snapshots during live provider 
     calls.push(String(url));
     assert.deepEqual(init.headers, { Accept: "application/json" });
     assert.equal(Object.hasOwn(init, "credentials"), false);
-    assert.equal(init.redirect, "error");
+    assert.equal(init.redirect, "manual");
     if (String(url).startsWith("https://api.frankfurter.dev/")) return new Response("Blocked", { status: 503 });
     if (String(url) === "https://hugotristan.github.io/investment_helper/data/exchange-rate.json") return Response.json(currentFxFixture());
     assert.equal(String(url), "https://hugotristan.github.io/investment_helper/data/portfolio-fx.json");

@@ -61,6 +61,7 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     function runtimeFetch(url, init) {
       assert.equal(this?.fetch, runtimeFetch);
       assert.equal(Object.hasOwn(init, "credentials"), false, "Workers do not support browser credential options");
+      if (init.redirect === "error") throw new TypeError("Invalid redirect value: error");
       assert.equal(url, "https://api.frankfurter.dev/v2/providers/ecb/rate/usd/eur");
       providerCalls++;
       return Promise.resolve(Response.json({ base: "USD", quote: "EUR", rate: 0.9,
