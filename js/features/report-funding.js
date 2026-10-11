@@ -18,7 +18,7 @@ export function initializeFundingReport() {
 }
 export function refreshFundingReport() {
   if (!reportElement("reportFundingBody")) return;
-  const book = document.documentElement.dataset.privateBlocked === "true" ? null : getActivePortfolioBook();
+  const book = document.documentElement?.dataset?.privateBlocked === "true" ? null : getActivePortfolioBook();
   current = book ? fundingReport(book, { from: reportElement("reportFundingFrom").value, to: reportElement("reportFundingTo").value }) : null;
   reportElement("reportFundingExport").disabled = !current?.rows.length || !!current.error;
   if (!current || current.error || !current.rows.length) { reportHtml("reportFundingBody", reportEmpty(current?.error || "No funding entries in this period.")); return; }

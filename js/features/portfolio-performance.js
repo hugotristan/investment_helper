@@ -12,6 +12,11 @@ let latestReport = null;
 let reportInputs = null;
 const subscribers = new Set();
 export function subscribePortfolioPerformance(listener) { subscribers.add(listener); listener(latestReport, reportInputs); return () => subscribers.delete(listener); }
+export function refreshPerformanceMetadata() {
+  if (!reportInputs) { void refreshPortfolioPerformance(); return; }
+  if (reportInputs && getActivePortfolioBook()) reportInputs = { ...reportInputs, book: getActivePortfolioBook() };
+  renderPortfolioPerformance(latestReport);
+}
 const boundInputs = new WeakSet();
 const element = (id) => globalThis.document?.getElementById(id);
 const money = (value) => portfolioMoney(value, "EUR");
@@ -98,7 +103,7 @@ export function renderPortfolioPerformance(report) {
   }
   const metrics = [
     ["Total value", money(summary.currentValue)],
-    ["Growth since start", money(summary.selectedPeriodGain)],
+    ["Period gain", money(summary.selectedPeriodGain)],
     ["Adjusted return (approx.)", percent(summary.return)],
     ["SPY price return in EUR", percent(summary.benchmarkReturn)]
   ];

@@ -5,7 +5,7 @@ import { escapeHtml } from "../shared/text.js";
 import { downloadReport } from "../shared/report-export.js";
 import { reportElement, reportHtml, reportEmpty, reportTable, euro, reportPercent } from "../shared/report-ui.js";
 
-let report = null, selected = "", initialized = false;
+let report = null, selected = "", initialized = false, optionSignature = "";
 const identity = (row) => `${row.ticker}|${row.currency}`;
 const gain = (row) => Number.isFinite(row.realizedGain) && Number.isFinite(row.unrealizedGain) ? row.realizedGain + row.unrealizedGain : null;
 export function initializeInvestmentReport() {
@@ -22,12 +22,19 @@ export function initializeInvestmentReport() {
 }
 function render() {
   if (!initialized) return;
+  if (!getActivePortfolioBook() || document.documentElement?.dataset?.privateBlocked === "true") report = null;
   const rows = report?.holdings || [];
   const input = reportElement("reportInvestmentSelect");
   reportElement("reportInvestmentExport").disabled = !rows.length;
-  if (!rows.length) { input.innerHTML = ""; reportHtml("reportInvestmentBody", reportEmpty("Investment gains are waiting for recorded history.")); return; }
+  if (!rows.length) { input.innerHTML = ""; optionSignature = ""; reportHtml("reportInvestmentBody", reportEmpty("Investment gains are waiting for recorded history.")); return; }
   if (!rows.some((row) => identity(row) === selected)) selected = identity(rows[0]);
-  input.innerHTML = [...rows].sort((a, b) => identity(a).localeCompare(identity(b))).map((row) => `<option value="${escapeHtml(identity(row))}"${identity(row) === selected ? " selected" : ""}>${escapeHtml(row.ticker)} · ${escapeHtml(row.currency)}${row.shares === 0 ? " · Sold" : ""}</option>`).join("");
+  const sorted = [...rows].sort((a, b) => identity(a).localeCompare(identity(b)));
+  const signature = sorted.map((row) => `${identity(row)}:${row.shares === 0}`).join(",");
+  if (signature !== optionSignature) {
+    input.innerHTML = sorted.map((row) => `<option value="${escapeHtml(identity(row))}">${escapeHtml(row.ticker)} · ${escapeHtml(row.currency)}${row.shares === 0 ? " · Sold" : ""}</option>`).join("");
+    optionSignature = signature;
+  }
+  input.value = selected;
   const row = rows.find((row) => identity(row) === selected);
   const annotation = positionOrganization(getActivePortfolioBook()?.organization, row);
   const metrics = [["Remaining value", row.currentValue], ["Realized gain", row.realizedGain], ["Unrealized gain", row.unrealizedGain], ["Capital gain", gain(row)]];

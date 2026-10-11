@@ -33,7 +33,7 @@ test("performance screen shows actual EUR settlement gains and dated monthly res
     histories: { MSFT: history("MSFT", 170, 180), SPY: history("SPY", 400, 410) } });
   renderPortfolioPerformance(report);
   assert.ok(html("portfolioPerformanceSummary").includes(money(10024)));
-  assert.ok(html("portfolioPerformanceSummary").includes(`<span>Growth since start</span><strong>${money(24)}</strong>`));
+  assert.ok(html("portfolioPerformanceSummary").includes(`<span>Period gain</span><strong>${money(24)}</strong>`));
   assert.ok(html("portfolioPerformanceHoldings").includes(money(300)));
   assert.ok(html("portfolioPerformanceHoldings").includes(money(324)));
   assert.match(html("portfolioPerformanceMonths"), /2026-10-01 → 2026-10-09/);

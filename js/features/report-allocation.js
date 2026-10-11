@@ -6,7 +6,7 @@ import { reportElement, reportHtml, reportEmpty, reportBars, reportTable, euro, 
 let model = null, select = null, button = null;
 export function renderAllocationReport(holdings) {
   if (!reportElement("reportAllocationBody")) return;
-  model = document.documentElement.dataset.privateBlocked === "true" ? null : calculatePortfolioAnalytics(holdings);
+  model = document.documentElement?.dataset?.privateBlocked === "true" ? null : calculatePortfolioAnalytics(holdings);
   const input = reportElement("reportAllocationView");
   if (input && input !== select) { select = input; input.addEventListener("change", renderBody); }
   const exportButton = reportElement("reportAllocationExport");
@@ -25,7 +25,8 @@ function renderBody() {
   if (button) button.disabled = !model?.count;
   if (!model?.count) { reportHtml("reportAllocationBody", reportEmpty("Add holdings to see their allocation.")); return; }
   const rows = model.allocations[select?.value] || model.allocations.holdings;
-  const dates = model.oldestPrice ? `Prices: ${escapeHtml(model.oldestPrice.slice(0, 10))}${model.newestPrice !== model.oldestPrice ? ` to ${escapeHtml(model.newestPrice.slice(0, 10))}` : ""}.` : "Price dates unavailable.";
+  const oldest = model.oldestPrice?.slice(0, 10), newest = model.newestPrice?.slice(0, 10);
+  const dates = oldest ? `Prices: ${escapeHtml(oldest)}${newest !== oldest ? ` to ${escapeHtml(newest)}` : ""}.` : "Price dates unavailable.";
   reportHtml("reportAllocationBody", `<p class="report-total">${euro(model.knownValue)} <span>${model.complete ? "holdings value" : `known value · ${model.valuedCount} of ${model.count} valued`}</span></p><p class="data-note">${dates} Cash is excluded.</p>
     ${model.complete ? "" : '<p class="data-note">Allocation percentages need a value for every holding. Known subtotals are shown below.</p>'}
     ${reportBars(rows)}${reportTable(["Allocation", "Value in EUR", "Weight", "Positions", "Missing"], rows.map((row) => [escapeHtml(row.label), euro(row.value), reportPercent(row.weight), String(row.count), String(row.missing)]), "Current holdings allocation")}`);

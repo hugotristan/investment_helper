@@ -23,7 +23,7 @@ export function initializeTransactionReport() {
 }
 export function refreshTransactionReport() {
   if (!reportElement("reportTransactionsBody")) return;
-  const book = document.documentElement.dataset.privateBlocked === "true" ? null : getActivePortfolioBook();
+  const book = document.documentElement?.dataset?.privateBlocked === "true" ? null : getActivePortfolioBook();
   current = book ? transactionReport(book, { from: reportElement("reportTransactionsFrom").value,
     to: reportElement("reportTransactionsTo").value, type: reportElement("reportTransactionsType").value, search: reportElement("reportTransactionsSearch").value }) : null;
   page = 0; render();

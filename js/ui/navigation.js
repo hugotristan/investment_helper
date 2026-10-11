@@ -18,6 +18,7 @@ const pages = {
   research: "Market & research",
   sources: "Data sources",
 };
+let previousPage = null;
 
 export function syncActivePage() {
   const requested = String(window.location.hash || "").replace(/^#/, "") || "dashboard";
@@ -29,7 +30,7 @@ export function syncActivePage() {
   });
   els.pageLinks.forEach((link) => {
     const active = link.dataset.pageLink === activePage;
-    link.classList.toggle("active", active);
+    link.classList.toggle("active", active || link.dataset.pageLink === "reports" && activePage.startsWith("report-"));
     if (active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   });
@@ -38,6 +39,8 @@ export function syncActivePage() {
   if (more && !["dashboard", "screener", "portfolio", "portfolio-performance", "reports"].includes(activePage) && !activePage.startsWith("report-")) more.open = true;
   document.title = `${pages[activePage]} · Investing`;
   if (requested !== activePage) window.history.replaceState(null, "", `#${activePage}`);
+  if (previousPage !== activePage) window.scrollTo?.({ top: 0, left: 0, behavior: "instant" });
+  previousPage = activePage;
 }
 
 export function bindQuickSearch(analyzeTicker) {

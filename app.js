@@ -15,7 +15,7 @@ import { initializePortfolioOrganization, refreshPortfolioOrganization } from ".
 import { initializeCloudSync } from "./js/features/cloud-sync.js";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
-import { initializePortfolioPerformance, refreshPortfolioPerformance } from "./js/features/portfolio-performance.js";
+import { initializePortfolioPerformance, refreshPortfolioPerformance, refreshPerformanceMetadata } from "./js/features/portfolio-performance.js";
 import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
 import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
@@ -140,7 +140,7 @@ function portfolioChanged({ metadataOnly = false } = {}) {
   refreshTransactionReport();
   refreshPortfolioOrganization();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
-  if (metadataOnly) return;
+  if (metadataOnly) { refreshPerformanceMetadata(); return; }
   void refreshPortfolioPrices();
   void refreshPortfolioExchangeRate();
   refreshPortfolioPerformance();

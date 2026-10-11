@@ -7,17 +7,17 @@ import { reportElement, reportHtml, reportEmpty, reportTable, reportBars, euro, 
 let current = null, button = null;
 export function renderEtfReport(holdings) {
   if (!reportElement("reportEtfBody")) return;
-  current = document.documentElement.dataset.privateBlocked === "true" ? null : calculateEtfExposure(calculatePortfolioAnalytics(holdings));
+  current = document.documentElement?.dataset?.privateBlocked === "true" ? null : calculateEtfExposure(calculatePortfolioAnalytics(holdings));
   const exportButton = reportElement("reportEtfExport");
   if (button !== exportButton) {
     button = exportButton;
     button.addEventListener("click", () => {
-      if (!current?.rows.length) return;
+      if (!current?.hasEtfs) return;
       downloadReport("etf-exposure.csv", ["Company", "Direct EUR", "Estimated ETF EUR", "Known combined EUR", "Known weight fraction", "Fund and weight date"],
         [...current.rows.map((row) => [row.name, row.direct, row.indirect, row.value, row.weight, row.sources.join("; ")]), ["Unreported ETF constituents", null, current.unreported, current.unreported, current.unreportedWeight, "Not assigned to companies"]]);
     });
   }
-  button.disabled = !current?.hasEtfs || !current.rows.length;
+  button.disabled = !current?.hasEtfs;
   if (!current?.hasEtfs) { reportHtml("reportEtfBody", reportEmpty("No ETF holdings are recorded.")); return; }
   const sources = current.reports.map((fund) => `<li><strong>${escapeHtml(fund.ticker)}</strong> · top ten securities cover ${reportPercent(fund.coverage)} of the fund · weights dated ${escapeHtml(fund.asOf)} (${fund.ageDays} days old). <a href="${escapeHtml(fund.sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(fund.source)} ↗</a></li>`).join("");
   reportHtml("reportEtfBody", `<p class="data-note">Company exposure combines your direct holdings with current ETF values multiplied by published fund weights. This is a partial estimate; weights can change between reports. Cash is excluded.</p><ul class="data-note">${sources}</ul>
