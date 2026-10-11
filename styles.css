@@ -744,6 +744,7 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .cloud-migration button { margin-top: 12px; }
 [data-private-blocked="true"] [data-page="portfolio"],
 [data-private-blocked="true"] [data-page="portfolio-performance"],
+[data-private-blocked="true"] [data-page="analyst"],
 [data-private-blocked="true"] [data-page="screener"],
 [data-private-blocked="true"] #watchlistChips,
 [data-private-blocked="true"] #screenerResults,
@@ -785,3 +786,32 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .report-funding-row i { display: block; height: 9px; }
 .report-funding-row .gain { background: var(--accent); }
 .report-funding-row .loss { background: #ac4545; }
+
+.analyst-panel { width: 100%; max-width: 960px; }
+.analyst-form { display: grid; gap: 16px; margin-top: 30px; }
+.analyst-form > label:first-child { font-size: 13px; color: var(--muted-foreground); }
+.analyst-form textarea { width: 100%; min-height: 112px; resize: vertical; padding: 14px; line-height: 1.6; }
+.analyst-examples, .analyst-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.analyst-examples button { font-size: 12px; padding: 9px 12px; text-align: left; white-space: normal; }
+.analyst-notes { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.analyst-notes input { width: 16px; height: 16px; accent-color: var(--accent); }
+.analyst-form .data-note, .analyst-status { margin: 0; }
+.analyst-status { color: var(--muted-foreground); font-size: 13px; line-height: 1.6; min-height: 21px; }
+.analyst-answer { line-height: 1.8; }
+.analyst-answer-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.analyst-answer-heading button { font-size: 12px; }
+.analyst-asked { color: var(--muted-foreground); padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.analyst-citation { display: inline; padding: 0 2px; border: 0; border-bottom: 1px dotted var(--accent); background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.analyst-citation sup { font-size: 9px; margin-left: 3px; }
+.analyst-facts { margin: 18px 0; }
+.analyst-facts > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr); gap: 24px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.analyst-facts dt { font-size: 13px; line-height: 1.6; }
+.analyst-fact-number { display: inline-block; color: var(--muted-foreground); min-width: 24px; }
+.analyst-facts dd { margin: 0; overflow-wrap: anywhere; }
+.analyst-facts strong { font: 500 15px 'JetBrains Mono', monospace; }
+.analyst-facts small { display: block; font-size: 11px; line-height: 1.6; color: var(--muted-foreground); margin-top: 6px; }
+.analyst-facts > div:focus { outline: 2px solid var(--accent); outline-offset: 4px; }
+@media (max-width: 600px) {
+  .analyst-facts > div { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .analyst-form { margin-top: 22px; }
+}

@@ -7,6 +7,7 @@ const pages = {
   portfolio: "Portfolio",
   "portfolio-performance": "Portfolio performance",
   reports: "Reports",
+  analyst: "AI analyst",
   "report-allocation": "Allocation report",
   "report-investments": "Investment performance",
   "report-funding": "Contributions and withdrawals",
@@ -36,7 +37,7 @@ export function syncActivePage() {
   });
   els.pageTitle.textContent = pages[activePage];
   const more = document.getElementById("navMore");
-  if (more && !["dashboard", "screener", "portfolio", "portfolio-performance", "reports"].includes(activePage) && !activePage.startsWith("report-")) more.open = true;
+  if (more && !["dashboard", "screener", "portfolio", "portfolio-performance", "reports", "analyst"].includes(activePage) && !activePage.startsWith("report-")) more.open = true;
   document.title = `${pages[activePage]} · Investing`;
   if (requested !== activePage) window.history.replaceState(null, "", `#${activePage}`);
   if (previousPage !== activePage) window.scrollTo?.({ top: 0, left: 0, behavior: "instant" });

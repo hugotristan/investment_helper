@@ -2,6 +2,8 @@ import { ApiError, checkSameOrigin, readJsonRequest } from "./request-body.mjs";
 import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, validateSaveEnvelope } from "./cloud-store.mjs";
 import { createMarketAssetReader, createMarketData, marketTicker } from "./market-data.mjs";
 import { createPasswordAuth } from "./auth.mjs";
+import { loadAnalystContext } from "./analyst-context.mjs";
+import { analystStatus, askAnalyst, reserveAnalystRequest, validateAnalystQuestion } from "./analyst.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -51,17 +53,31 @@ export function createApp(assets, options = {}) {
           userId = access.userId;
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
-          const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx"].includes(url.pathname);
+          const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx",
+            "/api/analyst", "/api/analyst/status", "/api/analyst/context"].includes(url.pathname);
           if (!recognized) return json({ error: "API route not found.", code: "NOT_FOUND" }, 404);
-          const methods = ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
+          const methods = url.pathname === "/api/analyst" ? ["POST"] : ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
           const denied = methodAllowed(request, methods);
           if (denied) return denied;
           userId ||= sitesUserId(request);
           const expectedUserId = request.headers.get("x-expected-user-id");
-          if (expectedUserId !== null && expectedUserId !== userId || request.method === "PUT" && expectedUserId === null) {
+          if (expectedUserId !== null && expectedUserId !== userId || ["PUT", "POST"].includes(request.method) && expectedUserId === null) {
             throw new ApiError(409, "ACCOUNT_CHANGED", "Your signed-in account changed. Reload the app before opening or saving data.");
           }
           if (url.pathname === "/api/session") return userJson({ cloud: true, authMode, storageAvailable: storageAvailable(env) });
+          if (url.pathname === "/api/analyst/status") return userJson(analystStatus(env));
+          if (url.pathname === "/api/analyst/context") return userJson(await loadAnalystContext({ env, userId, market, now: clock() }));
+          if (url.pathname === "/api/analyst") {
+            checkSameOrigin(request);
+            const input = validateAnalystQuestion(await readJsonRequest(request, 8192));
+            if (!analystStatus(env).ready) throw new ApiError(503, "ANALYST_SETUP_REQUIRED", analystStatus(env).message);
+            const context = await loadAnalystContext({ env, userId, market, ...input, now: clock() });
+            const remainingRequests = await reserveAnalystRequest(env, userId, clock());
+            const answer = await askAnalyst({ env, context, question: input.question, fetchImpl: options.analystFetchImpl,
+              timeoutMs: options.analystTimeoutMs });
+            return userJson({ ...answer, sources: context.sources.filter((source) => answer.facts.some((fact) => fact.sourceIds.includes(source.id))),
+              limitations: context.limitations, generatedAt: context.generatedAt, portfolioRevision: context.portfolioRevision, remainingRequests });
+          }
           if (url.pathname === "/api/market/history") {
             if (url.searchParams.getAll("ticker").length !== 1 || [...url.searchParams.keys()].some((key) => key !== "ticker")) {
               throw new ApiError(400, "INVALID_TICKER", "Request one ticker without additional options.");

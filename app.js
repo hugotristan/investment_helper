@@ -19,6 +19,7 @@ import { initializePortfolioPerformance, refreshPortfolioPerformance, refreshPer
 import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
 import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
+import { initializeAnalyst } from "./js/features/analyst.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, initializeWatchlist, renderWatchlist } from "./js/features/watchlist.js";
@@ -58,6 +59,7 @@ async function init() {
   initializeInvestmentReport();
   initializeFundingReport();
   initializeTransactionReport();
+  initializeAnalyst();
   initializeTickerSuggestions();
   bindEvents();
   initializeCloudSync();

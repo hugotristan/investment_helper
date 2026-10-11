@@ -29,3 +29,11 @@ export const passwordLoginAttempts = sqliteTable("password_login_attempts", {
   attempts: integer("attempts").notNull(),
   expiresAt: integer("expires_at").notNull(),
 }, (table) => [check("password_attempts_positive", sql`${table.attempts} >= 1`), index("password_attempts_expiry").on(table.expiresAt)]);
+
+// Only counters are persisted; analyst questions/answers are not stored in D1.
+export const analystUsage = sqliteTable("analyst_usage", {
+  userId: text("user_id").primaryKey(),
+  day: text("day").notNull(),
+  requests: integer("requests").notNull(),
+  nextAllowedAt: integer("next_allowed_at").notNull(),
+}, (table) => [check("analyst_requests_positive", sql`${table.requests} >= 1`)]);

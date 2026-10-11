@@ -15,6 +15,13 @@
       "when": 1791660884800,
       "tag": "0001_password_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791716584406,
+      "tag": "0002_rainy_puma",
+      "breakpoints": true
     }
   ]
 }

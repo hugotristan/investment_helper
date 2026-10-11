@@ -59,7 +59,8 @@ test("anonymous and spoofed native identities cannot read pages, assets or any p
     assert.equal(response.headers.get("cache-control"), "private, no-store");
     assert.equal(await response.text(), "");
   }
-  for (const path of ["/api", "/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history?ticker=MSFT", "/api/exchange-rate", "/api/portfolio-fx", "/api/unknown"]) {
+  for (const path of ["/api", "/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history?ticker=MSFT", "/api/exchange-rate", "/api/portfolio-fx",
+    "/api/analyst/status", "/api/analyst/context", "/api/analyst", "/api/unknown"]) {
     const response = await app.fetch(request(path, { headers: spoof }), env);
     assert.equal(response.status, 401);
     assert.equal((await response.json()).code, "SIGN_IN_REQUIRED");
