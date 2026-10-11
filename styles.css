@@ -778,3 +778,10 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .report-gain-track .gain { background: var(--accent); }
 .report-gain-track .loss { background: #ac4545; }
 @media (max-width: 600px) { .report-gain-chart > div { grid-template-columns: 90px minmax(30px, 1fr) 86px; gap: 8px; font-size: 11px; } }
+.report-funding-chart { margin: 28px 0; }
+.report-funding-row { display: grid; grid-template-columns: 70px minmax(50px, 1fr) 100px; align-items: center; gap: 14px; margin: 16px 0; font-size: 12px; }
+.report-funding-row > div { display: grid; gap: 4px; }
+.report-funding-row > span:last-child { text-align: right; }
+.report-funding-row i { display: block; height: 9px; }
+.report-funding-row .gain { background: var(--accent); }
+.report-funding-row .loss { background: #ac4545; }

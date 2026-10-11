@@ -9,6 +9,7 @@ const pages = {
   reports: "Reports",
   "report-allocation": "Allocation report",
   "report-investments": "Investment performance",
+  "report-funding": "Contributions and withdrawals",
   performance: "Research picks",
   ask: "Stock check",
   signals: "Signals",
