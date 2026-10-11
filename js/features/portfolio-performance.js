@@ -5,9 +5,13 @@ import { loadPortfolioFx } from "../data/portfolio-history.js";
 import { getActivePortfolioBook } from "../portfolio-state.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
 import { escapeHtml } from "../shared/text.js";
+import { downloadReport } from "../shared/report-export.js";
 
 let refreshId = 0;
 let latestReport = null;
+let reportInputs = null;
+const subscribers = new Set();
+export function subscribePortfolioPerformance(listener) { subscribers.add(listener); listener(latestReport, reportInputs); return () => subscribers.delete(listener); }
 const boundInputs = new WeakSet();
 const element = (id) => globalThis.document?.getElementById(id);
 const money = (value) => portfolioMoney(value, "EUR");
@@ -15,6 +19,19 @@ const percent = (value) => Number.isFinite(value) ? `${value > 0 ? "+" : ""}${(v
 const setHtml = (id, html) => { const node = element(id); if (node) node.innerHTML = html; };
 
 export function initializePortfolioPerformance() {
+  const form = element("portfolioPerformancePeriod");
+  if (form && !boundInputs.has(form)) {
+    boundInputs.add(form);
+    form.addEventListener("submit", (event) => { event.preventDefault(); recalculatePeriod(); });
+    element("portfolioPerformanceAll")?.addEventListener("click", () => {
+      element("portfolioPerformanceFrom").value = ""; element("portfolioPerformanceTo").value = ""; recalculatePeriod();
+    });
+    element("portfolioPerformanceExport")?.addEventListener("click", () => {
+      if (!latestReport?.months?.length) return;
+      downloadReport("portfolio-performance.csv", ["Month", "From", "To", "Start value EUR", "End value EUR", "Net funding EUR", "Gain EUR", "Return fraction", "SPY EUR return fraction", "Status"],
+        latestReport.months.map((row) => [row.month, row.startDate, row.endDate, row.startValue, row.endValue, row.netFlow, row.gain, row.return, row.benchmarkReturn, row.status]));
+    });
+  }
   const input = element("portfolioChartDate");
   if (input && !boundInputs.has(input)) {
     input.addEventListener("input", () => updateChartReadout(Number(input.value)));
@@ -25,7 +42,9 @@ export function initializePortfolioPerformance() {
 
 export async function refreshPortfolioPerformance() {
   const id = ++refreshId;
-  if (!getActivePortfolioBook()) { renderPortfolioPerformance(null); return null; }
+  reportInputs = null;
+  renderPortfolioPerformance(null);
+  if (!getActivePortfolioBook()) return null;
   try {
     const [snapshot, fxHistory] = await Promise.all([loadPriceSnapshot(), loadPortfolioFx()]);
     if (id !== refreshId) return null;
@@ -35,8 +54,8 @@ export async function refreshPortfolioPerformance() {
       ...book.transactions.map((entry) => entry.ticker).filter(Boolean)]);
     const histories = await loadStockHistories([...tickers], { snapshot });
     if (id !== refreshId || book !== getActivePortfolioBook()) return null;
-    const report = calculatePortfolioPerformance({ book, histories, fxHistory });
-    renderPortfolioPerformance(report);
+    reportInputs = { book, histories, fxHistory };
+    const report = recalculatePeriod();
     return report;
   } catch {
     if (id !== refreshId) return null;
@@ -46,11 +65,22 @@ export async function refreshPortfolioPerformance() {
   }
 }
 
+function recalculatePeriod() {
+  if (!reportInputs || reportInputs.book !== getActivePortfolioBook()) return null;
+  const report = calculatePortfolioPerformance({ ...reportInputs,
+    from: element("portfolioPerformanceFrom")?.value || undefined, to: element("portfolioPerformanceTo")?.value || undefined });
+  renderPortfolioPerformance(report);
+  return report;
+}
+
 export function renderPortfolioPerformance(report) {
   latestReport = report;
+  for (const listener of subscribers) listener(report, reportInputs);
+  const exportButton = element("portfolioPerformanceExport");
+  if (exportButton) exportButton.disabled = !report?.months?.length;
   const status = element("portfolioPerformanceStatus");
   if (!report) {
-    if (status) status.textContent = "Start portfolio tracking and record your transactions in Portfolio to see performance.";
+    if (status) status.textContent = getActivePortfolioBook() ? "Loading recorded price and currency history." : "Start portfolio tracking and record your transactions in Portfolio to see performance.";
     setHtml("portfolioPerformanceSummary", "");
     setHtml("portfolioPerformanceChart", '<p class="empty-state"><a href="#portfolio">Open Portfolio</a></p>');
     setHtml("portfolioPerformanceMonths", "");

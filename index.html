@@ -272,7 +272,8 @@
           </section>
           <section class="view-page" data-page="portfolio-performance" aria-label="Portfolio performance" hidden>
             <section class="panel">
-              <div class="section-heading"><h2>Your portfolio</h2><a href="#portfolio">Transactions ↗</a></div>
+              <div class="section-heading"><h2>Your portfolio</h2><a href="#reports">All reports ↗</a></div>
+              <form id="portfolioPerformancePeriod" class="report-controls"><label>From<input id="portfolioPerformanceFrom" type="date"></label><label>To<input id="portfolioPerformanceTo" type="date"></label><button type="submit">Apply dates</button><button id="portfolioPerformanceAll" class="ghost" type="button">All history</button><button id="portfolioPerformanceExport" class="ghost" type="button" disabled>Export CSV</button></form>
               <p id="portfolioPerformanceStatus" class="data-note" role="status" aria-live="polite">Loading recorded portfolio history.</p>
               <div id="portfolioPerformanceSummary" class="portfolio-performance-summary"></div>
               <div id="portfolioPerformanceReasons"></div>
