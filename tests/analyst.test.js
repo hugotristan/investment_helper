@@ -161,3 +161,32 @@ test("evidence loads only its authenticated saved book and rejects revision chan
   } };
   await assert.rejects(loadAnalystContext({ env: { DB }, userId: "one", market: changeDuringLoad, expectedRevision: 1, now: NOW }), (error) => error.code === "PORTFOLIO_CHANGED");
 });
+
+test("cold Insights requests accept FX retrieved after the request started and retain its observation date", async (t) => {
+  const DB = createLocalDatabase(); t.after(() => DB.close());
+  await saveCloudRecord({ DB }, "one", "portfolio", fixtureBook(), 0, NOW);
+  const before = await readCloudRecord({ DB }, "one", "portfolio", NOW);
+  let time = NOW;
+  const start = Date.parse("2021-10-04");
+  const historicalDates = [...new Set([...Array.from({ length: 201 }, (_, i) =>
+    new Date(start + Math.floor((NOW - start) / 86400000 * i / 200) * 86400000).toISOString().slice(0, 10)), ...days])];
+  // Embed dated prices so only freshly retrieved current/historical FX advances.
+  const prices = { schemaVersion: 1, generatedAt: new Date(NOW).toISOString(), byTicker: Object.fromEntries(
+    Object.entries(histories).map(([ticker, history]) => [ticker, { ...history, source: "Yahoo Finance published snapshot" }])) };
+  const app = createApp({ "data/prices.json": JSON.stringify(prices) }, { now: () => ++time, reportFailure() {}, fetchImpl: async (url) => {
+    if (url === EXCHANGE_RATE_SOURCE_URL) return Response.json({ base: "USD", quote: "EUR", rate: 0.9, date: rate.date });
+    if (String(url).startsWith(PORTFOLIO_FX_SOURCE_URL)) return Response.json(
+      ["USD", "GBP", "JPY", "CHF", "CAD", "AUD"].flatMap(quote => historicalDates.map(date => ({ base: "EUR", quote, date, rate: 1 / 0.9 }))));
+    return new Response("Use the embedded price fixture", { status: 503 });
+  } });
+  const get = () => app.fetch(new Request(ORIGIN + "/api/analyst/context", { headers: { "oai-authenticated-user-id": "one" } }), { DB });
+  const cold = await (await get()).json();
+  close(fact(cold, "total-value")?.value, 1056);
+  close(fact(cold, "usd-eur")?.value, 0.9);
+  assert.equal(fact(cold, "usd-eur").asOf, "2026-10-09");
+  assert.ok(cold.sources.some(source => source.id === "historical-fx"));
+  assert.equal(cold.generatedAt, new Date(time).toISOString());
+  const warm = await (await get()).json();
+  close(fact(warm, "total-value").value, 1056);
+  assert.deepEqual(await readCloudRecord({ DB }, "one", "portfolio", time), before);
+});

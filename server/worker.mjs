@@ -72,7 +72,7 @@ export function createApp(assets, options = {}) {
               || url.searchParams.has("includeNotes") && !["true", "false"].includes(url.searchParams.get("includeNotes"))) {
               throw new ApiError(400, "INVALID_OPTIONS", "Choose whether to include position notes.");
             }
-            return userJson(await loadAnalystContext({ env, userId, market, fundData, includeNotes: url.searchParams.get("includeNotes") === "true", now: clock() }));
+            return userJson(await loadAnalystContext({ env, userId, market, fundData, includeNotes: url.searchParams.get("includeNotes") === "true", now: clock }));
           }
           if (url.pathname === "/api/analyst") {
             return userJson({ code: "ANALYST_RETIRED", error: "Paid AI requests have been removed. Open Portfolio insights and copy a summary for ChatGPT." }, 410);
