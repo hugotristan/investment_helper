@@ -54,6 +54,6 @@ function renderBody(doc) {
         ${concentration.topCount > 1 ? `<div><dt>Largest ${concentration.topCount} positions combined</dt><dd>${percent(concentration.topWeight)}</dd></div>` : ""}
         ${concentration.largestStock && concentration.largestStock !== concentration.largest ? `<div><dt>Largest individual stock · ${escapeHtml(concentration.largestStock.ticker)}</dt><dd>${percent(concentration.largestStock.weight)}</dd></div>` : ""}
       </dl>` : '<p class="data-note">Complete EUR valuations are needed to calculate concentration.</p>'}
-      ${model.hasEtfs ? '<p class="data-note">ETFs count as individual positions. Underlying fund holdings are unavailable, so company exposure and ETF overlap are not calculated.</p>' : ""}
+      ${model.hasEtfs ? '<p class="data-note">ETFs count as individual positions. <a href="#report-etf">View partial company exposure ↗</a></p>' : ""}
     </div>`;
 }
