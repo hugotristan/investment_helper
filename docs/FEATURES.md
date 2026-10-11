@@ -1,5 +1,13 @@
 # Feature changes
 
+## Full published VWCE exposure
+
+**What changed:** ETF exposure replaces the top-ten estimate with Vanguard's complete published stock list. Companies, sectors and countries combine direct holdings with dated fund weights. Matching direct stocks expand in one disclosure; company rows are searchable and paged, with full filtered CSV exports. Same-fund listings are identified in supported ETF overlap. Unsupported ETFs remain unassigned.
+
+**How:** A bounded issuer fetch follows every cursor, reconciles all 4,093 portfolio rows, and groups the 3,813 stock rows into 3,684 issuers in the initial 2026-08-31 snapshot. Published stock weights cover 99.34%; residual cash/FX/derivative/rounding value is not redistributed to companies. US aliases require issuer country metadata; Alphabet classes and verified TSMC ADR/local shares combine. Sites caches public fund data for six hours with embedded fallback; Pages refreshes daily and on publication. Refresh failures preserve dates, and sources older than 120 days are withheld. Portfolio records are never sent to Vanguard or changed.
+
+**Validation:** Accounting checks reconcile company/sector/country value, overlap weights and CSV coverage. Provider checks cover pagination totals, loops, identity, dates, zero-weight closed rows, malformed/duplicate securities, retained dates and stale snapshots. Authentication checks protect the new GET endpoint. Renderer checks cover paging, search, grouping and clearing private data.
+
 ## Password-only cloud access
 
 **What changed:** The Sites app opens with a personal password, without a ChatGPT account. Each unlocked browser stays signed in for 30 days and has a Lock app control. Existing cloud portfolio and watchlist data keep their original workspace identity and revisions.

@@ -12,7 +12,7 @@ import { positionOrganization } from "./portfolio-organization.js";
 
 // All figures come from the same pure calculators used by Portfolio/Reports.
 // Insights and the optional copyable summary use calculated facts, not the raw ledger.
-export function buildAnalystContext({ book, revision, histories = {}, exchangeRate, fxHistory, includeNotes = false, now = Date.now() }) {
+export function buildAnalystContext({ book, revision, histories = {}, exchangeRate, fxHistory, funds, includeNotes = false, now = Date.now() }) {
   const projection = projectPortfolioBook(book);
   const rate = normalizeExchangeRate(exchangeRate, { now });
   const sources = [{ id: "ledger", name: "Your recorded portfolio", url: "#portfolio", asOf: book.updatedAt }];
@@ -40,13 +40,16 @@ export function buildAnalystContext({ book, revision, histories = {}, exchangeRa
   const totals = calculatePortfolioTotals({ holdings, book, projection, exchangeRate: rate, now });
   const analytics = calculatePortfolioAnalytics(holdings);
   const performance = calculatePortfolioPerformance({ book, histories: qualified, fxHistory, now });
-  const exposure = calculateEtfExposure(analytics, { now });
+  const exposure = calculateEtfExposure(analytics, { now, funds });
   const limitations = new Set([...totals.reasons, ...performance.reasons, ...projection.warnings]);
   limitations.add("Current values use dated quotes and reference FX; broker prices and conversion rates can differ.");
   limitations.add("Monthly returns use approximate Modified Dietz. SPY comparison is an EUR price return and excludes dividends.");
   limitations.add("This evidence does not include current company financials, news, price targets, taxes, or your risk tolerance.");
   if (projection.holdings.length > 40) limitations.add("Detailed evidence covers the first forty held positions. Price history checks cover at most fifty-nine portfolio tickers; incomplete totals and weights are withheld.");
-  if (exposure.hasEtfs) limitations.add("ETF company exposure is partial: only Vanguard's dated VWCE top holdings are covered. Unreported companies are unknown, not zero.");
+  if (exposure.hasEtfs) {
+    limitations.add("ETF exposure applies dated issuer weights to current fund values; it is an estimate, not today's exact fund composition. Unassigned fund value is not treated as zero company exposure.");
+    if (exposure.missingFunds.length) limitations.add(`No recent full fund holdings are available for ${exposure.missingFunds.join(", ")}.`);
+  }
   const facts = [];
   const add = (id, label, value, unit, asOf, sourceIds, route) => {
     if (value === null || value === undefined || typeof value === "number" && !Number.isFinite(value) || facts.length >= 600) return;
@@ -116,9 +119,12 @@ export function buildAnalystContext({ book, revision, histories = {}, exchangeRa
     const id = `fund-${fund.ticker}`;
     sources.push({ id, name: fund.source, url: fund.sourceUrl, asOf: fund.asOf });
     add(`${id}-coverage`, `${fund.ticker} portion covered by published company weights`, fund.coverage, "percent", fund.asOf, [id], "#report-etf");
+    add(`${id}-companies`, `${fund.ticker} companies in the published stock list`, fund.companyCount, "count", fund.asOf, [id], "#report-etf");
   }
+  if (exposure.hasEtfs) add("etf-unassigned", "Known ETF value outside published company lists", exposure.unreported, "EUR", latest,
+    [...currentSources, ...exposure.reports.map((fund) => `fund-${fund.ticker}`)], "#report-etf");
   for (const [index, company] of exposure.rows.filter((row) => row.indirect > 0).slice(0, 12).entries()) {
-    add(`company-${index}-weight`, `${company.name} known direct plus partial ETF exposure / total holdings`, company.weight, "percent", latest,
+    add(`company-${index}-weight`, `${company.name} direct plus dated ETF exposure / total holdings`, company.weight, "percent", latest,
       [...currentSources, ...exposure.reports.map((fund) => `fund-${fund.ticker}`)], "#report-etf");
   }
   const notes = [];

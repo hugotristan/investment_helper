@@ -3,6 +3,7 @@ import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, valida
 import { createMarketAssetReader, createMarketData, marketTicker } from "./market-data.mjs";
 import { createPasswordAuth } from "./auth.mjs";
 import { loadAnalystContext } from "./analyst-context.mjs";
+import { createFundData } from "./fund-data.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -30,6 +31,7 @@ function publicAsset(path) {
 
 export function createApp(assets, options = {}) {
   const market = createMarketData({ ...options, readMarketAsset: createMarketAssetReader(assets) });
+  const fundData = createFundData(options);
   const clock = () => typeof options.now === "function" ? options.now() : options.now ?? Date.now();
   const passwordGate = createPasswordAuth({ now: clock });
   return {
@@ -52,7 +54,7 @@ export function createApp(assets, options = {}) {
           userId = access.userId;
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
-          const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx",
+          const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx", "/api/fund-holdings",
             "/api/analyst", "/api/analyst/status", "/api/analyst/context"].includes(url.pathname);
           if (!recognized) return json({ error: "API route not found.", code: "NOT_FOUND" }, 404);
           const methods = url.pathname === "/api/analyst" ? ["POST"] : ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
@@ -70,7 +72,7 @@ export function createApp(assets, options = {}) {
               || url.searchParams.has("includeNotes") && !["true", "false"].includes(url.searchParams.get("includeNotes"))) {
               throw new ApiError(400, "INVALID_OPTIONS", "Choose whether to include position notes.");
             }
-            return userJson(await loadAnalystContext({ env, userId, market, includeNotes: url.searchParams.get("includeNotes") === "true", now: clock() }));
+            return userJson(await loadAnalystContext({ env, userId, market, fundData, includeNotes: url.searchParams.get("includeNotes") === "true", now: clock() }));
           }
           if (url.pathname === "/api/analyst") {
             return userJson({ code: "ANALYST_RETIRED", error: "Paid AI requests have been removed. Open Portfolio insights and copy a summary for ChatGPT." }, 410);
@@ -83,6 +85,10 @@ export function createApp(assets, options = {}) {
           }
           if (url.pathname === "/api/exchange-rate") return userJson(await market.loadExchangeRate());
           if (url.pathname === "/api/portfolio-fx") return userJson(await market.loadHistoricalFx());
+          if (url.pathname === "/api/fund-holdings") {
+            if (url.search) throw new ApiError(400, "INVALID_OPTIONS", "Fund holdings do not accept additional options.");
+            return userJson({ schemaVersion: 1, funds: await fundData.loadFunds() });
+          }
           const kind = url.pathname === "/api/portfolio" ? "portfolio" : "watchlist";
           if (request.method === "GET") return userJson(await readCloudRecord(env, userId, kind, clock()));
           checkSameOrigin(request);

@@ -1,18 +1,30 @@
-// Published issuer data, never a substitute for live constituent prices.
-// Update weights and the observation date together after checking the source.
-export const VWCE_EXPOSURE = {
-  tickers: ["VWCE.DE"], name: "Vanguard FTSE All-World UCITS ETF (USD) Accumulating",
-  asOf: "2026-08-31", source: "Vanguard", sourceUrl: "https://www.vanguard.co.uk/professional/product/etf/equity/9679/ftse-all-world-ucits",
-  // Vanguard lists two Alphabet share classes; issuer exposure combines both.
-  holdings: [
-    { id: "nvidia", name: "NVIDIA", tickers: ["NVDA"], weight: 0.0476598 },
-    { id: "apple", name: "Apple", tickers: ["AAPL"], weight: 0.0423529 },
-    { id: "microsoft", name: "Microsoft", tickers: ["MSFT"], weight: 0.0348660 },
-    { id: "amazon", name: "Amazon", tickers: ["AMZN"], weight: 0.0233245 },
-    { id: "alphabet", name: "Alphabet", tickers: ["GOOG", "GOOGL"], weight: 0.0330583 },
-    { id: "tsmc", name: "Taiwan Semiconductor Manufacturing", tickers: ["TSM", "2330.TW"], weight: 0.0170366 },
-    { id: "broadcom", name: "Broadcom", tickers: ["AVGO"], weight: 0.0159466 },
-    { id: "meta", name: "Meta Platforms", tickers: ["META"], weight: 0.0116567 },
-    { id: "micron", name: "Micron Technology", tickers: ["MU"], weight: 0.0100043 }
-  ]
-};
+import snapshot from "./fund-holdings-snapshot.js";
+import { normalizeVanguardFund } from "./vanguard-holdings.js";
+import { usesCloudMarket } from "./cloud-mode.js";
+
+// Public fund weights only. This cache never contains a personal portfolio.
+export const VWCE_EXPOSURE = snapshot;
+let current = snapshot, pending = null, retryAt = 0;
+export function getFundExposures({ now = Date.now() } = {}) {
+  const valid = normalizeVanguardFund(current, {now});
+  return valid ? [valid] : [];
+}
+export function loadFundExposures() {
+  if (!usesCloudMarket()) return Promise.resolve(getFundExposures());
+  if (!pending && Date.now() >= retryAt) {
+    retryAt = Date.now() + 6 * 3600000;
+    pending = (async () => {
+      const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 55000);
+      try {
+        const response = await fetch("/api/fund-holdings", { credentials: "same-origin", cache: "no-cache", signal: controller.signal });
+        if (!response.ok) throw new Error("Fund data unavailable.");
+        const value = await response.json(), next = normalizeVanguardFund(value?.funds?.[0]);
+        if (!next || value.funds.length !== 1) throw new Error("Invalid fund data.");
+        if (!normalizeVanguardFund(current) || next.asOf >= current.asOf) current = next;
+      } catch { retryAt = Date.now() + 5 * 60000; }
+      finally { clearTimeout(timer); pending = null; }
+      return getFundExposures();
+    })();
+  }
+  return pending || Promise.resolve(getFundExposures());
+}

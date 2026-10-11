@@ -291,7 +291,7 @@
           <section class="view-page" data-page="reports" aria-label="Reports" hidden>
             <section class="panel"><h2>Portfolio reports</h2><div class="report-directory" id="reportDirectory">
               <a href="#report-allocation"><span>Allocation</span><small>Holdings, groups, and stocks / ETFs in EUR</small><span aria-hidden="true">↗</span></a>
-              <a href="#report-etf"><span>ETF exposure</span><small>Known companies inside funds and direct holdings</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-etf"><span>ETF exposure</span><small>Companies, sectors and countries behind your holdings</small><span aria-hidden="true">↗</span></a>
               <a href="#portfolio-performance"><span>Portfolio performance</span><small>Value history and monthly returns</small><span aria-hidden="true">↗</span></a>
               <a href="#report-investments"><span>Investment performance</span><small>EUR gains for held and sold positions</small><span aria-hidden="true">↗</span></a>
               <a href="#report-funding"><span>Contributions and withdrawals</span><small>Monthly deposits, withdrawals, and net funding</small><span aria-hidden="true">↗</span></a>
@@ -299,7 +299,11 @@
             </div></section>
           </section>
           <section class="view-page" data-page="report-etf" aria-label="ETF exposure" hidden>
-            <section class="panel"><div class="section-heading"><h2>ETF exposure</h2><a href="#reports">All reports ↗</a></div><div class="report-controls"><button id="reportEtfExport" class="ghost" type="button" disabled>Export CSV</button></div><div id="reportEtfBody"></div></section>
+            <section class="panel"><div class="section-heading"><h2>ETF exposure</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><label>View<select id="reportEtfView"><option value="companies">Companies</option><option value="sectors">Sectors</option><option value="countries">Countries</option></select></label>
+                <label>Search<input id="reportEtfSearch" type="search" placeholder="Company or ticker"></label><button id="reportEtfExport" class="ghost" type="button" disabled>Export CSV</button></div>
+              <div id="reportEtfBody"></div><div id="reportEtfPages" class="report-controls" hidden><button id="reportEtfPrevious" class="ghost" type="button">Previous</button><span id="reportEtfPageStatus" class="data-note" aria-live="polite"></span><button id="reportEtfNext" class="ghost" type="button">Next</button></div>
+            </section>
           </section>
           <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
             <section class="panel"><div class="section-heading"><h2>Allocation</h2><a href="#reports">All reports ↗</a></div>
@@ -401,6 +405,6 @@
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261011-insights"></script>
+    <script type="module" src="app.js?v=20261011-etf"></script>
   </body>
 </html>

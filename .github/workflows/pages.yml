@@ -143,6 +143,27 @@ jobs:
           path: data/portfolio-fx.json
           key: portfolio-fx-${{ github.run_id }}
 
+      - name: Restore latest complete fund holdings
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: js/data/fund-holdings-snapshot.js
+          key: fund-holdings-${{ github.run_id }}
+          restore-keys: |
+            fund-holdings-
+
+      - name: Refresh official fund stock holdings
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
+        run: node scripts/update-fund-holdings.mjs
+
+      - name: Preserve complete fund holdings
+        if: github.event_name != 'schedule' || github.event.schedule == '30 6 * * *'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: js/data/fund-holdings-snapshot.js
+          key: fund-holdings-${{ github.run_id }}
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
