@@ -36,8 +36,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const book = await store.read();
       loaded = true;
       apply(book);
-      message("portfolioBookStatus", book ? store.mode === "cloud" ? "Portfolio synced across your devices. Export a backup to keep a separate copy."
-        : "Portfolio saved in this browser. Export a backup to keep a separate copy."
+      message("portfolioBookStatus", book ? ""
         : store.mode === "cloud" ? "To bring your existing portfolio here, export a backup from the GitHub app and restore it below." : "");
     } catch (error) {
       el("portfolioSetup").hidden = true;

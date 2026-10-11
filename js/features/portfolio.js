@@ -176,7 +176,7 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
   }
   const sourceWarning = priceSource === "sample"
     ? '<p class="data-note">Sample prices cannot value holdings or support position signals. Legacy amounts remain as entered.</p>'
-    : '<p class="data-note">Values are grouped by currency. Manual amounts stay as entered.</p>';
+    : "";
   const money = (value, currency, signed = false, eurValue) => portfolioMoney(
     currency === "EUR" && eurValue !== undefined ? eurValue : value, currency,
     { exchangeRate: rate, signed, ...(eurValue !== undefined ? { eurValue } : {}) });
@@ -214,7 +214,6 @@ function renderPortfolioTotals(holdings, exchangeRate, now) {
     projection: getPortfolioProjection(), exchangeRate, now });
   target.innerHTML = `<article><span>Money put in</span><strong>${escapeHtml(portfolioMoney(totals.contributed, "EUR"))}</strong></article>
     <article><span>Total value</span><strong>${escapeHtml(portfolioMoney(totals.totalValue, "EUR"))}</strong></article>
-    <p class="portfolio-total-note">Deposits minus withdrawals, plus starting cash. Total value includes holdings and cash.</p>
     ${totals.reasons.length ? `<p class="portfolio-total-note">${totals.reasons.slice(0, 2).map(escapeHtml).join(" ")}</p>` : ""}`;
 }
 
