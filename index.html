@@ -263,6 +263,7 @@
             <section class="panel"><h2>Portfolio reports</h2><div class="report-directory" id="reportDirectory">
               <a href="#report-allocation"><span>Allocation</span><small>Holdings, groups, and stocks / ETFs in EUR</small><span aria-hidden="true">↗</span></a>
               <a href="#portfolio-performance"><span>Portfolio performance</span><small>Value history and monthly returns</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-investments"><span>Investment performance</span><small>EUR gains for held and sold positions</small><span aria-hidden="true">↗</span></a>
             </div></section>
           </section>
           <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
@@ -291,6 +292,11 @@
             </div></details>
           </section>
 
+          <section class="view-page" data-page="report-investments" aria-label="Investment performance" hidden>
+            <section class="panel"><div class="section-heading"><h2>Investment performance</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><label>Investment<select id="reportInvestmentSelect"></select></label><button id="reportInvestmentExport" class="ghost" type="button" disabled>Export CSV</button><a href="#portfolio-performance">Change valuation end date ↗</a></div><div id="reportInvestmentBody"></div>
+            </section>
+          </section>
           <section class="view-page" data-page="performance" aria-label="Research picks" hidden>
             <section class="panel performance-panel" aria-labelledby="performanceHeading">
               <div class="section-heading"><h2 id="performanceHeading">Recorded picks</h2><button id="exportRecommendations" class="ghost" type="button" disabled>Export</button></div>

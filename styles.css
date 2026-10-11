@@ -769,3 +769,12 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
   .report-controls input, .report-controls select { width: 100%; max-width: 100%; min-width: 0; }
   .report-total span { display: block; margin-left: 0; margin-top: 6px; }
 }
+.report-gain-chart { margin: 28px 0; display: grid; gap: 16px; }
+.report-gain-chart > div { display: grid; grid-template-columns: 130px minmax(60px, 1fr) 110px; gap: 12px; align-items: center; font-size: 13px; }
+.report-gain-chart strong { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 400; }
+.report-gain-track { height: 16px; background: var(--muted); position: relative; }
+.report-gain-track::after { content: ''; position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--border-strong); }
+.report-gain-track i { position: absolute; height: 16px; }
+.report-gain-track .gain { background: var(--accent); }
+.report-gain-track .loss { background: #ac4545; }
+@media (max-width: 600px) { .report-gain-chart > div { grid-template-columns: 90px minmax(30px, 1fr) 86px; gap: 8px; font-size: 11px; } }

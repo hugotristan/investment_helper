@@ -16,6 +16,7 @@ import { initializeCloudSync } from "./js/features/cloud-sync.js";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { initializePortfolioPerformance, refreshPortfolioPerformance } from "./js/features/portfolio-performance.js";
+import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { answerQuestion } from "./js/features/questions.js";
 import { renderScreener } from "./js/features/screener.js";
 import { bindWatchlistEvents, initializeWatchlist, renderWatchlist } from "./js/features/watchlist.js";
@@ -52,6 +53,7 @@ async function init() {
   await initializePortfolioBook(portfolioChanged);
   initializePortfolioOrganization();
   initializePortfolioPerformance();
+  initializeInvestmentReport();
   initializeTickerSuggestions();
   bindEvents();
   initializeCloudSync();

@@ -8,6 +8,7 @@ const pages = {
   "portfolio-performance": "Portfolio performance",
   reports: "Reports",
   "report-allocation": "Allocation report",
+  "report-investments": "Investment performance",
   performance: "Research picks",
   ask: "Stock check",
   signals: "Signals",
