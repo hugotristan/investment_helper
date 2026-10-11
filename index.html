@@ -138,6 +138,11 @@
             <p id="portfolioBookStatus" class="portfolio-book-status" role="status" aria-live="polite" aria-atomic="true"></p>
             <section class="panel">
               <div class="section-heading"><h2>Holdings</h2><button id="openHoldingEditor" class="ghost" type="button">Add or edit holdings</button></div>
+              <div class="portfolio-sort-controls">
+                <label for="portfolioSortBy"><span>Sort by</span><select id="portfolioSortBy"><option value="size">Position size</option><option value="performance">Performance (EUR %)</option><option value="name">Name</option></select></label>
+                <label for="portfolioSortDirection"><span>Order</span><select id="portfolioSortDirection"><option value="desc">Descending</option><option value="asc">Ascending</option></select></label>
+              </div>
+              <p class="data-note">Sorts within each currency group. Performance uses EUR gain as a percentage of recorded EUR purchase cost.</p>
               <div id="portfolioReview" class="portfolio-review"><p class="empty-state">Add a holding to track its value and gain.</p></div>
             </section>
             <details class="panel portfolio-editor" id="portfolioEditor">

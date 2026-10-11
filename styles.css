@@ -379,6 +379,8 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .detail-price-chart .chart-caption { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 20px; }
 
 /* Holdings use one form and plain currency-separated rows. */
+.portfolio-sort-controls { display: flex; flex-wrap: wrap; gap: 14px; margin: 20px 0 10px; }
+.portfolio-sort-controls > label { flex: 0 1 230px; min-width: 140px; }
 .holding-form { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px 14px; align-items: end; }
 .holding-form label { display: block; min-width: 0; }
 .holding-form label small { color: var(--muted-foreground); font-size: .75rem; }

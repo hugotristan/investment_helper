@@ -8,7 +8,7 @@ import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { loadExchangeRate } from "./js/data/exchange-rate.js";
 import { mergePortfolioPriceResults } from "./js/data/portfolio-prices.js";
 import { runStockDetail } from "./js/features/detail.js";
-import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
+import { bindPortfolioSorting, buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
 import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js";
 import { initializeCloudSync } from "./js/features/cloud-sync.js";
@@ -81,6 +81,7 @@ function hydrateInputs() {
 }
 
 function bindEvents() {
+  bindPortfolioSorting(() => renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource));
   bindPortfolioEvents(portfolioChanged);
   bindWatchlistEvents(scheduleConfigScan);
   bindOpportunityEvents(scheduleConfigScan);

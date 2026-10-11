@@ -2,6 +2,7 @@ import { broadFunds } from "../config/settings.js";
 import { calculateHoldings } from "../analysis/holdings.js";
 import { calculatePortfolioTotals } from "../analysis/portfolio-totals.js";
 import { holdingEurReturn } from "../analysis/portfolio-returns.js";
+import { sortPortfolioHoldings } from "../analysis/portfolio-sort.js";
 import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -9,6 +10,30 @@ import { escapeHtml } from "../shared/text.js";
 import { state } from "../storage.js";
 import { getActivePortfolioBook, getPortfolioProjection } from "../portfolio-state.js";
 import { els } from "../ui/dom.js";
+
+const SORT_KEY = "investment-helper-portfolio-sort";
+let portfolioSort = { by: "size", direction: "desc" };
+let sortBound = false;
+
+export function bindPortfolioSorting(onChange) {
+  const by = document.getElementById("portfolioSortBy");
+  const direction = document.getElementById("portfolioSortDirection");
+  if (!by || !direction || sortBound) return;
+  sortBound = true;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_KEY));
+    if (["size", "performance", "name"].includes(saved?.by) && ["asc", "desc"].includes(saved?.direction)) portfolioSort = saved;
+  } catch { /* A view preference must never prevent the portfolio from loading. */ }
+  by.value = portfolioSort.by;
+  direction.value = portfolioSort.direction;
+  const changed = () => {
+    portfolioSort = { by: by.value, direction: direction.value };
+    try { localStorage.setItem(SORT_KEY, JSON.stringify(portfolioSort)); } catch { /* Session sorting still works. */ }
+    onChange();
+  };
+  by.addEventListener("change", changed);
+  direction.addEventListener("change", changed);
+}
 
 export function buildPortfolioReview(results, marketContext) {
   const calculated = calculateHoldings(getPortfolioHoldings(), results);
@@ -132,14 +157,14 @@ function portfolioHoldingReview(holding, marketContext) {
   };
 }
 
-export function renderPortfolioReview(portfolio, priceSource, { now = Date.now(), exchangeRate = getExchangeRate({ now }), projection = getPortfolioProjection() } = {}) {
+export function renderPortfolioReview(portfolio, priceSource, { now = Date.now(), exchangeRate = getExchangeRate({ now }), projection = getPortfolioProjection(), sort = portfolioSort } = {}) {
   const rate = normalizeExchangeRate(exchangeRate, { now });
   const displayHoldings = portfolio.holdings.map((holding) => {
     const eur = holdingEurReturn(holding, { eurCostBases: projection?.eurCostBases, exchangeRate: rate });
     return { ...holding, eur, status: eur.gain === null ? holding.status : gainStatus(eur.gain) };
   });
   const groups = portfolio.groups.map((group) => {
-    const holdings = displayHoldings.filter((holding) => holding.currency === group.currency);
+    const holdings = sortPortfolioHoldings(displayHoldings.filter((holding) => holding.currency === group.currency), sort);
     const sumKnown = (key) => holdings.every((holding) => Number.isFinite(holding.eur[key]))
       ? holdings.reduce((sum, holding) => sum + holding.eur[key], 0) : null;
     return { ...group, holdings, eurCostBasis: sumKnown("costBasis"), eurGain: sumKnown("gain") };
