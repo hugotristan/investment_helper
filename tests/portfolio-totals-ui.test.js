@@ -4,7 +4,7 @@ import { createPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 
 const nodes = new Map();
 const node = (id) => {
-  if (!nodes.has(id)) nodes.set(id, { innerHTML: "" });
+  if (!nodes.has(id)) nodes.set(id, { innerHTML: "", addEventListener() {} });
   return nodes.get(id);
 };
 globalThis.document = { getElementById: node, querySelectorAll: () => [] };
@@ -44,7 +44,7 @@ test("top figures combine EUR/USD holdings with EUR cash without double-counting
   renderPortfolioReview(review, "fixture", { exchangeRate: FX, now: NOW });
   assert.equal(valueFor("Money put in"), money(10000));
   assert.equal(valueFor("Total value"), money(10190)); // 5100 + 2100 * 0.9 + 3200 cash
-  assert.match(node("portfolioTotals").innerHTML, /includes holdings and cash/);
+  assert.doesNotMatch(node("portfolioTotals").innerHTML, /Deposits minus withdrawals|includes holdings and cash/);
   assert.doesNotMatch(node("portfolioTotals").innerHTML, /USD|\(€|Unavailable/);
   assert.deepEqual(book, before);
   assert.equal(review.holdings.find((h) => h.ticker === "MSFT").gain, 95);

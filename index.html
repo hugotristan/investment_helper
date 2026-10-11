@@ -136,6 +136,13 @@
               <div id="portfolioSetupSummary" class="portfolio-setup-summary"></div>
             </section>
             <p id="portfolioBookStatus" class="portfolio-book-status" role="status" aria-live="polite" aria-atomic="true"></p>
+            <details class="panel portfolio-book-disclosure" id="portfolioAnalytics" hidden>
+              <summary>Portfolio analytics</summary>
+              <div class="portfolio-book-content">
+                <label class="portfolio-allocation-control" for="portfolioAllocationView"><span>Allocation by</span><select id="portfolioAllocationView"><option value="holdings">Holding</option><option value="groups">Group</option><option value="types">Stocks / ETFs</option></select></label>
+                <div id="portfolioAnalyticsBody"></div>
+              </div>
+            </details>
             <section class="panel">
               <div class="section-heading"><h2>Holdings</h2><button id="openHoldingEditor" class="ghost" type="button">Add or edit holdings</button></div>
               <div class="portfolio-sort-controls">

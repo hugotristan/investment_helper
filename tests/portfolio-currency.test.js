@@ -59,7 +59,7 @@ function browserFixture(t) {
 }
 
 function groupMarkup(html, currency) {
-  const match = html.match(new RegExp(`<details class="portfolio-currency-group" data-portfolio-currency="${currency}"(?: open)?>\\s*<summary class="control-summary"><strong>${currency} holdings</strong></summary>([\\s\\S]*?)(?=<details class="portfolio-currency-group"|<details class="secondary-details"><summary>Concentration checks)`));
+  const match = html.match(new RegExp(`<details class="portfolio-currency-group" data-portfolio-currency="${currency}"(?: open)?>\\s*<summary class="control-summary"><strong>${currency} holdings</strong></summary>([\\s\\S]*?)(?=<details class="portfolio-currency-group"|$)`));
   assert.ok(match, `${currency} group rendered`);
   return match[1];
 }

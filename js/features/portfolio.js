@@ -4,6 +4,7 @@ import { calculatePortfolioTotals } from "../analysis/portfolio-totals.js";
 import { holdingEurReturn } from "../analysis/portfolio-returns.js";
 import { sortPortfolioHoldings } from "../analysis/portfolio-sort.js";
 import { positionKey, positionOrganization } from "../analysis/portfolio-organization.js";
+import { renderPortfolioAnalytics } from "./portfolio-analytics.js";
 import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -63,17 +64,6 @@ export function buildPortfolioReview(results, marketContext) {
   });
   const onlyGroup = groups.length === 1 ? groups[0] : null;
   const downCount = enriched.filter((holding) => holding.status === "down").length;
-  const concentrationNotes = [];
-  groups.forEach((group) => {
-    if (!group.complete) { concentrationNotes.push(`${group.currency}: some prices are unavailable. Totals show known values; weights remain unavailable.`); return; }
-    const ownedTech = group.holdings.filter((holding) => ["MSFT", "TSM", "AVGO", "NVDA", "GOOGL"].includes(holding.ticker))
-      .reduce((sum, holding) => sum + (holding.currentValue || 0), 0);
-    if (group.total && group.coreValue / group.total >= 0.8) concentrationNotes.push(`${group.currency}: core fund exposure represents ${((group.coreValue / group.total) * 100).toFixed(1)}% of tracked value.`);
-    if (group.total && ownedTech / group.total >= 0.1) concentrationNotes.push(`${group.currency}: technology and semiconductor holdings can fall together.`);
-  });
-  if (marketContext?.score < 45) concentrationNotes.push(`Market regime is weak (${marketContext.label}), so new buys need a stricter setup.`);
-  if (!concentrationNotes.length) concentrationNotes.push("Values and weights are grouped by their original currency.");
-
   return {
     holdings: enriched,
     groups,
@@ -82,8 +72,7 @@ export function buildPortfolioReview(results, marketContext) {
     stockValue: onlyGroup?.stockValue ?? null,
     largest: onlyGroup ? onlyGroup.holdings.reduce((best, holding) => !best || holding.currentValue > best.currentValue ? holding : best, null) : null,
     missingCount: calculated.missingCount,
-    downCount,
-    concentrationNotes
+    downCount
   };
 }
 
@@ -174,6 +163,7 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
     return { ...group, holdings, eurCostBasis: sumKnown("costBasis"), eurGain: sumKnown("gain") };
   });
   renderPortfolioTotals(portfolio.holdings, rate, now);
+  renderPortfolioAnalytics(displayHoldings);
   if (!portfolio.holdings.length) {
     els.portfolioReview.innerHTML = `<div class="empty-state">Add a holding to track its value and gain or loss.</div>`;
     return;
@@ -205,9 +195,6 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
       ${group.legacyCount ? `<p class="data-note">${group.legacyCount} legacy amount${group.legacyCount === 1 ? " is" : "s are"} included as entered. Group cost basis and gain / loss need share quantities and purchase prices for every holding.</p>` : ""}
       <div class="holding-grid">${group.holdings.map((holding) => renderHoldingCard(holding, money)).join("")}</div>
     </details>`).join("")}
-    <details class="secondary-details"><summary>Concentration checks</summary><div class="portfolio-notes">
-      ${portfolio.concentrationNotes.map((note) => `<p>${escapeHtml(note)}</p>`).join("")}
-    </div></details>
   `;
 }
 

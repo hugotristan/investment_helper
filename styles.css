@@ -388,6 +388,31 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .portfolio-new-group label { flex: 1 1 240px; }
 .portfolio-group-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto auto; gap: 10px; margin: 10px 0; }
 .portfolio-group-row button { padding: 6px 10px; }
+.portfolio-allocation-control { display: block; max-width: 240px; }
+.portfolio-allocation-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 28px; }
+.portfolio-allocation-heading h3, .portfolio-return-ranks h3, .portfolio-concentration h3 { margin: 0; font-size: .85rem; font-weight: 500; }
+.portfolio-allocation-heading > span { font-family: "JetBrains Mono", Consolas, monospace; font-size: .85rem; }
+.portfolio-allocation { list-style: none; padding: 0; margin: 18px 0; display: grid; gap: 18px; }
+.allocation-label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; font-size: .8rem; }
+.allocation-label > span:first-child { overflow-wrap: anywhere; }
+.allocation-label > span:last-child { font-family: "JetBrains Mono", Consolas, monospace; font-size: .75rem; }
+.allocation-label strong { margin-left: 12px; font-weight: 400; color: var(--muted-foreground); }
+.allocation-track { height: 8px; margin-top: 8px; background: var(--muted); }
+.allocation-track > span { display: block; height: 100%; background: var(--accent); max-width: 100%; }
+.portfolio-return-ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 26px; padding-top: 24px; border-top: 1px solid var(--border); }
+.portfolio-return-ranks > section { min-width: 0; }
+.portfolio-return-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.portfolio-return-list li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: .8rem; }
+.portfolio-return-list li > span:last-child { text-align: right; font-family: "JetBrains Mono", Consolas, monospace; }
+.portfolio-return-list small { display: block; margin-top: 3px; font-size: .75rem; color: var(--muted-foreground); }
+.portfolio-return-list .positive { color: var(--good); }
+.portfolio-return-list .negative { color: var(--bad); }
+.portfolio-concentration { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+.portfolio-concentration dl { margin: 12px 0; }
+.portfolio-concentration dl > div { display: flex; justify-content: space-between; gap: 16px; margin: 10px 0; font-size: .8rem; }
+.portfolio-concentration dt { overflow-wrap: anywhere; }
+.portfolio-concentration dd { margin: 0; font-family: "JetBrains Mono", Consolas, monospace; }
+@media (max-width: 600px) { .portfolio-return-ranks { grid-template-columns: 1fr; gap: 22px; } }
 .holding-form { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px 14px; align-items: end; }
 .holding-form label { display: block; min-width: 0; }
 .holding-form label small { color: var(--muted-foreground); font-size: .75rem; }
