@@ -11,6 +11,7 @@ const pages = {
   "report-investments": "Investment performance",
   "report-funding": "Contributions and withdrawals",
   "report-transactions": "Transaction report",
+  "report-etf": "ETF exposure",
   performance: "Research picks",
   ask: "Stock check",
   signals: "Signals",
