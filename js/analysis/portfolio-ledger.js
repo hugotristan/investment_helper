@@ -153,6 +153,7 @@ function transaction(input, startDate, today, strict, baseCurrency) {
 
 function projectNormalized(book) {
   const positions = new Map();
+  const eurCosts = new Map();
   const manual = [];
   const cash = new Map();
   const baseCurrency = book.settings.baseCurrency;
@@ -162,6 +163,8 @@ function projectNormalized(book) {
   for (const holding of book.openingHoldings) {
     if (holding.kind === "manual") { manual.push({ ...holding }); continue; }
     const key = `${holding.ticker}|${holding.currency}`;
+    const openingCost = holding.currency === "EUR" ? finite(holding.shares * holding.averageCost) : null;
+    eurCosts.set(key, eurCosts.has(key) ? addKnownCost(eurCosts.get(key), openingCost) : openingCost);
     const previous = positions.get(key);
     if (!previous) { positions.set(key, { ...holding }); continue; }
     const shares = finite(previous.shares + holding.shares);
@@ -187,6 +190,9 @@ function projectNormalized(book) {
         }
         const shares = finite(holding.shares + entry.quantity);
         const cost = finite(finite(holding.shares * holding.averageCost) + finite(amount + fee));
+        const eurPaid = entry.cashCurrency === "EUR" ? entry.cashAmount
+          : !entry.cashCurrency && currency === "EUR" ? finite(amount + fee) : null;
+        eurCosts.set(key, addKnownCost(eurCosts.has(key) ? eurCosts.get(key) : 0, eurPaid));
         holding.shares = shares;
         holding.averageCost = finite(cost / shares);
         change = -finite(amount + fee);
@@ -194,7 +200,10 @@ function projectNormalized(book) {
         const tolerance = Number.EPSILON * 8 * Math.max(holding?.shares || 0, entry.quantity);
         if (!holding || entry.quantity - holding.shares > tolerance) throw new TypeError(`Cannot sell more ${entry.ticker} shares than are held in ${currency} on ${entry.date}.`);
         const remaining = holding.shares - entry.quantity;
+        const previousShares = holding.shares;
         holding.shares = Math.abs(remaining) <= tolerance ? 0 : remaining;
+        const eurCost = eurCosts.get(key);
+        eurCosts.set(key, holding.shares === 0 ? 0 : eurCost === null ? null : finite(eurCost * (holding.shares / previousShares)));
         if (!holding.shares) holding.averageCost = 0;
         change = finite(amount - fee);
       }
@@ -215,7 +224,14 @@ function projectNormalized(book) {
     .map(({ currency }) => `${currency} cash is negative. Funding history may be incomplete.`);
   if (!complete) warnings.push(`Reporting cash in ${baseCurrency} needs actual converted cash amounts for ${missingTransactionIds.length} foreign-currency transaction${missingTransactionIds.length === 1 ? "" : "s"}. The balance is incomplete.`);
   if (manual.length) warnings.push("Amount-only legacy holdings do not provide share quantities or cost basis.");
-  return { holdings: [...positions.values()].filter(({ shares }) => shares > 0).map((holding) => ({ ...holding })).concat(manual), cash: balances, reportingCash, warnings };
+  return { holdings: [...positions.values()].filter(({ shares }) => shares > 0).map((holding) => ({ ...holding })).concat(manual),
+    eurCostBases: [...positions.entries()].filter(([, holding]) => holding.shares > 0)
+      .map(([key, holding]) => ({ id: holding.id, ticker: holding.ticker, currency: holding.currency, costBasis: eurCosts.get(key) ?? null })),
+    cash: balances, reportingCash, warnings };
+}
+
+function addKnownCost(first, second) {
+  return first === null || second === null ? null : finite(first + second);
 }
 
 function plainObject(value) {

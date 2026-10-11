@@ -112,7 +112,7 @@ test("missing or invalid display rates preserve USD amounts and unavailable mone
   assert.match(portfolioMoney(Number.MAX_VALUE, "USD", { exchangeRate: { ...FX, rate: 2 }, locale: "en-US" }), /\(EUR unavailable\)$/);
 });
 
-test("portfolio review converts every USD monetary line while preserving native groups, shares, returns, and inputs", async (t) => {
+test("portfolio review uses recorded EUR costs and gains while preserving native groups, shares, and inputs", async (t) => {
   const browser = browserFixture(t);
   const { renderPortfolioReview } = await import("../js/features/portfolio.js");
   const { els } = await import("../js/ui/dom.js");
@@ -121,26 +121,31 @@ test("portfolio review converts every USD monetary line while preserving native 
     position("FLAT", { shares: 1.25, averageCost: 40 }), position("EURO", { currency: "EUR", averageCost: 20 })];
   const results = [priceResult("GAIN", 150), priceResult("LOSS", 50), priceResult("FLAT", 40), priceResult("EURO", 30, "EUR")];
   const portfolio = reviewFixture(holdings, results);
+  const costs = { GAIN: 160, LOSS: 210, FLAT: 45 };
+  const projection = { eurCostBases: holdings.filter((holding) => holding.currency === "USD")
+    .map((holding) => ({ id: holding.id, ticker: holding.ticker, currency: holding.currency, costBasis: costs[holding.ticker] })) };
+  const recordedMoney = (value, eur, signed = false) => `${nativeMoney(value, "USD", signed)} (${nativeMoney(eur, "EUR", signed)})`;
   const before = structuredClone({ holdings, results, portfolio, exchangeRate: FX, state, saved: [...browser.saved] });
   const originalOutput = els.portfolioReview;
   // The shared DOM module keeps its first references; point it at this test's output.
   els.portfolioReview = browser.nodes.get("portfolioReview");
   t.after(() => { els.portfolioReview = originalOutput; });
 
-  renderPortfolioReview(portfolio, "fixture", { now: NOW, exchangeRate: FX });
+  renderPortfolioReview(portfolio, "fixture", { now: NOW, exchangeRate: FX, projection });
   const html = els.portfolioReview.innerHTML;
   const usd = groupMarkup(html, "USD");
   assert.equal(labeledValue(usd, "Tracked value"), convertedMoney(500));
-  assert.equal(labeledValue(usd, "Cost basis"), convertedMoney(490));
-  assert.equal(labeledValue(usd, "Unrealized gain / loss"), convertedMoney(10, true));
+  assert.equal(labeledValue(usd, "Cost basis"), recordedMoney(490, 415));
+  assert.equal(labeledValue(usd, "Unrealized gain / loss"), recordedMoney(10, 35, true));
 
   for (const row of portfolio.holdings.filter((holding) => holding.currency === "USD")) {
     const card = cardMarkup(usd, row.ticker);
     assert.equal(labeledValue(card, "Shares"), new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(row.shares));
-    assert.equal(labeledValue(card, "Average purchase"), convertedMoney(row.averageCost));
-    assert.equal(labeledValue(card, "Cost basis"), convertedMoney(row.costBasis));
+    assert.equal(labeledValue(card, "Average purchase"), recordedMoney(row.averageCost, costs[row.ticker] / row.shares));
+    assert.equal(labeledValue(card, "Cost basis"), recordedMoney(row.costBasis, costs[row.ticker]));
     assert.equal(labeledValue(card, "Current value"), convertedMoney(row.currentValue));
-    assert.equal(labeledValue(card, "Unrealized gain / loss"), `${convertedMoney(row.gain, true)} <small>${row.gainPercent >= 0 ? "+" : ""}${(row.gainPercent * 100).toFixed(1)}%</small>`);
+    const gain = row.currentValue * FX.rate - costs[row.ticker];
+    assert.equal(labeledValue(card, "Unrealized gain / loss"), `${recordedMoney(row.gain, gain, true)} <small>${gain >= 0 ? "+" : ""}${(gain / costs[row.ticker] * 100).toFixed(1)}% EUR</small>`);
     assert.ok(card.includes(`Price ${convertedMoney(row.price)} · quote`));
     assert.ok(card.includes(`<strong>${row.weight.toFixed(1)}%</strong>`));
   }
@@ -151,14 +156,14 @@ test("portfolio review converts every USD monetary line while preserving native 
   assert.equal(labeledValue(euro, "Tracked value"), nativeMoney(60, "EUR"));
   assert.doesNotMatch(euro, /\(€|EUR unavailable/);
   assert.match(html, /2026-10-09 reference rate/);
-  assert.match(html, /not your historical EUR costs or EUR investment return/);
+  assert.match(html, /EUR gains include currency changes/);
   assert.match(html, /data-portfolio-currency="USD" open>/);
   assert.match(html, /data-portfolio-currency="EUR" open>/);
   els.portfolioReview.querySelectorAll = () => [
     { dataset: { portfolioCurrency: "USD" }, open: false },
     { dataset: { portfolioCurrency: "EUR" }, open: true }
   ];
-  renderPortfolioReview(portfolio, "fixture", { now: NOW, exchangeRate: FX });
+  renderPortfolioReview(portfolio, "fixture", { now: NOW, exchangeRate: FX, projection });
   assert.match(els.portfolioReview.innerHTML, /data-portfolio-currency="USD">/);
   assert.match(els.portfolioReview.innerHTML, /data-portfolio-currency="EUR" open>/);
   assert.equal(labeledValue(groupMarkup(els.portfolioReview.innerHTML, "USD"), "Tracked value"), convertedMoney(500));
@@ -194,8 +199,8 @@ test("legacy amounts convert for display while missing prices and group gains re
   assert.match(manual, /Manual status: down/);
   assert.match(manual, /Legacy amount stays as entered/);
   const missing = cardMarkup(usd, "MISSING");
-  assert.equal(labeledValue(missing, "Average purchase"), convertedMoney(25));
-  assert.equal(labeledValue(missing, "Cost basis"), convertedMoney(100));
+  assert.equal(labeledValue(missing, "Average purchase"), `${nativeMoney(25, "USD")} (EUR unavailable)`);
+  assert.equal(labeledValue(missing, "Cost basis"), `${nativeMoney(100, "USD")} (EUR unavailable)`);
   assert.equal(labeledValue(missing, "Current value"), "Unavailable");
   assert.equal(labeledValue(missing, "Unrealized gain / loss"), "Unavailable");
   assert.match(missing, /Gain \/ loss unavailable/);

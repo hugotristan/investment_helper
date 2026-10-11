@@ -1,5 +1,6 @@
 // Display conversion only: stored transactions and native holding calculations stay unchanged.
-export function portfolioMoney(value, currency, { exchangeRate = null, signed = false, locale } = {}) {
+export function portfolioMoney(value, currency, options = {}) {
+  const { exchangeRate = null, signed = false, locale } = options;
   if (!Number.isFinite(value)) return "Unavailable";
   const format = (amount, code) => {
     const prefix = signed && amount > 0 ? "+" : "";
@@ -8,7 +9,8 @@ export function portfolioMoney(value, currency, { exchangeRate = null, signed = 
   };
   const native = format(value, currency);
   if (currency !== "USD") return native;
-  const converted = exchangeRate?.available === true && exchangeRate.base === "USD" && exchangeRate.quote === "EUR"
+  const converted = Object.hasOwn(options, "eurValue") ? options.eurValue
+    : exchangeRate?.available === true && exchangeRate.base === "USD" && exchangeRate.quote === "EUR"
     && Number.isFinite(exchangeRate.rate) && exchangeRate.rate > 0 ? value * exchangeRate.rate : NaN;
   return `${native} (${Number.isFinite(converted) ? format(converted, "EUR") : "EUR unavailable"})`;
 }
