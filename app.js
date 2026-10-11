@@ -6,6 +6,7 @@ import { applyQuoteSnapshot, loadMarketContext, loadQuoteSnapshots, loadTickerSe
 import { loadNewsSources } from "./js/data/news.js";
 import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { loadExchangeRate } from "./js/data/exchange-rate.js";
+import { mergePortfolioPriceResults } from "./js/data/portfolio-prices.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
 import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfolio-editor.js";
@@ -38,6 +39,8 @@ let lastScanDurationMs = 0;
 let isRunning = false;
 let pendingInputScan = false;
 let cachedScanAt = null;
+let portfolioPriceResults = [];
+let portfolioPricesVersion = 0;
 
 init();
 
@@ -125,13 +128,47 @@ function bindEvents() {
 
 function portfolioChanged() {
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+  void refreshPortfolioPrices();
+  void refreshPortfolioExchangeRate();
   refreshPortfolioPerformance();
   scheduleConfigScan();
 }
 
 async function refreshPortfolioExchangeRate() {
   await loadExchangeRate();
+  if (document.documentElement?.dataset?.privateBlocked === "true") return;
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+}
+
+function portfolioTickers() {
+  return unique(getPortfolioHoldings().map((holding) => holding.ticker)).filter((ticker) => !isBlockedAssetTicker(ticker));
+}
+
+function withPortfolioPrices(results) {
+  const owned = new Set(portfolioTickers());
+  return mergePortfolioPriceResults(results, portfolioPriceResults.filter((item) => owned.has(item.ticker))).sort(stableRankSort);
+}
+
+async function refreshPortfolioPrices() {
+  const version = ++portfolioPricesVersion;
+  const book = getActivePortfolioBook();
+  const tickers = portfolioTickers();
+  if (!tickers.length || document.documentElement?.dataset?.privateBlocked === "true") return;
+  try {
+    // This small batch renders independently of the complete watchlist scan.
+    // The market loaders share in-flight requests and their dated price cache.
+    const [series, quotes] = await Promise.all([loadTickerSeries(tickers), loadQuoteSnapshots(tickers)]);
+    if (version !== portfolioPricesVersion || book !== getActivePortfolioBook()
+      || tickers.join("|") !== portfolioTickers().join("|") || document.documentElement?.dataset?.privateBlocked === "true") return;
+    const ranked = rankSeries(series, quotes, scanState.latestNews?.byTicker || {});
+    const owned = new Set(tickers);
+    portfolioPriceResults = mergePortfolioPriceResults(ranked, portfolioPriceResults.filter((item) => owned.has(item.ticker)));
+    scanState.latestRankedResults = withPortfolioPrices(scanState.latestRankedResults);
+    scanState.latestPriceSource = scanState.latestRankedResults.find((item) => item.prices.length && item.source !== "sample")?.source || "unavailable";
+    renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
+  } catch (error) {
+    console.error(error);
+  }
 }
 
 async function runAnalysis(options = {}) {
@@ -139,8 +176,9 @@ async function runAnalysis(options = {}) {
     if (options.reason === "config") pendingInputScan = true;
     return;
   }
-  const tickers = unique(parseTickers(state.tickerInput)
-    .concat(getPortfolioHoldings().map((holding) => holding.ticker), getRecommendationTickers(), opportunityUniverse, ["SPY"]))
+  // Queue owned symbols first and publish them before the broader scan finishes.
+  void refreshPortfolioPrices();
+  const tickers = unique(portfolioTickers().concat(parseTickers(state.tickerInput), getRecommendationTickers(), opportunityUniverse, ["SPY"]))
     .filter((ticker) => !isBlockedAssetTicker(ticker))
     .slice(0, 180);
   if (!tickers.length) {
@@ -167,8 +205,8 @@ async function runAnalysis(options = {}) {
       loadQuoteSnapshots(tickers),
       loadMarketContext()
     ]);
-    const priceSource = series.find((item) => item.prices.length && item.source !== "sample")?.source || "unavailable";
-    const preliminary = rankSeries(series, quotes, {});
+    const preliminary = withPortfolioPrices(rankSeries(series, quotes, {}));
+    const priceSource = preliminary.find((item) => item.prices.length && item.source !== "sample")?.source || "unavailable";
     scanState.latestRankedResults = preliminary;
     scanState.latestPriceSource = priceSource;
     scanState.latestQuoteSnapshot = quotes;
@@ -182,7 +220,7 @@ async function runAnalysis(options = {}) {
     const response = await newsRequest;
     if (response.error) throw response.error;
     const news = response.news;
-    const ranked = rankSeries(series, quotes, news.byTicker);
+    const ranked = withPortfolioPrices(rankSeries(series, quotes, news.byTicker));
 
     renderAll(ranked, priceSource, news, marketContext, quotes);
     recordRecommendations(ranked, marketContext);
