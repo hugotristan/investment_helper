@@ -95,6 +95,22 @@ test("group and note saves preserve transactions and reject stale portfolio revi
   assert.deepEqual(f.stored.organization, organization);
 });
 
+test("dividend assumptions save independently of accounting and reject stale revisions", async () => {
+  const initial = book(), before = projectPortfolioBook(initial);
+  const f = fixture(initial);
+  await f.controller.initialize();
+  const assumptions = [{ ticker: "AAPL", currency: "USD", amountPerShare: 0.26,
+    firstPaymentDate: "2026-11-15", frequency: "quarterly" }];
+  assert.equal(await f.controller.saveDividendAssumptions(assumptions, initial.updatedAt), true);
+  assert.deepEqual(f.stored.dividendAssumptions, assumptions);
+  assert.deepEqual(projectPortfolioBook(f.stored), before);
+  assert.deepEqual(f.stored.openingHoldings, initial.openingHoldings);
+  assert.deepEqual(f.stored.transactions, initial.transactions);
+  assert.equal(await f.controller.saveDividendAssumptions([], initial.updatedAt), false);
+  assert.equal(f.writes, 1);
+  assert.deepEqual(f.stored.dividendAssumptions, assumptions);
+});
+
 test("setup preserves current holdings and legacy source without changing localStorage snapshot", async () => {
   const f = fixture();
   const previous = structuredClone(state.holdings);

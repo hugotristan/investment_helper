@@ -93,6 +93,16 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     });
   }
 
+  async function saveDividendAssumptions(dividendAssumptions, expectedUpdatedAt) {
+    return work("reportDividendStatus", async () => {
+      const book = getActivePortfolioBook();
+      if (!book || doc.documentElement?.dataset?.privateBlocked === "true") throw new TypeError("Unlock and load your portfolio before saving dividend assumptions.");
+      if (book.updatedAt !== expectedUpdatedAt) throw new TypeError("Your portfolio changed. Reload the dividend editor before saving.");
+      await commit(changed(book, { dividendAssumptions }), expectedUpdatedAt, { metadataOnly: true });
+      message("reportDividendStatus", "Assumptions saved.");
+    });
+  }
+
   async function work(id, action) {
     if (!loaded || busy) { message(id, "Wait for the current portfolio operation to finish, then try again."); return false; }
     setBusy(true);
@@ -514,7 +524,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
   }
 
   return { initialize, setup, saveTransaction, saveSettings, startHistory, removeTransaction, importBackup, restoreBackup, exportBackup,
-    openTransactionEditor, writeOpeningHoldings, saveOrganization, refreshFromStorage, render,
+    openTransactionEditor, writeOpeningHoldings, saveOrganization, saveDividendAssumptions, refreshFromStorage, render,
     get book() { return getActivePortfolioBook(); }, get pendingBackup() { return pendingBackup; } };
 }
 
@@ -539,3 +549,4 @@ export async function initializePortfolioBook(onChange) {
 export function openPortfolioTransactionEditor() { controller?.openTransactionEditor(); }
 export function reloadPortfolioBook() { return controller?.refreshFromStorage(); }
 export function savePortfolioOrganization(organization, expectedUpdatedAt) { return controller?.saveOrganization(organization, expectedUpdatedAt); }
+export function savePortfolioDividendAssumptions(assumptions, expectedUpdatedAt) { return controller?.saveDividendAssumptions(assumptions, expectedUpdatedAt); }

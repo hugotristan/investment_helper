@@ -786,6 +786,8 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .report-funding-row i { display: block; height: 9px; }
 .report-funding-row .gain { background: var(--accent); }
 .report-funding-row .loss { background: #ac4545; }
+.portfolio-performance-summary.dividend-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 600px) { .portfolio-performance-summary.dividend-summary { grid-template-columns: 1fr; } }
 
 .analyst-panel { width: 100%; max-width: 960px; }
 .insights-topics, .analyst-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }

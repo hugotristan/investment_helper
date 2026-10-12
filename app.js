@@ -18,6 +18,7 @@ import { getRecommendationTickers, initializePerformance, recordRecommendations,
 import { initializePortfolioPerformance, refreshPortfolioPerformance, refreshPerformanceMetadata } from "./js/features/portfolio-performance.js";
 import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
+import { initializeDividendReport, refreshDividendReport } from "./js/features/report-dividends.js";
 import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
 import { initializeAnalyst, refreshPortfolioInsights } from "./js/features/analyst.js";
 import { answerQuestion } from "./js/features/questions.js";
@@ -58,6 +59,7 @@ async function init() {
   initializePortfolioPerformance();
   initializeInvestmentReport();
   initializeFundingReport();
+  initializeDividendReport();
   initializeTransactionReport();
   initializeAnalyst();
   initializeTickerSuggestions();
@@ -140,6 +142,7 @@ function bindEvents() {
 function portfolioChanged({ metadataOnly = false } = {}) {
   refreshPortfolioInsights();
   refreshFundingReport();
+  refreshDividendReport();
   refreshTransactionReport();
   refreshPortfolioOrganization();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
@@ -153,6 +156,7 @@ function portfolioChanged({ metadataOnly = false } = {}) {
 async function refreshPortfolioExchangeRate() {
   await loadExchangeRate();
   if (document.documentElement?.dataset?.privateBlocked === "true") return;
+  refreshDividendReport();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);
 }
 

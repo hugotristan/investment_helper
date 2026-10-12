@@ -296,6 +296,7 @@
               <a href="#report-investments"><span>Investment performance</span><small>EUR gains for held and sold positions</small><span aria-hidden="true">↗</span></a>
               <a href="#report-funding"><span>Contributions and withdrawals</span><small>Monthly deposits, withdrawals, and net funding</small><span aria-hidden="true">↗</span></a>
               <a href="#report-transactions"><span>Transactions</span><small>Filter and export your recorded history</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-dividends"><span>Dividend forecast</span><small>Expected cash payments from your entered assumptions</small><span aria-hidden="true">↗</span></a>
             </div></section>
           </section>
           <section class="view-page" data-page="report-etf" aria-label="ETF exposure" hidden>
@@ -303,6 +304,21 @@
               <div class="report-controls"><label>View<select id="reportEtfView"><option value="companies">Companies</option><option value="sectors">Sectors</option><option value="countries">Countries</option></select></label>
                 <label>Search<input id="reportEtfSearch" type="search" placeholder="Company or ticker"></label><button id="reportEtfExport" class="ghost" type="button" disabled>Export CSV</button></div>
               <div id="reportEtfBody"></div><div id="reportEtfPages" class="report-controls" hidden><button id="reportEtfPrevious" class="ghost" type="button">Previous</button><span id="reportEtfPageStatus" class="data-note" aria-live="polite"></span><button id="reportEtfNext" class="ghost" type="button">Next</button></div>
+            </section>
+          </section>
+          <section class="view-page" data-page="report-dividends" aria-label="Dividend forecast" hidden>
+            <section class="panel"><div class="section-heading"><h2>Dividend forecast</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><button id="reportDividendExport" class="ghost" type="button" disabled>Export CSV</button></div>
+              <div id="reportDividendBody"></div>
+              <details id="reportDividendEditor" class="secondary-details" hidden><summary>Edit dividend assumptions</summary>
+                <form id="reportDividendForm" class="report-controls">
+                  <label>Position<select id="reportDividendPosition" required></select></label>
+                  <label>Repeat<select id="reportDividendFrequency"><option value="quarterly">Quarterly</option><option value="monthly">Monthly</option><option value="semiannual">Twice a year</option><option value="annual">Annually</option><option value="once">One payment</option><option value="none">No cash dividend</option></select></label>
+                  <label>Gross dividend per share<input id="reportDividendAmount" type="number" min="0" max="1000000" step="any" required></label>
+                  <label>Next payment date<input id="reportDividendDate" type="date" required></label>
+                  <button id="reportDividendSave" type="submit">Save assumption</button><button id="reportDividendRemove" class="ghost" type="button">Remove assumption</button><button id="reportDividendReload" class="ghost" type="button">Reload editor</button>
+                </form><p id="reportDividendPositionHint" class="data-note"></p><p id="reportDividendStatus" class="data-note" role="status" aria-live="polite"></p>
+              </details>
             </section>
           </section>
           <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
@@ -385,26 +401,26 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261011-reports",
-          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261011-reports",
-          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261011-reports",
-          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261011-reports",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261011-reports",
-          "./js/storage.js": "./js/storage.js?v=20261011-reports",
-          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261011-reports",
-          "./js/data/market.js": "./js/data/market.js?v=20261011-reports",
-          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261011-reports",
-          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261011-reports",
-          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261011-reports",
-          "./js/features/detail.js": "./js/features/detail.js?v=20261011-reports",
-          "./js/features/questions.js": "./js/features/questions.js?v=20261011-reports",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261011-reports",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261011-reports",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261011-reports",
-          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261011-reports"
+          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261011-dividends",
+          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261011-dividends",
+          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261011-dividends",
+          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261011-dividends",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261011-dividends",
+          "./js/storage.js": "./js/storage.js?v=20261011-dividends",
+          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261011-dividends",
+          "./js/data/market.js": "./js/data/market.js?v=20261011-dividends",
+          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261011-dividends",
+          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261011-dividends",
+          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261011-dividends",
+          "./js/features/detail.js": "./js/features/detail.js?v=20261011-dividends",
+          "./js/features/questions.js": "./js/features/questions.js?v=20261011-dividends",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261011-dividends",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261011-dividends",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261011-dividends",
+          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261011-dividends"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261011-etf"></script>
+    <script type="module" src="app.js?v=20261011-dividends"></script>
   </body>
 </html>

@@ -1,5 +1,13 @@
 # Feature changes
 
+## Dividend cash-flow forecast
+
+**What changed:** Reports has a 12-month dividend forecast with monthly EUR estimates, expected payment details and CSV export. Each held stock or distributing ETF can have a gross native-currency dividend per share, next payment date and repeat interval, or an explicit No cash dividend assumption. VWCE's verified accumulating listings are excluded. Missing assumptions and FX are visible; projected payments do not become recorded income or cash.
+
+**How:** Optional dividend metadata saves through the existing portfolio revision checks and D1 sync, and is included in backup/restore. A pure calculator holds current quantities and reference FX constant and preserves original month-end anchors when rolling recurring dates or editing an amount. Old books remain valid. Sold or quantity-free positions are excluded; their old assumptions can be removed. The editor preserves unsaved drafts during refresh, rejects stale revisions, and clears private data when locked.
+
+**Validation:** Model and editor checks cover mixed currencies, fractional quantities, month ends/leap years, missing and stale FX, explicit zero, expired one-off dates, duplicate/invalid assumptions, backup round trips, stale edits and late replies after locking. Existing backend checks verify synced assumptions and user isolation. Accounting projections and recorded transactions remain unchanged.
+
 ## Full published VWCE exposure
 
 **What changed:** ETF exposure replaces the top-ten estimate with Vanguard's complete published stock list. Companies, sectors and countries combine direct holdings with dated fund weights. Matching direct stocks expand in one disclosure; company rows are searchable and paged, with full filtered CSV exports. Same-fund listings are identified in supported ETF overlap. Unsupported ETFs remain unassigned.
