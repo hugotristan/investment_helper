@@ -81,6 +81,14 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
   const html = gunzipSync(Buffer.from(await page.arrayBuffer())).toString();
   assert.match(html, /data-cloud-mode="sites"/);
   assert.match(html, /cloudStorageStatus/);
+  assert.match(html, /rel="icon" type="image\/svg\+xml" href="favicon\.svg/);
+  const icon = await app.fetch(new Request("https://investment.example/favicon.svg"), environment);
+  assert.equal(icon.status, 200);
+  assert.match(icon.headers.get("content-type"), /^image\/svg\+xml/);
+  assert.match(await icon.text(), /<svg[^>]+viewBox="0 0 32 32"/);
+  const iconHead = await app.fetch(new Request("https://investment.example/favicon.svg", { method: "HEAD" }), environment);
+  assert.equal(iconHead.status, 200);
+  assert.equal(iconHead.body, null);
   const startup = await authorized("/app.js");
   assert.equal(startup.status, 200);
   assert.match(gunzipSync(Buffer.from(await startup.arrayBuffer())).toString(), /initializeCloudSync/);

@@ -4,10 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Investing</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg?v=20261013">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261013-lock-icon">
+    <link rel="stylesheet" href="styles.css?v=20261013-polish">
   </head>
   <body>
     <div class="app-layout">
@@ -364,7 +365,7 @@
               <div id="portfolioPerformanceSummary" class="portfolio-performance-summary"></div>
               <div id="portfolioPerformanceReasons"></div>
               <div id="portfolioPerformanceChart"></div>
-              <label class="portfolio-chart-control" for="portfolioChartDate"><span>Inspect a date</span><input id="portfolioChartDate" type="range" min="0" max="0" step="1" value="0" disabled></label>
+              <label class="portfolio-chart-control" for="portfolioChartDate"><input id="portfolioChartDate" type="range" aria-label="Inspect portfolio value by date" min="0" max="0" step="1" value="0" disabled></label>
               <output id="portfolioChartReadout" for="portfolioChartDate" class="portfolio-chart-readout"></output>
             </section>
             <section class="panel"><div class="section-heading"><h2>Monthly performance</h2></div><div id="portfolioPerformanceMonths"></div></section>
@@ -453,7 +454,7 @@
           "./js/features/cloud-sync.js": "./js/features/cloud-sync.js?v=20261012-cleanup",
           "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-watchlist",
           "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-watchlist",
-          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-watchlist"
+          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261013-polish"
         }
       }
     </script>

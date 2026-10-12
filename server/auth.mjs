@@ -143,10 +143,10 @@ function returnPath(value) {
 }
 
 function loginPage(message = "", status = 200, next = "/", extraHeaders = {}) {
-  return new Response(`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#dedfdd"><title>Investment Helper — Sign in</title><style>
+  return new Response(`<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#dedfdd"><title>Investment Helper — Sign in</title><link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261013"><style>
     *{box-sizing:border-box}body{margin:0;background:#dedfdd;color:#222823;font:16px/1.5 system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}main{width:min(100%,420px);padding:36px;background:#eeefed;border:1px solid #bfc3be}h1{font-size:26px;line-height:1.2;margin:0 0 12px;font-weight:600}p{color:#50594f;margin:0 0 26px}label{display:block;margin:0 0 8px}input,button{width:100%;border-radius:0;font:inherit;padding:12px;border:1px solid #9da79c}input{background:#f8f8f7;color:#222823}button{background:#234634;color:#fff;border-color:#234634;margin-top:18px;cursor:pointer}input:focus,button:focus{outline:2px solid #376b4f;outline-offset:3px}.error{margin:16px 0 0;color:#963c35;font-size:14px}
   </style></head><body><main><h1>Investment Helper</h1><p>Enter your password to open your portfolio.</p><form method="post" action="/login"><input type="hidden" name="next" value="${returnPath(next)}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256" autofocus>${message ? `<p class="error" role="alert">${message}</p>` : ""}<button type="submit">Open portfolio</button></form></main></body></html>`, { status, headers: {
-    ...privateHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'", ...extraHeaders,
+    ...privateHeaders, "Content-Type": "text/html; charset=utf-8", "Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'", ...extraHeaders,
   } });
 }
 

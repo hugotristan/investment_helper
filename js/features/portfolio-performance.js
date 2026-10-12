@@ -123,7 +123,7 @@ function renderMonthlyTable(months, { showAll = false } = {}) {
       + `<details class="secondary-details"><summary>Earlier months (${months.length - 12})</summary>${renderMonthlyTable(months.slice(0, -12), { showAll: true })}</details>`;
   }
   return `<div class="portfolio-performance-table-wrap" tabindex="0" aria-label="Monthly portfolio performance, scroll for all columns">
-    <table class="portfolio-performance-table"><caption>Monthly results · first and last months may be partial</caption>
+    <table class="portfolio-performance-table" aria-label="Monthly portfolio performance">
       <thead><tr><th scope="col">Month</th><th scope="col">End value</th><th scope="col">Deposits − withdrawals</th><th scope="col">Gain</th><th scope="col">Approx. return</th><th scope="col">SPY in EUR</th></tr></thead>
       <tbody>${[...months].reverse().map((row) => `<tr><th scope="row">${escapeHtml(row.month)}<small>${escapeHtml(row.startDate)} → ${escapeHtml(row.endDate)}</small></th>
         <td>${escapeHtml(money(row.endValue))}</td><td>${escapeHtml(money(row.netFlow))}</td><td>${escapeHtml(money(row.gain))}</td>

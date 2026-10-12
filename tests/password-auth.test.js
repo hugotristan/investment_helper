@@ -79,7 +79,8 @@ test("login is standalone, uncached and does not expose credentials or load prot
   assert.match(html, /type="password"/);
   assert.match(html, /autocomplete="current-password"/);
   assert.match(html, /value="\/#portfolio"/);
-  assert.doesNotMatch(html, /<script|<link|border-radius:(?!0)/);
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg/);
+  assert.doesNotMatch(html, /<script|<link(?! rel="icon")|border-radius:(?!0)/);
   assert(!html.includes(PASSWORD));
   assert(!html.includes(secrets.INVESTMENT_PASSWORD_HASH));
   assert.equal((await app.fetch(request("/login", { method: "HEAD" }), env)).body, null);

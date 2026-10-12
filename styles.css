@@ -86,6 +86,8 @@ dl { margin: 0; }
 .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 18px; min-width: 0; }
 .quick-search { display: flex; align-items: center; gap: 6px; width: 210px; }
 .quick-search input { min-height: 38px; font-size: .78rem; }
+.quick-search input:focus { border-color: var(--border-strong); }
+.quick-search input:focus-visible { outline-color: var(--border-strong); }
 .quick-search button { min-width: 54px; min-height: 38px; flex-shrink: 0; padding: 9px 12px; border-color: var(--border-strong); background: transparent; color: var(--muted-foreground); font-size: .78rem; }
 .quick-search button:hover { background: var(--muted); color: var(--foreground); }
 .quick-search button svg { width: 17px; height: 17px; }

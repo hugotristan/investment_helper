@@ -4,7 +4,7 @@ import { gzipSync } from "node:zlib";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const publicFiles = ["index.html", "styles.css", "app.js"];
+const publicFiles = ["index.html", "styles.css", "app.js", "favicon.svg"];
 const dataFiles = ["earnings-calendar.json", "exchange-rate.json", "fundamentals.json", "instruments.json", "portfolio-fx.json", "prices.json", "sec-tickers.json"];
 const mime = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml" };
 async function browserModules(directory) {

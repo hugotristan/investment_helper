@@ -29,7 +29,7 @@ createServer(async (incoming, outgoing) => {
       response = await app.fetch(request, { DB: database, ...passwordPreview });
     } else {
       const name = decodeURIComponent(url.pathname) === "/" ? "index.html" : decodeURIComponent(url.pathname).slice(1);
-      const allowed = ["index.html", "styles.css", "app.js"].includes(name) || /^(?:js\/[^.][\w/.-]*\.js|data\/[\w-]+\.json)$/.test(name);
+      const allowed = ["index.html", "styles.css", "app.js", "favicon.svg"].includes(name) || /^(?:js\/[^.][\w/.-]*\.js|data\/[\w-]+\.json)$/.test(name);
       const filename = resolve(root, name);
       if (!allowed || !filename.startsWith(`${root}\\`) && !filename.startsWith(`${root}/`)) response = new Response("Not found", { status: 404 });
       else {

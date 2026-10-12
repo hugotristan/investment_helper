@@ -48,7 +48,8 @@ export function createApp(assets, options = {}) {
           const denied = methodAllowed(request, ["GET"]);
           return denied || json({ ok: true, cloud: true, storageAvailable: storageAvailable(env) });
         }
-        if (authMode === "password") {
+        // The public brand icon contains no app or portfolio data.
+        if (authMode === "password" && url.pathname !== "/favicon.svg") {
           const access = await passwordGate(request, env);
           if (access.response) return access.response;
           userId = access.userId;
