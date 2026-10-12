@@ -1,5 +1,13 @@
 # Feature changes
 
+## Annual summary
+
+**What changed:** Reports has a year selector, opening and closing daily-close values, period gain, linked approximate return, monthly gain bars, and disclosures for recorded funding, dividends, fees and gains. Current years are marked year to date; first tracking years show the actual start date. One CSV contains the selected-year summary plus every month, with coverage and estimate flags. The report does not write portfolio data.
+
+**How:** The annual wrapper reuses the existing performance model and its historical prices/FX, independently of Performance-page date filters. It measures changes from the opening snapshot or previous December 31, excludes transactions after the report end, and scopes sale gains by subtracting the earlier cumulative amount. Changes in unrealized gains offset profits carried from earlier years. Funding and cash activity remain visible without prices; missing valuations or returns remain unavailable. Foreign fees and non-EUR income converted using reference rates are labelled estimates. Calculations run when opening the annual page and cache until its year, ledger or historical data changes. Locking clears the report and blocks CSV export.
+
+**Validation:** Independent multi-year cases reconcile carried gains, sales, funding, dividends and fees without double charging trade fees. Checks cover geometric linking, partial years, opening market values, exact EUR settlements, FX estimates, missing prices and gaps, UTC/Tallinn year boundaries, future acquisitions, input preservation, scoped CSV, stale replies and lock privacy.
+
 ## Retirement scenarios
 
 **What changed:** Reports has a retirement scenario using the current complete EUR portfolio value, including recorded cash. Enter a retirement month, monthly EUR contributions, effective annual return, inflation, monthly withdrawals in today's EUR, and a withdrawal horizon. Calculate a preview without saving, or sync one scenario across devices. The report shows retirement value, today's purchasing power, a growth chart, annual snapshots, any first withdrawal shortfall and a full monthly CSV.

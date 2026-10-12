@@ -298,6 +298,7 @@
               <a href="#report-transactions"><span>Transactions</span><small>Filter and export your recorded history</small><span aria-hidden="true">↗</span></a>
               <a href="#report-dividends"><span>Dividend forecast</span><small>Expected cash payments from your entered assumptions</small><span aria-hidden="true">↗</span></a>
               <a href="#report-retirement"><span>Retirement scenarios</span><small>Contributions, purchasing power and future withdrawals</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-annual"><span>Annual summary</span><small>Year-end value, funding, gains, dividends and fees</small><span aria-hidden="true">↗</span></a>
             </div></section>
           </section>
           <section class="view-page" data-page="report-etf" aria-label="ETF exposure" hidden>
@@ -337,6 +338,12 @@
                   <button type="submit">Calculate preview</button><button id="reportRetirementSave" class="ghost" type="button">Save assumptions</button><button id="reportRetirementReload" class="ghost" type="button">Reload editor</button><button id="reportRetirementRemove" class="ghost" type="button" disabled>Remove saved scenario</button>
                 </form><p class="data-note">Enter your own return and inflation assumptions. Contributions are fixed EUR; withdrawals are entered in today's euros and rise with inflation.</p><p id="reportRetirementStatus" class="data-note" role="status" aria-live="polite"></p>
               </details>
+            </section>
+          </section>
+          <section class="view-page" data-page="report-annual" aria-label="Annual summary" hidden>
+            <section class="panel"><div class="section-heading"><h2>Annual summary</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><label>Year<select id="reportAnnualYear"></select></label><button id="reportAnnualExport" class="ghost" type="button" disabled>Export CSV</button></div>
+              <div id="reportAnnualBody"></div>
             </section>
           </section>
           <section class="view-page" data-page="report-allocation" aria-label="Allocation report" hidden>
@@ -419,26 +426,26 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-retirement",
-          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-retirement",
-          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-retirement",
-          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261012-retirement",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261012-retirement",
-          "./js/storage.js": "./js/storage.js?v=20261012-retirement",
-          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261012-retirement",
-          "./js/data/market.js": "./js/data/market.js?v=20261012-retirement",
-          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261012-retirement",
-          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261012-retirement",
-          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261012-retirement",
-          "./js/features/detail.js": "./js/features/detail.js?v=20261012-retirement",
-          "./js/features/questions.js": "./js/features/questions.js?v=20261012-retirement",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261012-retirement",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-retirement",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-retirement",
-          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-retirement"
+          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-annual",
+          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-annual",
+          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-annual",
+          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261012-annual",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261012-annual",
+          "./js/storage.js": "./js/storage.js?v=20261012-annual",
+          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261012-annual",
+          "./js/data/market.js": "./js/data/market.js?v=20261012-annual",
+          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261012-annual",
+          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261012-annual",
+          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261012-annual",
+          "./js/features/detail.js": "./js/features/detail.js?v=20261012-annual",
+          "./js/features/questions.js": "./js/features/questions.js?v=20261012-annual",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261012-annual",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-annual",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-annual",
+          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-annual"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261012-retirement"></script>
+    <script type="module" src="app.js?v=20261012-annual"></script>
   </body>
 </html>

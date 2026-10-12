@@ -20,6 +20,7 @@ import { initializeInvestmentReport } from "./js/features/report-investments.js"
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
 import { initializeDividendReport, refreshDividendReport } from "./js/features/report-dividends.js";
 import { initializeRetirementReport } from "./js/features/report-retirement.js";
+import { initializeAnnualReport, refreshAnnualReport } from "./js/features/report-annual.js";
 import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
 import { initializeAnalyst, refreshPortfolioInsights } from "./js/features/analyst.js";
 import { answerQuestion } from "./js/features/questions.js";
@@ -62,6 +63,7 @@ async function init() {
   initializeFundingReport();
   initializeDividendReport();
   initializeRetirementReport();
+  initializeAnnualReport();
   initializeTransactionReport();
   initializeAnalyst();
   initializeTickerSuggestions();
@@ -145,6 +147,7 @@ function portfolioChanged({ metadataOnly = false } = {}) {
   refreshPortfolioInsights();
   refreshFundingReport();
   refreshDividendReport();
+  refreshAnnualReport();
   refreshTransactionReport();
   refreshPortfolioOrganization();
   renderPortfolioReview(buildPortfolioReview(scanState.latestRankedResults, scanState.latestMarketContext), scanState.latestPriceSource);

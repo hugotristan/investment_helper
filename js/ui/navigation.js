@@ -15,6 +15,7 @@ const pages = {
   "report-etf": "ETF exposure",
   "report-dividends": "Dividend forecast",
   "report-retirement": "Retirement scenarios",
+  "report-annual": "Annual summary",
   performance: "Research picks",
   ask: "Stock check",
   signals: "Signals",
