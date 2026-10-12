@@ -19,6 +19,7 @@ import { initializePortfolioPerformance, refreshPortfolioPerformance, refreshPer
 import { initializeInvestmentReport } from "./js/features/report-investments.js";
 import { initializeFundingReport, refreshFundingReport } from "./js/features/report-funding.js";
 import { initializeDividendReport, refreshDividendReport } from "./js/features/report-dividends.js";
+import { initializeRetirementReport } from "./js/features/report-retirement.js";
 import { initializeTransactionReport, refreshTransactionReport } from "./js/features/report-transactions.js";
 import { initializeAnalyst, refreshPortfolioInsights } from "./js/features/analyst.js";
 import { answerQuestion } from "./js/features/questions.js";
@@ -60,6 +61,7 @@ async function init() {
   initializeInvestmentReport();
   initializeFundingReport();
   initializeDividendReport();
+  initializeRetirementReport();
   initializeTransactionReport();
   initializeAnalyst();
   initializeTickerSuggestions();

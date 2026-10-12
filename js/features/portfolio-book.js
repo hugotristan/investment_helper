@@ -103,6 +103,16 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     });
   }
 
+  async function saveRetirementScenario(retirementScenario, expectedUpdatedAt) {
+    return work("reportRetirementStatus", async () => {
+      const book = getActivePortfolioBook();
+      if (!book || doc.documentElement?.dataset?.privateBlocked === "true") throw new TypeError("Unlock and load your portfolio before saving retirement assumptions.");
+      if (book.updatedAt !== expectedUpdatedAt) throw new TypeError("Your portfolio changed. Reload the retirement editor before saving.");
+      await commit(changed(book, { retirementScenario }), expectedUpdatedAt, { metadataOnly: true });
+      message("reportRetirementStatus", "Assumptions saved.");
+    });
+  }
+
   async function work(id, action) {
     if (!loaded || busy) { message(id, "Wait for the current portfolio operation to finish, then try again."); return false; }
     setBusy(true);
@@ -524,7 +534,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
   }
 
   return { initialize, setup, saveTransaction, saveSettings, startHistory, removeTransaction, importBackup, restoreBackup, exportBackup,
-    openTransactionEditor, writeOpeningHoldings, saveOrganization, saveDividendAssumptions, refreshFromStorage, render,
+    openTransactionEditor, writeOpeningHoldings, saveOrganization, saveDividendAssumptions, saveRetirementScenario, refreshFromStorage, render,
     get book() { return getActivePortfolioBook(); }, get pendingBackup() { return pendingBackup; } };
 }
 
@@ -550,3 +560,4 @@ export function openPortfolioTransactionEditor() { controller?.openTransactionEd
 export function reloadPortfolioBook() { return controller?.refreshFromStorage(); }
 export function savePortfolioOrganization(organization, expectedUpdatedAt) { return controller?.saveOrganization(organization, expectedUpdatedAt); }
 export function savePortfolioDividendAssumptions(assumptions, expectedUpdatedAt) { return controller?.saveDividendAssumptions(assumptions, expectedUpdatedAt); }
+export function savePortfolioRetirementScenario(assumptions, expectedUpdatedAt) { return controller?.saveRetirementScenario(assumptions, expectedUpdatedAt); }

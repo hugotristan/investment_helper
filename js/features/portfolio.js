@@ -7,6 +7,7 @@ import { positionKey, positionOrganization } from "../analysis/portfolio-organiz
 import { renderPortfolioAnalytics } from "./portfolio-analytics.js";
 import { renderAllocationReport } from "./report-allocation.js";
 import { renderEtfReport } from "./report-etf.js";
+import { renderRetirementReport } from "./report-retirement.js";
 import { getExchangeRate, normalizeExchangeRate } from "../data/exchange-rate.js";
 import { formatNumber, formatPercent } from "../shared/format.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
@@ -168,6 +169,7 @@ export function renderPortfolioReview(portfolio, priceSource, { now = Date.now()
   renderPortfolioAnalytics(displayHoldings);
   renderAllocationReport(displayHoldings);
   renderEtfReport(displayHoldings);
+  renderRetirementReport(portfolio.holdings, rate);
   if (!portfolio.holdings.length) {
     els.portfolioReview.innerHTML = `<div class="empty-state">Add a holding to track its value and gain or loss.</div>`;
     return;

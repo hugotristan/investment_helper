@@ -111,6 +111,18 @@ test("dividend assumptions save independently of accounting and reject stale rev
   assert.deepEqual(f.stored.dividendAssumptions, assumptions);
 });
 
+test("retirement scenario saves preserve accounting and do not overwrite stale portfolio revisions", async () => {
+  const initial = book(), before = projectPortfolioBook(initial), f = fixture(initial);
+  await f.controller.initialize();
+  const scenario = { retirementMonth: "2050-10", monthlyContribution: 200, annualReturnPercent: 4,
+    annualInflationPercent: 2, monthlyWithdrawal: 1000, withdrawalYears: 30 };
+  assert.equal(await f.controller.saveRetirementScenario(scenario, initial.updatedAt), true);
+  assert.deepEqual(f.stored.retirementScenario, scenario); assert.deepEqual(projectPortfolioBook(f.stored), before);
+  assert.equal(await f.controller.saveRetirementScenario(null, initial.updatedAt), false); assert.equal(f.writes, 1);
+  assert.equal(await f.controller.saveRetirementScenario(null, f.stored.updatedAt), true);
+  assert.equal(f.stored.retirementScenario, null); assert.deepEqual(projectPortfolioBook(f.stored), before);
+});
+
 test("setup preserves current holdings and legacy source without changing localStorage snapshot", async () => {
   const f = fixture();
   const previous = structuredClone(state.holdings);

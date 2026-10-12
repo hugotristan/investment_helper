@@ -1,5 +1,13 @@
 # Feature changes
 
+## Retirement scenarios
+
+**What changed:** Reports has a retirement scenario using the current complete EUR portfolio value, including recorded cash. Enter a retirement month, monthly EUR contributions, effective annual return, inflation, monthly withdrawals in today's EUR, and a withdrawal horizon. Calculate a preview without saving, or sync one scenario across devices. The report shows retirement value, today's purchasing power, a growth chart, annual snapshots, any first withdrawal shortfall and a full monthly CSV.
+
+**How:** A bounded monthly model converts effective annual return to its monthly equivalent. Contributions occur after growth and stop at retirement; withdrawals begin the next month and rise with inflation measured from today. The model records funded and unfunded withdrawals separately and keeps balances non-negative. All current assets, including cash, earn the entered return. Dividends are part of that assumed total return. Taxes, fees, pensions and variable returns are not modeled. Optional metadata uses existing validation, revision checks, D1 sync and backup/restore. Missing current valuations block projections; stale drafts cannot overwrite a newer book, and locking clears forecasts and inputs.
+
+**Validation:** Independent accounting/annuity checks cover zero and negative returns, fractional amounts, effective annual compounding, inflation and deflation, depletion, expired targets and bounded horizons. Editor checks cover read-only previews, saved assumptions, refreshed prices, stale edits, CSV and lock privacy. Existing portfolio and backend tests verify metadata round trips without changing actual transactions or accounting.
+
 ## Dividend cash-flow forecast
 
 **What changed:** Reports has a 12-month dividend forecast with monthly EUR estimates, expected payment details and CSV export. Each held stock or distributing ETF can have a gross native-currency dividend per share, next payment date and repeat interval, or an explicit No cash dividend assumption. VWCE's verified accumulating listings are excluded. Missing assumptions and FX are visible; projected payments do not become recorded income or cash.

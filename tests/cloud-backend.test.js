@@ -124,6 +124,8 @@ test("portfolio round trips validated native settlement data and separates authe
   ] };
   book.dividendAssumptions = [{ ticker: "MSFT", currency: "USD", amountPerShare: 0.75,
     firstPaymentDate: "2026-11-30", frequency: "quarterly" }];
+  book.retirementScenario = { retirementMonth: "2050-10", monthlyContribution: 200, annualReturnPercent: 4,
+    annualInflationPercent: 2, monthlyWithdrawal: 1000, withdrawalYears: 30 };
   book.transactions = [
     { id: "fund", type: "deposit", date: "2020-01-01", currency: "EUR", amount: 1000, note: "", cashCurrency: "EUR", cashAmount: 1000 },
     { id: "purchase", type: "buy", date: "2020-01-02", currency: "USD", ticker: "MSFT", quantity: 1, price: 330, fee: 1, note: "", cashCurrency: "EUR", cashAmount: 300 },
@@ -136,6 +138,7 @@ test("portfolio round trips validated native settlement data and separates authe
   assert.equal(save.data.book.transactions[1].cashAmount, 300);
   assert.deepEqual(save.data.book.organization, book.organization);
   assert.deepEqual(save.data.book.dividendAssumptions, book.dividendAssumptions);
+  assert.deepEqual(save.data.book.retirementScenario, book.retirementScenario);
   assert.deepEqual((await response(app, { DB }, "/api/portfolio")).data, save.data);
   assert.deepEqual((await response(app, { DB }, "/api/portfolio", { user: "owner-two" })).data,
     { book: null, revision: 0, updatedAt: null, userId: "owner-two" });

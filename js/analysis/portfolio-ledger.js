@@ -1,10 +1,11 @@
 import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { normalizePortfolioOrganization } from "./portfolio-organization.js";
 import { normalizeDividendAssumptions } from "./dividend-assumptions.js";
+import { normalizeRetirementScenario } from "./retirement-assumptions.js";
 
 const CURRENCIES = new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD"]);
 const TYPES = new Set(["buy", "sell", "deposit", "withdrawal", "dividend", "fee", "opening_cash"]);
-const BOOK_KEYS = ["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput", "organization", "dividendAssumptions"];
+const BOOK_KEYS = ["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput", "organization", "dividendAssumptions", "retirementScenario"];
 const TRANSACTION_KEYS = ["id", "type", "date", "currency", "ticker", "quantity", "price", "amount", "fee", "note", "cashCurrency", "cashAmount"];
 const tallinnDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Tallinn", year: "numeric", month: "2-digit", day: "2-digit" });
 
@@ -91,8 +92,9 @@ function normalizeBook(input, now) {
   }
   const organization = Object.hasOwn(input, "organization") ? normalizePortfolioOrganization(input.organization) : null;
   const dividendAssumptions = Object.hasOwn(input, "dividendAssumptions") ? normalizeDividendAssumptions(input.dividendAssumptions) : null;
+  const retirementScenario = Object.hasOwn(input, "retirementScenario") ? { retirementScenario: normalizeRetirementScenario(input.retirementScenario) } : {};
   return { schemaVersion: 1, id: "personal", settings: { baseCurrency, startDate }, openingHoldings, transactions, createdAt, updatedAt, legacyPortfolioInput,
-    ...(organization ? { organization } : {}), ...(dividendAssumptions ? { dividendAssumptions } : {}) };
+    ...(organization ? { organization } : {}), ...(dividendAssumptions ? { dividendAssumptions } : {}), ...retirementScenario };
 }
 
 function normalizeOpening(input, strict, fallbackId) {

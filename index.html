@@ -297,6 +297,7 @@
               <a href="#report-funding"><span>Contributions and withdrawals</span><small>Monthly deposits, withdrawals, and net funding</small><span aria-hidden="true">↗</span></a>
               <a href="#report-transactions"><span>Transactions</span><small>Filter and export your recorded history</small><span aria-hidden="true">↗</span></a>
               <a href="#report-dividends"><span>Dividend forecast</span><small>Expected cash payments from your entered assumptions</small><span aria-hidden="true">↗</span></a>
+              <a href="#report-retirement"><span>Retirement scenarios</span><small>Contributions, purchasing power and future withdrawals</small><span aria-hidden="true">↗</span></a>
             </div></section>
           </section>
           <section class="view-page" data-page="report-etf" aria-label="ETF exposure" hidden>
@@ -318,6 +319,23 @@
                   <label>Next payment date<input id="reportDividendDate" type="date" required></label>
                   <button id="reportDividendSave" type="submit">Save assumption</button><button id="reportDividendRemove" class="ghost" type="button">Remove assumption</button><button id="reportDividendReload" class="ghost" type="button">Reload editor</button>
                 </form><p id="reportDividendPositionHint" class="data-note"></p><p id="reportDividendStatus" class="data-note" role="status" aria-live="polite"></p>
+              </details>
+            </section>
+          </section>
+          <section class="view-page" data-page="report-retirement" aria-label="Retirement scenarios" hidden>
+            <section class="panel"><div class="section-heading"><h2>Retirement scenarios</h2><a href="#reports">All reports ↗</a></div>
+              <div class="report-controls"><button id="reportRetirementExport" class="ghost" type="button" disabled>Export CSV</button></div>
+              <div id="reportRetirementBody"></div>
+              <details id="reportRetirementEditor" class="secondary-details" open hidden><summary>Scenario assumptions</summary>
+                <form id="reportRetirementForm" class="report-controls">
+                  <label>Retirement month<input id="reportRetirementMonth" type="month" required></label>
+                  <label>Monthly contribution · EUR<input id="reportRetirementContribution" type="number" min="0" max="1000000" step="any" required></label>
+                  <label>Annual return · effective %<input id="reportRetirementReturn" type="number" min="-99" max="50" step="any" required></label>
+                  <label>Annual inflation · %<input id="reportRetirementInflation" type="number" min="-10" max="20" step="any" required></label>
+                  <label>Monthly withdrawal · today's EUR<input id="reportRetirementWithdrawal" type="number" min="0" max="1000000" step="any" required></label>
+                  <label>Years after retirement<input id="reportRetirementYears" type="number" min="1" max="60" step="1" value="30" required></label>
+                  <button type="submit">Calculate preview</button><button id="reportRetirementSave" class="ghost" type="button">Save assumptions</button><button id="reportRetirementReload" class="ghost" type="button">Reload editor</button><button id="reportRetirementRemove" class="ghost" type="button" disabled>Remove saved scenario</button>
+                </form><p class="data-note">Enter your own return and inflation assumptions. Contributions are fixed EUR; withdrawals are entered in today's euros and rise with inflation.</p><p id="reportRetirementStatus" class="data-note" role="status" aria-live="polite"></p>
               </details>
             </section>
           </section>
@@ -401,26 +419,26 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261011-dividends",
-          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261011-dividends",
-          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261011-dividends",
-          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261011-dividends",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261011-dividends",
-          "./js/storage.js": "./js/storage.js?v=20261011-dividends",
-          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261011-dividends",
-          "./js/data/market.js": "./js/data/market.js?v=20261011-dividends",
-          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261011-dividends",
-          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261011-dividends",
-          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261011-dividends",
-          "./js/features/detail.js": "./js/features/detail.js?v=20261011-dividends",
-          "./js/features/questions.js": "./js/features/questions.js?v=20261011-dividends",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261011-dividends",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261011-dividends",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261011-dividends",
-          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261011-dividends"
+          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-retirement",
+          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-retirement",
+          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-retirement",
+          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261012-retirement",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261012-retirement",
+          "./js/storage.js": "./js/storage.js?v=20261012-retirement",
+          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261012-retirement",
+          "./js/data/market.js": "./js/data/market.js?v=20261012-retirement",
+          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261012-retirement",
+          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261012-retirement",
+          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261012-retirement",
+          "./js/features/detail.js": "./js/features/detail.js?v=20261012-retirement",
+          "./js/features/questions.js": "./js/features/questions.js?v=20261012-retirement",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261012-retirement",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-retirement",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-retirement",
+          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-retirement"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261011-dividends"></script>
+    <script type="module" src="app.js?v=20261012-retirement"></script>
   </body>
 </html>
