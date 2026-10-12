@@ -88,6 +88,7 @@ export const companyAliases = {
   google: "GOOGL",
   amd: "AMD",
   broadcom: "AVGO",
+  vistra: "VST",
   netflix: "NFLX",
   palantir: "PLTR",
   "jp morgan": "JPM",

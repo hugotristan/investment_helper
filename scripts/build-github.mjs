@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const target = resolve(root, "dist/github");
 await mkdir(target, { recursive: true });
-for (const name of ["index.html", "styles.css", "app.js", "js", "data"]) {
+for (const name of ["index.html", "styles.css", "app.js", "favicon.svg", "js", "data"]) {
   await cp(resolve(root, name), resolve(target, name), { recursive: true });
 }
 console.log("Prepared browser-local GitHub Pages assets.");

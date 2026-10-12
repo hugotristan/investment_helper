@@ -1,5 +1,13 @@
 # Feature changes
 
+## Yahoo request handling and price backups
+
+**What changed:** Covered stocks and ETFs use the shared published snapshot and the embedded backup before any direct Yahoo request. A Yahoo 429 starts a cooldown shared across tickers within the Worker instance. VST is included in scheduled price publication, and the real snapshot was refreshed for all 98 configured and saved symbols. The static Pages build also includes the existing site icon.
+
+**How:** Backup selection keeps the newest original history and quote observation independently, rejects stale or malformed records, and shares the publisher request. Direct lookups remain available for uncovered symbols. Retry-After accepts seconds or an HTTP date, with a one-minute minimum, 30-minute maximum and five-minute default; requests resume after the interval. Private portfolio records and watchlist membership are not changed or sent to the price publisher.
+
+**Validation:** Coverage was checked against all 87 saved watchlist symbols, recorded portfolio tickers and the configured publisher universe. All 98 backups are usable, and VST has 1,253 completed bars plus a dated quote. Backend checks cover avoiding Yahoo for covered symbols, retaining a newer embedded quote, deduplicated publisher reads and cooldown expiry across symbols. The publisher checks include VST's scheduled membership and preserve original dates during failures.
+
 ## Watchlist search and sorting
 
 **What changed:** Watchlist has a visible ticker/company search, sort selector, direction selector and Clear search button. Search covers every saved symbol, including those beyond the initial preview or with unavailable prices, and also filters the editor's ticker chips. Ticker, company name, daily change, score and the existing technical sort options support ascending and descending order.

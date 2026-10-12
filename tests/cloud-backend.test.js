@@ -544,9 +544,68 @@ test("network runtime failures recover from bounded compressed embedded public p
   assert.equal(historical.status, 200);
   assert.equal(historical.data.generatedAt, "2026-10-09T21:00:00.000Z");
   assert.equal(calls.filter((url) => url.endsWith("/prices.json")).length, 1);
-  assert.equal(diagnostics.filter(({ provider }) => provider === "yahoo").length, 1);
+  assert.equal(diagnostics.filter(({ provider }) => provider === "yahoo").length, 0);
   assert(diagnostics.every(({ reason }) => reason === "fetch-binding"));
   assert(!JSON.stringify(diagnostics).includes("untrusted private text"));
+});
+
+test("covered symbols use one publisher request, avoid Yahoo and preserve newer embedded quotes", async () => {
+  const embedded = publishedFixture(["VST", "MSFT"]);
+  embedded.byTicker.VST.quote.price = 120;
+  embedded.byTicker.VST.quote.quoteTime = "2026-10-10T11:00:00.000Z";
+  const remote = publishedFixture(["VST", "MSFT"]);
+  const calls = [];
+  const app = createApp({ ...assets, "data/prices.json": embeddedJson(embedded) }, {
+    now: NOW, fetchImpl: async (url) => {
+      calls.push(String(url));
+      assert.equal(String(url), "https://hugotristan.github.io/investment_helper/data/prices.json");
+      return Response.json(remote);
+    }
+  });
+  const [vst, msft] = await Promise.all([response(app, {}, "/api/market/history?ticker=VST"),
+    response(app, {}, "/api/market/history?ticker=MSFT")]);
+  assert.equal(vst.status, 200);
+  assert.equal(msft.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(vst.data.quote.price, 120);
+  assert.equal(vst.data.quote.quoteTime, "2026-10-10T11:00:00.000Z");
+  assert.equal(vst.data.historyAsOf, embedded.byTicker.VST.historyAsOf);
+});
+
+test("a Yahoo 429 stops further ticker requests until the shared bounded Retry-After expires", async () => {
+  for (const retryAfter of [null, "600", new Date(NOW + 10 * 60000).toUTCString()]) {
+    let now = NOW;
+    let yahooCalls = 0;
+    const app = createApp(assets, { now: () => now, reportFailure() {}, fetchImpl: async (url) => {
+      if (!String(url).includes("finance.yahoo.com")) return new Response("Unavailable", { status: 503 });
+      yahooCalls += 1;
+      if (yahooCalls === 1) return new Response("Rate limited", { status: 429,
+        headers: retryAfter ? { "Retry-After": retryAfter } : {} });
+      return Response.json(yahooChart("MSFT"));
+    } });
+    assert.equal((await response(app, {}, "/api/market/history?ticker=VST")).status, 503);
+    assert.equal((await response(app, {}, "/api/market/history?ticker=MSFT")).status, 503);
+    assert.equal(yahooCalls, 1);
+    now += retryAfter ? 10 * 60000 + 1 : 5 * 60000 + 1;
+    assert.equal((await response(app, {}, "/api/market/history?ticker=MSFT")).status, 200);
+    assert.equal(yahooCalls, 2);
+  }
+});
+
+test("a large covered watchlist remains available after more than 96 distinct completed lookups", async () => {
+  const tickers = Array.from({ length: 110 }, (_, index) => `ST${index}`);
+  const snapshot = publishedFixture(tickers);
+  let publisherCalls = 0;
+  const app = createApp({ ...assets, "data/prices.json": embeddedJson(snapshot) }, {
+    now: NOW, fetchImpl: async (url) => {
+      assert.equal(String(url), "https://hugotristan.github.io/investment_helper/data/prices.json");
+      publisherCalls += 1;
+      return Response.json(snapshot);
+    }
+  });
+  for (const ticker of tickers) assert.equal((await response(app, {}, `/api/market/history?ticker=${ticker}`)).status, 200, ticker);
+  assert.equal((await response(app, {}, "/api/market/history?ticker=ST0")).status, 200);
+  assert.equal(publisherCalls, 1);
 });
 
 test("embedded recovery rejects stale prices, wrong-currency rates, incomplete histories and oversized decompressed files", async () => {
