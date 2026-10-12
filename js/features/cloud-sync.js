@@ -35,8 +35,11 @@ export function initializeCloudSync({ document: doc = globalThis.document, windo
       state.tickerInput = "";
       if (doc.documentElement) doc.documentElement.dataset.privateBlocked = "true";
     } else if (value.status === "ready" && doc.documentElement) doc.documentElement.dataset.privateBlocked = "false";
-    if (status) status.textContent = value.mode === "browser" ? "Saved in this browser" : value.status === "ready" ? "Cloud sync" : value.status === "connecting" ? "Connecting to cloud…" : "Cloud sync unavailable";
-    if (status) status.dataset.syncState = value.status;
+    if (status) {
+      status.textContent = value.mode === "browser" ? "Saved in this browser" : value.status === "ready" ? "" : value.status === "connecting" ? "Connecting to cloud…" : "Cloud sync unavailable";
+      status.hidden = value.mode !== "browser" && value.status === "ready";
+      status.dataset.syncState = value.status;
+    }
     say(value.message);
     const expired = value.errorCode === "UNAUTHORIZED";
     if (reload) { reload.hidden = !session.isCloud || expired; reload.disabled = busy; }

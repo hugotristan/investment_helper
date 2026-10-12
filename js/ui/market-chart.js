@@ -46,7 +46,7 @@ export function buildIndexComparison(results, period = "3M", { now = Date.now(),
     values: dates.map((date) => entry.byDay.get(date) / entry.byDay.get(dates[0]) - 1) }));
   if (series.some((entry) => !entry.values.every(finiteChange))) return unavailable("Index price changes could not be calculated from this history.");
   return { available: true, dates, series, partial,
-    note: available.length === 1 ? `${available[0].ticker} only; the other index is unavailable.` : "Matching SPY and QQQ dates." };
+    note: available.length === 1 ? `${available[0].ticker} only; the other index is unavailable.` : "" };
 }
 
 function unavailable(reason) { return { available: false, reason, dates: [], series: [] }; }
@@ -103,7 +103,7 @@ export function renderIndexComparison(results, priceSource) {
         ${model.series.map((series, index) => `<circle data-market-dot="${index}" class="market-chart-dot ${classes[index]}" cx="${xs[last]}" cy="${y(series.values[last])}" r="4" fill="currentColor"/>`).join("")}
         <text x="${plot.left}" y="${height - 8}">${escapeHtml(dateLabel(model.dates[0]))}</text><text x="${width - plot.right}" y="${height - 8}" text-anchor="end">${escapeHtml(dateLabel(model.dates.at(-1)))}</text>
       </svg><output id="overviewChartReadout" role="status" aria-live="polite" aria-atomic="true">${escapeHtml(readout(model, last))}</output>
-      <p class="market-chart-caption">${escapeHtml(model.note)}${model.partial ? " Available history only." : ""} Today's unfinished bar is excluded. Hover, touch, or use ← →, Home, End.</p>`;
+      ${model.note || model.partial ? `<p class="market-chart-caption">${escapeHtml(model.note)}${model.partial ? " Available history only." : ""}</p>` : ""}`;
     views.set(container, { model, geometry, index: last });
   }
   bindInteractions(container);
@@ -198,7 +198,7 @@ export function renderWatchlistMoves(results, tickers, quotes, priceSource) {
     return `<li class="watchlist-move"><div class="watchlist-move-label"><a href="#detail" data-detail-ticker="${escapeHtml(move.ticker)}">${escapeHtml(move.ticker)}</a><small>${known ? escapeHtml(asOf) : "Price unavailable"}</small></div>
       <div class="watchlist-move-value ${known ? move.change < 0 ? "change-negative" : move.change > 0 ? "change-positive" : "change-neutral" : "change-neutral"}">${known ? escapeHtml(formatPercent(move.change)) : "Unavailable"}<small>${escapeHtml(move.source)}</small></div>
       <div class="watchlist-move-bar" aria-hidden="true"><span class="${move.change < 0 ? "negative" : "positive"}" style="left:${move.change < 0 ? 50 - width : 50}%;width:${width}%"></span></div></li>`;
-  }).join("")}</ul><p class="data-note">Dated price observations; published quotes refresh about every 30 minutes during U.S. market hours.</p>` : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>';
+  }).join("")}</ul>` : '<p class="empty-state">Your watchlist is empty. <a href="#screener">Add a stock or ETF</a>.</p>';
 }
 
 function day(value) {
