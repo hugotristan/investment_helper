@@ -12,6 +12,7 @@ globalThis.localStorage = { getItem: () => null };
 const { state } = await import("../js/storage.js");
 const { scanState } = await import("../js/scan-state.js");
 const { renderScreener } = await import("../js/features/screener.js");
+const { watchlistRows, setWatchlistCatalog } = await import("../js/analysis/watchlist-view.js");
 
 beforeEach(() => {
   state.tickerInput = "OWN";
@@ -19,6 +20,9 @@ beforeEach(() => {
   element("screenerMinScore").value = "0";
   element("screenerMinLiquidity").value = "0";
   element("screenerSort").value = "score";
+  element("screenerSortDirection").value = "desc";
+  element("watchlistSearch").value = "";
+  setWatchlistCatalog({ entries: [] });
   scanState.latestRankedResults = [];
 });
 
@@ -64,4 +68,57 @@ test("unavailable and missing watched histories cannot show signals and have vis
   assert.match(html, /Unavailable prices \(2\)/);
   assert.match(html, /OLD<\/strong> — History &lt; 200 days/);
   assert.match(html, /MISS<\/strong> — Not returned/);
+});
+
+test("search finds a saved ticker beyond the preview and temporarily bypasses filters", () => {
+  const tickers = Array.from({ length: 45 }, (_, index) => `ST${String(index).padStart(2, "0")}`);
+  state.tickerInput = [...tickers, "VST"].join(", ");
+  scanState.latestRankedResults = [...tickers.map(ticker => stock(ticker)), stock("VST", { score: 10 })];
+  element("screenerMinScore").value = "90";
+  element("watchlistSearch").value = " vst ";
+  renderScreener();
+  assert.deepEqual(displayedTickers(), ["VST"]);
+  assert.match(element("screenerResults").innerHTML, /1 of 46 watched/);
+  assert.match(element("screenerResults").innerHTML, /filters paused/);
+  assert.equal(element("screenerMinScore").value, "90");
+  assert.equal(state.tickerInput, [...tickers, "VST"].join(", "));
+  element("watchlistSearch").value = "";
+  renderScreener();
+  assert.deepEqual(displayedTickers(), []);
+});
+
+test("company search works before prices arrive, without including unsaved discovery stocks", () => {
+  state.tickerInput = "VST, MSFT";
+  setWatchlistCatalog({ entries: [{ ticker: "VST", label: "Vistra Corp" }] });
+  element("watchlistSearch").value = "vistra";
+  renderScreener();
+  assert.deepEqual(displayedTickers(), ["VST"]);
+  assert.match(element("screenerResults").innerHTML, /Vistra Corp/);
+  assert.match(element("screenerResults").innerHTML, /Unavailable/);
+  scanState.latestRankedResults = [stock("VST", { quote: { name: "VST" } })];
+  renderScreener();
+  assert.deepEqual(displayedTickers(), ["VST"]);
+  state.tickerInput = "MSFT";
+  scanState.latestRankedResults = [stock("VST")];
+  renderScreener();
+  assert.deepEqual(displayedTickers(), []);
+  assert.match(element("screenerResults").innerHTML, /No saved tickers match/);
+});
+
+test("sorts text and numeric values in both directions with unknowns last, preserving inputs", () => {
+  const tickers = ["ZZZ", "AAA", "VST", "MISS"];
+  const results = [stock("ZZZ", { score: 0, oneDay: -.03, quote: { name: "Alpha" } }),
+    stock("AAA", { score: 90, oneDay: .02, quote: { name: "Zulu" } }),
+    stock("VST", { score: 20, oneDay: 0, quote: { name: "Vistra" } })];
+  const original = structuredClone({ tickers, results });
+  const ordered = options => watchlistRows(tickers, results, options).map(row => row.ticker);
+  assert.deepEqual(ordered({ sort: "ticker", direction: "asc" }), ["AAA", "MISS", "VST", "ZZZ"]);
+  assert.deepEqual(ordered({ sort: "ticker", direction: "desc" }), ["ZZZ", "VST", "MISS", "AAA"]);
+  assert.deepEqual(ordered({ sort: "name", direction: "asc" }), ["ZZZ", "MISS", "VST", "AAA"]);
+  assert.deepEqual(ordered({ sort: "name", direction: "desc" }), ["AAA", "VST", "MISS", "ZZZ"]);
+  for (const sort of ["change", "score"]) {
+    assert.deepEqual(ordered({ sort, direction: "asc" }), ["ZZZ", "VST", "AAA", "MISS"]);
+    assert.deepEqual(ordered({ sort, direction: "desc" }), ["AAA", "VST", "ZZZ", "MISS"]);
+  }
+  assert.deepEqual({ tickers, results }, original);
 });

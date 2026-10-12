@@ -1,4 +1,6 @@
 import { mapLimit } from "../data/http.js";
+import { watchlistRows } from "../analysis/watchlist-view.js";
+import { scanState } from "../scan-state.js";
 import { validateWatchlistTicker } from "../data/market.js";
 import { resolveTickerInput } from "../data/ticker-search.js";
 import { isBlockedAssetTicker, parseTickers } from "../shared/symbols.js";
@@ -43,14 +45,16 @@ export async function refreshWatchlistFromCloud() {
 
 export function renderWatchlist() {
   const tickers = parseTickers(state.tickerInput);
+  const matches = watchlistRows(tickers, scanState.latestRankedResults, { search: els.watchlistSearch?.value,
+    sort: els.screenerSort?.value || state.screenerSort, direction: els.screenerSortDirection?.value || state.screenerSortDirection }).map(row => row.ticker);
   const previewCount = 16;
-  const visible = watchlistExpanded ? tickers : tickers.slice(0, previewCount);
-  els.watchlistCount.textContent = `${tickers.length} ticker${tickers.length === 1 ? "" : "s"}`;
+  const visible = watchlistExpanded ? matches : matches.slice(0, previewCount);
+  els.watchlistCount.textContent = `${els.watchlistSearch?.value?.trim() ? `${matches.length} of ` : ""}${tickers.length} ticker${tickers.length === 1 ? "" : "s"}`;
   els.watchlistChips.innerHTML = visible.length
     ? visible.map((ticker) => `<button type="button" class="ticker-chip" data-remove-ticker="${escapeHtml(ticker)}" aria-label="Remove ${escapeHtml(ticker)} from watchlist" ${isWatchlistValidating || !watchlistReady ? "disabled" : ""}><span>${escapeHtml(ticker)}</span><span class="ticker-chip-remove" aria-hidden="true">×</span></button>`).join("")
-    : `<p class="watchlist-empty">Add tickers to build your watchlist.</p>`;
-  els.watchlistToggle.hidden = tickers.length <= previewCount;
-  els.watchlistToggle.textContent = watchlistExpanded ? "Show less" : `Show all ${tickers.length} tickers`;
+    : `<p class="watchlist-empty">${tickers.length ? "No tickers match your search." : "Add tickers to build your watchlist."}</p>`;
+  els.watchlistToggle.hidden = matches.length <= previewCount;
+  els.watchlistToggle.textContent = watchlistExpanded ? "Show less" : `Show all ${matches.length} tickers`;
   els.watchlistToggle.setAttribute("aria-expanded", String(watchlistExpanded));
   for (const control of [els.watchlistAddInput, els.watchlistApplyButton, els.tickerInput, els.watchlistAddForm?.querySelector("button")]) {
     if (control) control.disabled = isWatchlistValidating || !watchlistReady;

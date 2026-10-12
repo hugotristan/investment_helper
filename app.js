@@ -6,6 +6,8 @@ import { applyQuoteSnapshot, loadMarketContext, loadQuoteSnapshots, loadTickerSe
 import { loadNewsSources } from "./js/data/news.js";
 import { loadScanCache, saveScanCache } from "./js/data/scan-cache.js";
 import { loadExchangeRate } from "./js/data/exchange-rate.js";
+import { loadTickerCatalog } from "./js/data/ticker-search.js";
+import { setWatchlistCatalog } from "./js/analysis/watchlist-view.js";
 import { mergePortfolioPriceResults } from "./js/data/portfolio-prices.js";
 import { runStockDetail } from "./js/features/detail.js";
 import { bindPortfolioSorting, buildPortfolioReview, getPortfolioHoldings, renderPortfolioReview } from "./js/features/portfolio.js";
@@ -93,6 +95,7 @@ function hydrateInputs() {
   els.screenerMinScore.value = state.screenerMinScore;
   els.screenerMinLiquidity.value = state.screenerMinLiquidity;
   els.screenerSort.value = state.screenerSort;
+  els.screenerSortDirection.value = state.screenerSortDirection;
   els.detailTickerInput.value = state.detailTicker;
 }
 
@@ -109,12 +112,23 @@ function bindEvents() {
     document.getElementById("holdingTicker").focus();
   });
 
-  ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort"].forEach((key) => {
+  ["screenerSignal", "screenerMinScore", "screenerMinLiquidity", "screenerSort", "screenerSortDirection"].forEach((key) => {
     els[key].addEventListener("input", () => {
       state[key] = els[key].value;
       persist();
+      renderWatchlist();
       renderScreener();
     });
+  });
+  els.watchlistSearch.addEventListener("input", () => { renderWatchlist(); renderScreener(); });
+  els.watchlistSearchClear.addEventListener("click", () => {
+    els.watchlistSearch.value = ""; renderWatchlist(); renderScreener(); els.watchlistSearch.focus();
+  });
+  let catalogLoaded = false;
+  els.watchlistSearch.addEventListener("focus", () => {
+    if (catalogLoaded) return;
+    catalogLoaded = true;
+    loadTickerCatalog().then(catalog => { setWatchlistCatalog(catalog); renderWatchlist(); renderScreener(); }).catch(() => { catalogLoaded = false; });
   });
 
   els.detailButton.addEventListener("click", () => runStockDetail());
@@ -238,6 +252,7 @@ async function runAnalysis(options = {}) {
     scanState.latestMarketContext = marketContext;
     renderDashboardOverview(preliminary, priceSource, { sources: [], items: [] }, marketContext, quotes, { researchPending: true });
     renderPortfolioReview(buildPortfolioReview(preliminary, marketContext), priceSource);
+    renderWatchlist();
     renderScreener();
     const readyCount = preliminary.filter((item) => item.dataQuality?.eligible).length;
     setStatus(readyCount ? "Prices ready" : "Prices unavailable");

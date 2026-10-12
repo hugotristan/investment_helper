@@ -13,6 +13,7 @@ export const defaults = {
   screenerMinScore: 0,
   screenerMinLiquidity: 0,
   screenerSort: "score",
+  screenerSortDirection: "desc",
   detailTicker: "MSFT",
   currency: "EUR",
   learningHistory: []

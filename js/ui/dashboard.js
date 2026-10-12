@@ -4,6 +4,7 @@ import { uniqueArticles } from "../data/news-helpers.js";
 import { buildPortfolioReview, renderPortfolioReview } from "../features/portfolio.js";
 import { renderScanRow, scanListHeading, renderScreener } from "../features/screener.js";
 import { renderSellGuidance } from "../features/signals.js";
+import { renderWatchlist } from "../features/watchlist.js";
 import { scanState } from "../scan-state.js";
 import { formatNumber } from "../shared/format.js";
 import { dateValue, escapeHtml, unique } from "../shared/text.js";
@@ -41,6 +42,7 @@ export function renderAll(results, priceSource, news, marketContext, quoteSnapsh
   ].map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
 
   renderModelInstructions(allocation, sourceLine);
+  renderWatchlist();
   renderScreener();
   renderMarketForecast(marketContext, news);
   renderPortfolioReview(portfolio, priceSource);

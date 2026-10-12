@@ -1,5 +1,13 @@
 # Feature changes
 
+## Watchlist search and sorting
+
+**What changed:** Watchlist has a visible ticker/company search, sort selector, direction selector and Clear search button. Search covers every saved symbol, including those beyond the initial preview or with unavailable prices, and also filters the editor's ticker chips. Ticker, company name, daily change, score and the existing technical sort options support ascending and descending order.
+
+**How:** A shared view helper filters only saved membership, keeps missing numeric values last in either direction, and never mutates the saved list or scan results. Search temporarily bypasses signal, score and liquidity filters without changing them. Clear search restores those filters. Company names come from existing quotes and the public ticker catalog; no request is made per keystroke. Sort preferences remain local to each browser.
+
+**Validation:** Fifteen focused watchlist and cloud-client checks pass, including search beyond the preview, missing prices, company names, both directions, zero values, membership preservation and cloud-save behavior. Browser QA verifies VST/Vistra search, matching editor chips, clear search, alphabetic direction and desktop/phone layouts using disposable sample data.
+
 ## Annual summary
 
 **What changed:** Reports has a year selector, opening and closing daily-close values, period gain, linked approximate return, monthly gain bars, and disclosures for recorded funding, dividends, fees and gains. Current years are marked year to date; first tracking years show the actual start date. One CSV contains the selected-year summary plus every month, with coverage and estimate flags. The report does not write portfolio data.

@@ -129,14 +129,19 @@
             </details>
             <section class="panel">
               <details class="filter-disclosure" id="watchlistFilters">
-                <summary>Filter and sort</summary>
+                <summary>Filters</summary>
                 <div class="screener-controls">
                   <label><span>Signal</span><select id="screenerSignal"><option value="all" selected>All</option><option value="actionable">Buy or watch</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="avoid">Avoid</option><option value="sell">Sell or reduce</option></select></label>
                   <label><span>Minimum score</span><input id="screenerMinScore" type="number" min="0" max="100" step="1" value="0"></label>
                   <label><span>Minimum liquidity, $M</span><input id="screenerMinLiquidity" type="number" min="0" step="1" value="0"></label>
-                  <label><span>Sort by</span><select id="screenerSort"><option value="score" selected>Score</option><option value="momentum">Momentum</option><option value="risk">Risk control</option><option value="liquidity">Liquidity</option><option value="volume">Volume pressure</option></select></label>
                 </div>
               </details>
+              <div class="watchlist-browse-controls">
+                <label><span>Search watchlist</span><input id="watchlistSearch" type="search" placeholder="Ticker or company, e.g. VST" maxlength="80" autocomplete="off" spellcheck="false" aria-controls="screenerResults watchlistChips"></label>
+                <label><span>Sort by</span><select id="screenerSort"><option value="ticker">Ticker</option><option value="name">Company name</option><option value="change">Daily change</option><option value="score" selected>Score</option><option value="momentum">Momentum</option><option value="risk">Risk control</option><option value="liquidity">Liquidity</option><option value="volume">Volume pressure</option></select></label>
+                <label><span>Direction</span><select id="screenerSortDirection"><option value="asc">Ascending ↑</option><option value="desc" selected>Descending ↓</option></select></label>
+                <button id="watchlistSearchClear" class="ghost" type="button" disabled>Clear search</button>
+              </div>
               <div id="screenerResults" class="screener-results"><p class="empty-state">Loading your watchlist.</p></div>
             </section>
           </section>
@@ -426,26 +431,30 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-annual",
-          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-annual",
-          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-annual",
-          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261012-annual",
-          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261012-annual",
-          "./js/storage.js": "./js/storage.js?v=20261012-annual",
-          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261012-annual",
-          "./js/data/market.js": "./js/data/market.js?v=20261012-annual",
-          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261012-annual",
-          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261012-annual",
-          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261012-annual",
-          "./js/features/detail.js": "./js/features/detail.js?v=20261012-annual",
-          "./js/features/questions.js": "./js/features/questions.js?v=20261012-annual",
-          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261012-annual",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-annual",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-annual",
-          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-annual"
+          "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-watchlist",
+          "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-watchlist",
+          "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-watchlist",
+          "./js/analysis/portfolio-ledger.js": "./js/analysis/portfolio-ledger.js?v=20261012-watchlist",
+          "./js/data/portfolio-book-store.js": "./js/data/portfolio-book-store.js?v=20261012-watchlist",
+          "./js/storage.js": "./js/storage.js?v=20261012-watchlist",
+          "./js/portfolio-state.js": "./js/portfolio-state.js?v=20261012-watchlist",
+          "./js/data/market.js": "./js/data/market.js?v=20261012-watchlist",
+          "./js/data/ticker-search.js": "./js/data/ticker-search.js?v=20261012-watchlist",
+          "./js/analysis/holdings.js": "./js/analysis/holdings.js?v=20261012-watchlist",
+          "./js/analysis/portfolio-performance.js": "./js/analysis/portfolio-performance.js?v=20261012-watchlist",
+          "./js/features/detail.js": "./js/features/detail.js?v=20261012-watchlist",
+          "./js/features/questions.js": "./js/features/questions.js?v=20261012-watchlist",
+          "./js/features/watchlist.js": "./js/features/watchlist.js?v=20261012-watchlist",
+          "./js/features/screener.js": "./js/features/screener.js?v=20261012-watchlist",
+          "./js/analysis/watchlist-view.js": "./js/analysis/watchlist-view.js?v=20261012-watchlist",
+          "./js/ui/dom.js": "./js/ui/dom.js?v=20261012-watchlist",
+          "./js/ui/dashboard.js": "./js/ui/dashboard.js?v=20261012-watchlist",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-watchlist",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-watchlist",
+          "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261012-watchlist"
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261012-annual"></script>
+    <script type="module" src="app.js?v=20261012-watchlist"></script>
   </body>
 </html>
