@@ -1,5 +1,13 @@
 # Feature changes
 
+## Nokia price availability
+
+**Problem:** Live NOK requests returned 503 because Yahoo rejected the cloud request with HTTP 429 and neither price backup contained Nokia. Saving NOK to the private watchlist did not change the public publisher's configured symbols.
+
+**What changed:** Both NOK and NOKIA.HE are included in scheduled price publication, with separately validated histories and their original USD/EUR currencies. The refreshed public snapshot also supplies the deployment's embedded fallback. Typing Nokia resolves to NOK; Nokia Helsinki resolves to NOKIA.HE. An ambiguous Nokia Oyj name still requires choosing a listing.
+
+**Validation:** Publisher coverage and ticker-name checks verify both listings. Live API and watchlist checks verify real dated prices after deployment; no portfolio or watchlist records are changed.
+
 ## Yahoo request handling and price backups
 
 **What changed:** Covered stocks and ETFs use the shared published snapshot and the embedded backup before any direct Yahoo request. A Yahoo 429 starts a cooldown shared across tickers within the Worker instance. VST is included in scheduled price publication, and the real snapshot was refreshed for all 98 configured and saved symbols. The static Pages build also includes the existing site icon.

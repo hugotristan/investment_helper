@@ -24,6 +24,19 @@ const priceSnapshot = { schemaVersion: 1, byTicker: {
   QQQ: { ticker: "QQQ", instrumentType: "ETF", source: "Yahoo Finance published snapshot", quote: { ticker: "QQQ", name: "Invesco QQQ Trust" } }
 } };
 
+test("Nokia names resolve to the selected listing and retain both listings in suggestions", async () => {
+  const catalog = buildTickerCatalog({ priceSnapshot: { schemaVersion: 1, byTicker: {
+    NOK: { ticker: "NOK", instrumentType: "EQUITY", source: "Yahoo Finance published snapshot", quote: { ticker: "NOK", name: "Nokia Oyj" } },
+    "NOKIA.HE": { ticker: "NOKIA.HE", instrumentType: "EQUITY", source: "Yahoo Finance published snapshot", quote: { ticker: "NOKIA.HE", name: "Nokia Oyj" } }
+  } } });
+  assert.equal(await resolveTickerInput("Nokia", { catalog }), "NOK");
+  assert.equal(await resolveTickerInput("Nokia Helsinki", { catalog }), "NOKIA.HE");
+  assert.equal(await resolveTickerInput("NOK", { catalog }), "NOK");
+  assert.equal(await resolveTickerInput("NOKIA.HE", { catalog }), "NOKIA.HE");
+  assert.equal(await resolveTickerInput("Nokia Oyj", { catalog }), null);
+  assert.deepEqual(new Set(searchTickers("nokia", { catalog }).map(item => item.ticker)), new Set(["NOK", "NOKIA.HE"]));
+});
+
 test("catalog has configured fallback stocks/ETFs, keeps company aliases and adopts real instrument labels", () => {
   const fallback = buildTickerCatalog();
   assert.equal(searchTickers("apple", { catalog: fallback })[0].ticker, "AAPL");

@@ -89,6 +89,8 @@ export const companyAliases = {
   amd: "AMD",
   broadcom: "AVGO",
   vistra: "VST",
+  nokia: "NOK",
+  "nokia helsinki": "NOKIA.HE",
   netflix: "NFLX",
   palantir: "PLTR",
   "jp morgan": "JPM",

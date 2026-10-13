@@ -178,6 +178,7 @@ test("ticker universe includes configured, alias, fund, saved and optional symbo
   for (const ticker of [...opportunityUniverse, ...marketProxyTickers.map((item) => item.ticker), ...broadFunds, ...Object.values(companyAliases)]) assert.ok(symbols.includes(ticker), ticker);
   assert.ok(symbols.includes("SAVED") && symbols.includes("CUSTOM") && symbols.includes("^IXIC"));
   assert.ok(symbols.includes("VST"), "Vistra must have a scheduled backup without changing discovery membership");
+  assert.ok(symbols.includes("NOK") && symbols.includes("NOKIA.HE"), "Both Nokia listings need scheduled backups when the cloud provider is rate-limited");
   assert.equal(symbols.filter((ticker) => ticker === "CUSTOM").length, 1);
   assert.ok(!symbols.includes("BAD/TICKER") && !symbols.includes("BTC-USD"));
   const many = collectPriceTickers({ extraTickers: Array.from({ length: 400 }, (_, index) => `CUSTOM${index}`) });
