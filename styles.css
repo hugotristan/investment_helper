@@ -740,7 +740,7 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .cloud-reload { width: 100%; padding: 8px; font-size: .75rem; }
 .cloud-signout { display: inline-block; margin-top: 12px; color: inherit; font-size: .75rem; }
 .cloud-password-signout { margin: 12px 0 0; }
-.cloud-password-signout button { display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
+.cloud-password-signout button { display: grid; place-items: center; width: 44px; min-height: 44px; margin-inline: auto; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 .cloud-password-signout button:hover { background: var(--muted); }
 .cloud-password-signout svg { width: 20px; height: 20px; }
 .cloud-signout[hidden], .cloud-password-signout[hidden], .cloud-reload[hidden], .cloud-migration[hidden] { display: none; }
