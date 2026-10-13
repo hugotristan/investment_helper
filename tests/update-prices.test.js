@@ -75,6 +75,82 @@ test("partial failures retain qualified previous history and quote dates without
   assert.notEqual(snapshot.generatedAt, previous.generatedAt);
 });
 
+test("failed Yahoo fetches use an independent quote while retaining genuine history dates and splits", async () => {
+  const previous = await generate({ now: () => NOW - DAY, fetchChart: async ticker => fixture(ticker, { now: NOW - DAY }) });
+  const calls = [];
+  const snapshot = await generate({ previous, fetchChart: async ticker => {
+    if (ticker === "AAPL") throw new YahooPriceFetchError("Yahoo HTTP 429", 429);
+    return fixture(ticker);
+  }, fetchFallbackQuote: async (ticker, record) => {
+    calls.push(ticker);
+    assert.equal(record.historyAsOf, previous.byTicker.AAPL.historyAsOf);
+    return { ...previous.byTicker.AAPL.quote, price: 375, quoteTime: new Date(NOW - 20 * 60000).toISOString(),
+      source: "Leeway delayed quote", delayMinutes: 20 };
+  } });
+  assert.deepEqual(calls, ["AAPL"]);
+  assert.deepEqual(snapshot.byTicker.AAPL.prices, previous.byTicker.AAPL.prices);
+  assert.deepEqual(snapshot.byTicker.AAPL.splits, previous.byTicker.AAPL.splits);
+  assert.equal(snapshot.byTicker.AAPL.quote.price, 375);
+  assert.equal(snapshot.byTicker.AAPL.quote.source, "Leeway delayed quote");
+  assert.equal(snapshot.byTicker.AAPL.quote.delayMinutes, 20);
+  assert.equal(snapshot.byTicker.AAPL.historyAsOf, previous.byTicker.AAPL.historyAsOf);
+  assert.match(snapshot.provider, /Leeway/);
+  assert.match(snapshot.failures.AAPL, /429/);
+});
+
+test("alternate quotes cannot replace a newer saved quote, invent bars, or bypass an exhausted update deadline", async () => {
+  const previous = await generate();
+  for (const patch of [{ currency: "EUR" }, { quoteTime: new Date(NOW - DAY).toISOString() }, { source: "invented" }]) {
+    const snapshot = await generate({ previous, fetchChart: async ticker => {
+      if (ticker === "AAPL") throw new YahooPriceFetchError("Offline"); return fixture(ticker);
+    }, fetchFallbackQuote: async () => ({ ...previous.byTicker.AAPL.quote, price: 999, source: "Leeway delayed quote", ...patch }) });
+    assert.equal(snapshot.byTicker.AAPL.quote.price, previous.byTicker.AAPL.quote.price);
+    assert.equal(snapshot.byTicker.AAPL.quote.source, "Yahoo Finance published quote");
+  }
+  let calls = 0;
+  await generate({ previous, maximumDurationMs: 0, fetchFallbackQuote: async () => { calls += 1; } });
+  assert.equal(calls, 0);
+  const missing = await generate({ fetchChart: async ticker => {
+    if (ticker === "AAPL") throw new YahooPriceFetchError("Offline"); return fixture(ticker);
+  }, fetchFallbackQuote: async () => { calls += 1; } });
+  assert.equal(calls, 0);
+  assert.equal(missing.byTicker.AAPL, undefined);
+});
+
+test("a valid Yahoo history with no quote can use fallback without replacing its completed daily bars", async () => {
+  const calls = [];
+  const snapshot = await generate({ fetchChart: async ticker => {
+    const json = fixture(ticker);
+    if (ticker === "AAPL") delete json.chart.result[0].meta.regularMarketTime;
+    return json;
+  }, fetchFallbackQuote: async (ticker, record) => {
+    calls.push(ticker);
+    return { ticker, quoteType: "EQUITY", currency: record.currency, price: 400, quoteTime: new Date(NOW - 20 * 60000).toISOString(), source: "Leeway delayed quote" };
+  } });
+  assert.deepEqual(calls, ["AAPL"]);
+  assert.equal(snapshot.byTicker.AAPL.quote.price, 400);
+  assert.equal(snapshot.byTicker.AAPL.prices.at(-1).close, 349);
+  assert.match(snapshot.failures.AAPL, /dated quote/);
+});
+
+test("a quote older than the fresh daily history is discarded; European retrieval has priority without changing snapshot order", async () => {
+  const before = await generate({ tickers: ["SPY", "QQQ", "AAPL", "VWCE.DE"],
+    fetchChart: async ticker => fixture(ticker, { currency: ticker === "VWCE.DE" ? "EUR" : "USD" }) });
+  before.byTicker.AAPL.quote = null;
+  const order = [];
+  const snapshot = await generate({ tickers: ["SPY", "QQQ", "AAPL", "VWCE.DE"], previous: before, concurrency: 1,
+    fetchChart: async ticker => {
+      order.push(ticker);
+      const json = fixture(ticker, { currency: ticker === "VWCE.DE" ? "EUR" : "USD" });
+      if (ticker === "AAPL") delete json.chart.result[0].meta.regularMarketTime;
+      return json;
+    }, fetchFallbackQuote: async () => ({ ticker: "AAPL", quoteType: "EQUITY", currency: "USD", price: 999,
+      source: "Leeway delayed quote", quoteTime: new Date(NOW - 2 * DAY).toISOString() }) });
+  assert.equal(order[0], "VWCE.DE");
+  assert.deepEqual(Object.keys(snapshot.byTicker), ["SPY", "QQQ", "AAPL", "VWCE.DE"]);
+  assert.equal(snapshot.byTicker.AAPL.quote, null);
+});
+
 test("publisher preserves full five-year price coverage within a bounded1600-point limit", async () => {
   const snapshot = await generate({ fetchChart: async (ticker) => fixture(ticker, { count: 1250 }) });
   assert.equal(snapshot.byTicker.AAPL.prices.length, 1250);
@@ -241,7 +317,8 @@ test("403 is not retried and timeouts have at most one retry per host", async ()
 test("atomic publisher leaves the prior file unchanged if required indices expire", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "investment-prices-test-"));
   const output = join(directory, "prices.json");
-  t.after(async () => { await unlink(output).catch(() => {}); await unlink(`${output}.tmp`).catch(() => {}); await rmdir(directory); });
+  t.after(async () => { await unlink(output).catch(() => {}); await unlink(`${output}.tmp`).catch(() => {});
+    await unlink(`${output}.budget.json`).catch(() => {}); await rmdir(directory); });
   const fetchChart = async (ticker) => {
     if (!["SPY", "QQQ"].includes(ticker)) throw new YahooPriceFetchError("Fixture excludes optional symbols");
     return fixture(ticker);

@@ -1,4 +1,5 @@
 import { evaluateDataQuality, validHistoryPoints } from "../analysis/data-quality.js";
+import { isMarketQuoteSource, publishedQuoteSource } from "./quote-provenance.js";
 
 let request = null;
 let expiresAt = 0;
@@ -69,8 +70,9 @@ export function readSnapshotQuote(snapshot, ticker, { now = Date.now() } = {}) {
   const time = Date.parse(quote?.quoteTime);
   if (!record || record.ticker !== ticker || !quote || quote.ticker !== ticker
     || /^sample\b/i.test(record.source || "") || /^sample\b/i.test(quote.source || "")
+    || !isMarketQuoteSource(quote.source)
     || !Number.isFinite(quote.price) || quote.price <= 0 || !Number.isFinite(time)
     || time > now || now - time > 7 * 86400000
     || !/^[A-Za-z]{3}$/.test(quote.currency || "") || quote.currency !== record.currency) return null;
-  return { ...quote, quoteTime: new Date(time), source: "Yahoo Finance published quote" };
+  return { ...quote, quoteTime: new Date(time), source: publishedQuoteSource(quote.source) };
 }

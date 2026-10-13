@@ -50,6 +50,22 @@ test("snapshot quotes preserve zero change and original times; stale, wrong-curr
   }
 });
 
+test("independent quote provenance survives browser reads and public-history normalization", async () => {
+  const data = snapshot([record()]);
+  data.byTicker.SPY.quote.source = "Leeway delayed quote";
+  data.byTicker.SPY.quote.delayMinutes = 20;
+  const quote = readSnapshotQuote(data, "SPY", { now: NOW });
+  assert.equal(quote.source, "Leeway delayed quote");
+  assert.equal(quote.delayMinutes, 20);
+  const { normalizeStockHistory } = await import("../js/data/stock-history.js");
+  const history = normalizeStockHistory({ ...data.byTicker.SPY, quote }, "SPY", { now: NOW });
+  assert.equal(history.quote.source, "Leeway delayed quote");
+  assert.equal(history.historyAsOf, data.byTicker.SPY.prices.at(-1).date);
+  assert.equal(history.quote.quoteTime.getTime(), quote.quoteTime.getTime());
+  data.byTicker.SPY.quote.source = "Unverified provider";
+  assert.equal(readSnapshotQuote(data, "SPY", { now: NOW }), null);
+});
+
 function chart({ interval = "1d", prices = [100, 110, 120], ticker = "SPY" } = {}) {
   const midnight = Math.floor(Date.UTC(2026, 9, 8) / 1000);
   return { chart: { result: [{ meta: { symbol: ticker, currency: "USD", instrumentType: "ETF", dataGranularity: interval,

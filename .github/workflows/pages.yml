@@ -93,8 +93,27 @@ jobs:
           restore-keys: |
             prices-
 
+      - name: Restore independent quote budget
+        uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: .sites-runtime/price-provider-budget.json
+          key: quote-budget-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            quote-budget-
+
       - name: Refresh real price snapshot
+        env:
+          LEEWAY_API_TOKEN: ${{ secrets.LEEWAY_API_TOKEN }}
         run: node scripts/update-prices.mjs
+
+      - name: Preserve independent quote budget
+        if: always()
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: .sites-runtime/price-provider-budget.json
+          key: quote-budget-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Preserve price snapshot
         uses: actions/cache/save@v4

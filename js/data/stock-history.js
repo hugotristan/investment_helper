@@ -1,6 +1,7 @@
 import { loadPriceSnapshot, readSnapshotHistory, readSnapshotQuote } from "./price-snapshot.js";
 import { parseYahooChart, parseYahooQuote } from "./yahoo-chart.js";
 import { usesCloudMarket } from "./cloud-mode.js";
+import { isMarketQuoteSource } from "./quote-provenance.js";
 
 export const STOCK_HISTORY_CACHE_KEY = "investment-helper-stock-history-v1";
 const DAY = 86400000;
@@ -153,7 +154,7 @@ async function fetchStockHistory(ticker, now) {
 function normalizeQuote(quote, ticker, currency, now) {
   const time = timestamp(quote?.quoteTime);
   if (!quote || quote.ticker !== ticker || quote.currency !== currency
-    || !["Yahoo Finance quote", "Yahoo Finance published quote"].includes(quote.source)
+    || !isMarketQuoteSource(quote.source)
     || !Number.isFinite(time) || time > now || now - time > 7 * DAY || !Number.isFinite(quote.price) || quote.price <= 0) return null;
   return { ...quote, quoteTime: new Date(time) };
 }

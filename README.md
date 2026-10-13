@@ -144,6 +144,14 @@ Published prices cover up to five years for the configured universe. Portfolio t
 
 For covered tickers, Sites checks the shared published price snapshot and its embedded backup before calling Yahoo directly. It preserves the newest real history and quote dates. A Yahoo 429 pauses further direct requests across tickers in that Worker instance for five minutes by default, or a bounded Retry-After interval. Uncovered symbols may remain unavailable during that cooldown. Vistra (VST) and both Nokia listings (NOK and NOKIA.HE) are included in scheduled backup publication. The price publisher covers configured symbols and retains previously published symbols; adding a ticker to the private watchlist does not automatically add it to this public schedule. This does not cover every symbol in the search catalog.
 
+### Optional independent quote fallback
+
+The scheduled publisher can try **Leeway** when Yahoo fails or supplies no valid dated quote. It keeps the existing real Yahoo daily bars and splits, accepts only a matching supported listing/currency, and keeps the newer quote. A Leeway quote is labelled **Leeway delayed quote** throughout the browser and Worker; it never becomes a Yahoo quote or changes the history observation date. Missing or stale history still cannot support a market signal. This adds current quote recovery, not a second source of five-year history.
+
+Activation needs a free Leeway account and a repository **Actions secret** named `LEEWAY_API_TOKEN`. The workflow passes it only to the publisher; it is never included in browser assets, saved snapshots, or request logs. Without this secret, no Leeway requests are made. Exact VWCE/Nokia access must be checked using that account before treating the provider as active. Leeway advertises a limited free allowance and prices delayed 15–20 minutes: [stock API](https://leeway.tech/data-api/aktien), [ETF API](https://leeway.tech/data-api/etfs).
+
+The publisher conservatively caps attempts at **40 per UTC day**, including failed calls, and restores `.sites-runtime/price-provider-budget.json` between serialized workflow runs. European listings are retrieved first when fallback is enabled. It persists a reservation before the request, stops after authentication or rate-limit errors in that run, and does not retry Leeway. Missing/corrupt budget state with an enabled secret pauses fallback for that day. A workflow run without the secret initializes the counter safely. Reserve the token for this app; other tools' calls are outside this counter. Supported mappings are US symbols in USD, Xetra/Helsinki/Amsterdam in EUR; unverified exchange/unit conversions are skipped.
+
 Calculation references: [GIPS handbook, Modified Dietz](https://www.gipsstandards.org/standards/gips-standards-for-firms/gips-standards-handbook-for-firms/) and [Frankfurter ECB historical rates](https://frankfurter.dev/).
 
 ## Recommendation Performance

@@ -1,5 +1,13 @@
 # Feature changes
 
+## Independent quote fallback
+
+**What changed:** Scheduled price publication has an optional Leeway quote fallback after Yahoo fails or returns no usable dated quote. It requires a free account token in the repository Actions secret `LEEWAY_API_TOKEN`; no token is configured during this change, so the independent feed remains inactive.
+
+**How:** Failed symbols keep their original real daily bars and splits. Matching alternate quotes retain their provider timestamp, delayed source label and exchange/currency identity. The publisher chooses the newer valid quote and never invents price history. A separately cached counter reserves requests before sending them and caps fallback attempts at 40 per UTC day. Credentials and budget files are excluded from deployment assets.
+
+**Validation:** Focused checks exercise provider failure, identity and currency rejection, future/stale timestamps, zero daily changes, newer saved quotes, byte/deadline limits, concurrent quota reservations, counter recovery and provenance through browser/Worker history parsers. Provider access for the user's exact tickers still requires their free token and a live check.
+
 ## Nokia price availability
 
 **Problem:** Live NOK requests returned 503 because Yahoo rejected the cloud request with HTTP 429 and neither price backup contained Nokia. Saving NOK to the private watchlist did not change the public publisher's configured symbols.
