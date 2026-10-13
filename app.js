@@ -35,6 +35,7 @@ import { persist, saveLearningSnapshot, state } from "./js/storage.js";
 import { renderAll } from "./js/ui/dashboard.js";
 import { els, setStatus } from "./js/ui/dom.js";
 import { bindQuickSearch, syncActivePage } from "./js/ui/navigation.js";
+import { initializeSidebar } from "./js/ui/sidebar.js";
 import { bindTickerAutocomplete } from "./js/ui/ticker-autocomplete.js";
 import { renderDashboardOverview } from "./js/ui/overview.js";
 import { bindOpportunityEvents } from "./js/features/opportunities.js";
@@ -55,6 +56,7 @@ let portfolioPricesVersion = 0;
 init();
 
 async function init() {
+  initializeSidebar();
   await initializeWatchlist();
   hydrateInputs();
   initializePerformance();

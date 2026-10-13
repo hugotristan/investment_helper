@@ -8,12 +8,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css?v=20261013-polish">
+    <link rel="stylesheet" href="styles.css?v=20261013-sidebar">
   </head>
   <body>
     <div class="app-layout">
-      <aside class="sidebar">
+      <aside class="sidebar" id="sidebar" aria-label="Navigation" tabindex="-1">
+        <div class="sidebar-heading">
         <a class="sidebar-brand" href="#dashboard" aria-label="Investing home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 18V6M4 18h16M7 14l4-4 4 2 5-6" stroke="currentColor" stroke-width="1.8"/></svg></span><span class="brand-text">Investing</span></a>
+          <button id="sidebarClose" class="sidebar-control sidebar-close" type="button" aria-label="Close navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button>
+        </div>
         <p class="nav-section-label">Workspace</p>
         <nav class="page-nav" aria-label="Main pages">
           <a href="#dashboard" data-page-link="dashboard"><span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg></span><span class="nav-label">Overview</span></a>
@@ -43,9 +46,10 @@
           <a id="cloudSignOut" class="cloud-signout" href="/signout-with-chatgpt" target="_top" hidden>Sign out</a>
         </div>
       </aside>
-      <div class="workspace">
+      <button id="sidebarBackdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1" hidden></button>
+      <div class="workspace" id="workspace">
         <header class="topbar">
-          <div class="page-title-group"><h1 id="pageTitle" class="hero-title">Overview</h1></div>
+          <div class="page-title-group"><button id="sidebarToggle" class="sidebar-control sidebar-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><h1 id="pageTitle" class="hero-title">Overview</h1></div>
           <div class="top-actions">
             <form id="quickSearchForm" class="quick-search" role="search" aria-label="Find a stock">
               <input id="quickSearchInput" type="search" aria-label="Stock or ETF ticker" placeholder="Find a ticker" autocomplete="off" spellcheck="false">
@@ -458,6 +462,6 @@
         }
       }
     </script>
-    <script type="module" src="app.js?v=20261012-watchlist"></script>
+    <script type="module" src="app.js?v=20261013-sidebar"></script>
   </body>
 </html>
