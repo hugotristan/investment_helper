@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderEtfReport } from "../js/features/report-etf.js";
+import { VWCE_EXPOSURE } from "../js/data/fund-exposure.js";
 
-test("full ETF report stays paged/searchable, changes grouping and clears after private access is blocked",async()=>{
+test("full ETF report stays paged/searchable, changes grouping and clears after private access is blocked",async(t)=>{
+  // Exercise the saved issuer snapshot at its retrieval date, not the host date.
+  t.mock.method(Date,"now",()=>Date.parse(VWCE_EXPOSURE.retrievedAt));
   const ids=["reportEtfBody","reportEtfExport","reportEtfView","reportEtfSearch","reportEtfPrevious","reportEtfNext","reportEtfPages","reportEtfPageStatus"];
   const nodes=new Map(ids.map(id=>[id,{value:"",innerHTML:"",textContent:"",hidden:false,disabled:false,handlers:{},addEventListener(type,handler){this.handlers[type]=handler;}}]));
   const doc={documentElement:{dataset:{cloudMode:"browser",privateBlocked:"false"}},getElementById:id=>nodes.get(id)};

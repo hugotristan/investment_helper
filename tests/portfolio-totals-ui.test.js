@@ -19,7 +19,13 @@ const FX = { schemaVersion: 1, available: true, base: "USD", quote: "EUR", rate:
 const money = (value) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(value);
 const valueFor = (label) => node("portfolioTotals").innerHTML.match(new RegExp(`<span>${label}</span><strong>([^<]+)</strong>`))?.[1];
 
-beforeEach(() => { setActivePortfolioBook(null); node("portfolioTotals").innerHTML = ""; });
+beforeEach((t) => {
+  // Review building and rendering must both use the dated fixture's clock.
+  // The test context restores Date.now after each test.
+  t.mock.method(Date, "now", () => NOW);
+  setActivePortfolioBook(null);
+  node("portfolioTotals").innerHTML = "";
+});
 
 function bookWithTransactions(transactions) {
   return { ...createPortfolioBook({ holdings: [], baseCurrency: "EUR", startDate: "2026-10-01", now: NOW }), transactions };
