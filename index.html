@@ -84,9 +84,9 @@
             <section class="panel analyst-panel">
               <details id="insightsExport" class="insights-export">
                 <summary>Analyse in ChatGPT</summary>
-                <p class="panel-description">Prepare a summary to paste into ChatGPT using your existing account. The app makes no paid AI requests.</p>
+                <p class="panel-description">Prepare a critical investment review using your portfolio figures, then copy it into your own ChatGPT chat.</p>
                 <label for="insightsExportQuestion">Your question (optional)</label>
-                <textarea id="insightsExportQuestion" rows="2" maxlength="1200" placeholder="What should I review about my portfolio?"></textarea>
+                <textarea id="insightsExportQuestion" rows="2" maxlength="1200" placeholder="What are my portfolio's biggest risks, and what should I change or research?"></textarea>
                 <label class="analyst-notes"><input id="insightsIncludeNotes" type="checkbox">Include my position notes in the summary</label>
                 <div class="analyst-actions"><button id="insightsPrepare" type="button">Prepare summary</button><button id="insightsCopy" type="button" class="ghost" disabled>Copy summary</button><a id="insightsChatGPTLink" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" hidden>Open ChatGPT ↗</a></div>
                 <p id="insightsExportStatus" class="analyst-status" role="status" aria-live="polite"></p>
@@ -436,6 +436,7 @@
     <script type="importmap">
       {
         "imports": {
+          "./js/analysis/portfolio-insights.js": "./js/analysis/portfolio-insights.js?v=20261027-review",
           "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-watchlist",
           "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-watchlist",
           "./js/features/portfolio.js": "./js/features/portfolio.js?v=20261012-watchlist",
