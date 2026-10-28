@@ -4,6 +4,7 @@ import { validateWatchlistTicker } from "../data/market.js";
 import { resolveTickerInput } from "../data/ticker-search.js";
 import { getActivePortfolioBook, getPortfolioProjection, setActivePortfolioBook } from "../portfolio-state.js";
 import { escapeHtml } from "../shared/text.js";
+import { parseDecimalInput } from "../shared/decimal.js";
 import { state } from "../storage.js";
 import { configurePortfolioEditor, refreshPortfolioEditor } from "./portfolio-editor.js";
 import { getPortfolioHoldings } from "./portfolio.js";
@@ -169,8 +170,9 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const normalized = normalizeTransaction({ id: id || uuid(), type,
         date, currency: el("transactionCurrency").value,
         ...(trade || type === "dividend" ? { ticker } : {}),
-        ...(trade ? { quantity: el("transactionQuantity").value, price: el("transactionPrice").value, fee: el("transactionFee").value || 0 }
-          : { amount: el("transactionAmount").value }), note: el("transactionNote").value },
+        ...(trade ? { quantity: parseDecimalInput(el("transactionQuantity").value, { min: 0.00000001 }),
+          price: parseDecimalInput(el("transactionPrice").value), fee: parseDecimalInput(el("transactionFee").value || 0) }
+          : { amount: parseDecimalInput(el("transactionAmount").value, { min: type === "opening_cash" ? 0 : 0.00000001 }) }), note: el("transactionNote").value },
       { startDate, now: now(), baseCurrency: book.settings.baseCurrency });
       if (!normalized.ok) throw new TypeError(normalized.error);
       const native = normalized.transaction;
@@ -182,7 +184,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const nativeCash = trade ? native.amount + (type === "buy" ? native.fee : -native.fee) : native.amount;
       if (nativeCash < 0) throw new TypeError("A sale with fees greater than its proceeds cannot be recorded as net cash received. Record the separately charged fee as a Fee transaction.");
       const settled = normalizeTransaction({ ...native, cashCurrency: book.settings.baseCurrency,
-        cashAmount: foreign || (separateCash && enteredCash) ? enteredCash : nativeCash },
+        cashAmount: foreign || (separateCash && enteredCash) ? parseDecimalInput(enteredCash) : nativeCash },
       { startDate, now: now(), baseCurrency: book.settings.baseCurrency });
       if (!settled.ok) throw new TypeError(settled.error);
       const transaction = settled.transaction;
@@ -368,7 +370,6 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       : `Leave blank to use ${trade ? `shares × price ${paid ? "plus" : "minus"} the fee` : "the recorded amount"}, or enter the final ${cashCurrency} amount ${paid ? "paid" : "received"}. Fees are included in that total.`);
     message("transactionCurrencyLabel", trade ? "Price currency" : "Currency");
     message("transactionFeeLabel", `Fee in ${el("transactionCurrency").value}`);
-    el("transactionAmount").min = opening ? "0" : "0.00000001";
     el("transactionDate").disabled = opening;
     if (opening) el("transactionDate").value = getActivePortfolioBook()?.settings.startDate || today();
     updateDateHelp();
@@ -386,10 +387,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
     const trade = ["buy", "sell"].includes(type);
     const currency = el("transactionCurrency").value;
     const base = book.settings.baseCurrency;
-    const readAmount = (id) => {
-      const value = el(id).value.trim();
-      return /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value) ? Number(value) : NaN;
-    };
+    const readAmount = (id) => parseDecimalInput(el(id).value, { min: 0 });
     const fee = el("transactionFee").value.trim() ? readAmount("transactionFee") : 0;
     const native = trade ? readAmount("transactionQuantity") * readAmount("transactionPrice") + (type === "buy" ? fee : -fee)
       : readAmount("transactionAmount");

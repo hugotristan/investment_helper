@@ -35,6 +35,16 @@ test("preview never writes accounting; save, stale drafts, CSV and remove follow
   assert.deepEqual(projectPortfolioBook(f.book), before);
 });
 
+test("comma-decimal scenario amounts and negative percentages save as validated numbers", async () => {
+  const f = fixture(); f.fill();
+  for (const [id, value] of Object.entries({ Contribution: "100,50", Return: "-2,5", Inflation: "1,25", Withdrawal: "75,25" })) f.node(id).value = value;
+  f.node("Form").handlers.input();
+  assert.equal(f.controller.calculatePreview(), true);
+  assert.equal(await f.controller.persist(), true);
+  assert.deepEqual([f.writes[0].monthlyContribution, f.writes[0].annualReturnPercent,
+    f.writes[0].annualInflationPercent, f.writes[0].monthlyWithdrawal], [100.5, -2.5, 1.25, 75.25]);
+});
+
 test("missing valuation blocks projections; refresh preserves typed drafts and locking clears private data and exports", () => {
   const f = fixture(); f.fill(); f.node("Contribution").value = "200";
   f.controller.updateHoldings(null); assert.equal(f.controller.calculatePreview(), false);

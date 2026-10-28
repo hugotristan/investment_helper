@@ -215,8 +215,8 @@
                   <input id="holdingId" type="hidden">
                   <label for="holdingTicker"><span>Ticker</span><input id="holdingTicker" type="text" placeholder="AAPL" autocomplete="off" spellcheck="false" required></label>
                   <label for="holdingLabel"><span>Label <small>optional</small></span><input id="holdingLabel" type="text" placeholder="Apple" maxlength="120" autocomplete="off"></label>
-                  <label for="holdingShares"><span>Shares</span><input id="holdingShares" type="number" min="0.00000001" step="any" inputmode="decimal" required></label>
-                  <label for="holdingCost"><span>Average purchase price</span><input id="holdingCost" type="number" min="0" step="any" inputmode="decimal" placeholder="Per share" required></label>
+                  <label for="holdingShares"><span>Shares</span><input id="holdingShares" type="text" inputmode="decimal" required autocomplete="off" spellcheck="false"></label>
+                  <label for="holdingCost"><span>Average purchase price</span><input id="holdingCost" type="text" inputmode="decimal" placeholder="Per share" required autocomplete="off" spellcheck="false"></label>
                   <label for="holdingCurrency"><span>Currency</span><select id="holdingCurrency"><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
                   <div class="holding-form-actions"><button id="holdingSave" type="submit">Save holding</button><button id="holdingCancel" class="ghost" type="button" hidden>Cancel edit</button></div>
                 </form>
@@ -263,12 +263,12 @@
                       <label for="transactionDate"><span>Date</span><input id="transactionDate" type="date" aria-describedby="transactionDateHelp" required></label>
                       <label for="transactionCurrency"><span id="transactionCurrencyLabel">Currency</span><select id="transactionCurrency" required><option value="EUR" selected>EUR</option><option value="USD">USD</option><option value="GBP">GBP</option><option value="JPY">JPY</option><option value="CHF">CHF</option><option value="CAD">CAD</option><option value="AUD">AUD</option></select></label>
                       <label id="transactionTickerField" for="transactionTicker"><span>Ticker</span><input id="transactionTicker" type="text" placeholder="AAPL" autocomplete="off" spellcheck="false" required></label>
-                      <label id="transactionQuantityField" for="transactionQuantity"><span>Shares</span><input id="transactionQuantity" type="number" min="0.00000001" step="any" inputmode="decimal" required></label>
-                      <label id="transactionPriceField" for="transactionPrice"><span>Price per share</span><input id="transactionPrice" type="number" min="0" step="any" inputmode="decimal" required></label>
-                      <label id="transactionAmountField" for="transactionAmount" hidden><span>Amount</span><input id="transactionAmount" type="number" min="0" step="any" inputmode="decimal"></label>
-                      <label id="transactionFeeField" for="transactionFee"><span><span id="transactionFeeLabel">Fee</span> <small>optional</small></span><input id="transactionFee" type="number" min="0" step="any" inputmode="decimal" value="0"></label>
+                      <label id="transactionQuantityField" for="transactionQuantity"><span>Shares</span><input id="transactionQuantity" type="text" inputmode="decimal" required autocomplete="off" spellcheck="false"></label>
+                      <label id="transactionPriceField" for="transactionPrice"><span>Price per share</span><input id="transactionPrice" type="text" inputmode="decimal" required autocomplete="off" spellcheck="false"></label>
+                      <label id="transactionAmountField" for="transactionAmount" hidden><span>Amount</span><input id="transactionAmount" type="text" inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+                      <label id="transactionFeeField" for="transactionFee"><span><span id="transactionFeeLabel">Fee</span> <small>optional</small></span><input id="transactionFee" type="text" inputmode="decimal" value="0" autocomplete="off" spellcheck="false"></label>
                       <div id="transactionCashField" class="portfolio-cash-field portfolio-form-wide" hidden>
-                        <label for="transactionCashAmount"><span id="transactionCashLabel">Total EUR paid (including fees)</span><input id="transactionCashAmount" type="number" min="0" step="any" inputmode="decimal" aria-describedby="transactionCashHelp transactionFxPreview"></label>
+                        <label for="transactionCashAmount"><span id="transactionCashLabel">Total EUR paid (including fees)</span><input id="transactionCashAmount" type="text" inputmode="decimal" aria-describedby="transactionCashHelp transactionFxPreview" autocomplete="off" spellcheck="false"></label>
                       <p id="transactionCashHelp" class="data-note">Enter the final EUR debit, including USD fees and conversion costs. Fees are not deducted again. The trade price stays in its original currency.</p>
                         <div class="portfolio-cash-actions"><p id="transactionFxPreview" class="portfolio-book-status" role="status" aria-live="polite"></p></div>
                       </div>
@@ -326,7 +326,7 @@
                 <form id="reportDividendForm" class="report-controls">
                   <label>Position<select id="reportDividendPosition" required></select></label>
                   <label>Repeat<select id="reportDividendFrequency"><option value="quarterly">Quarterly</option><option value="monthly">Monthly</option><option value="semiannual">Twice a year</option><option value="annual">Annually</option><option value="once">One payment</option><option value="none">No cash dividend</option></select></label>
-                  <label>Gross dividend per share<input id="reportDividendAmount" type="number" min="0" max="1000000" step="any" required></label>
+                  <label>Gross dividend per share<input id="reportDividendAmount" type="text" required inputmode="decimal" autocomplete="off" spellcheck="false"></label>
                   <label>Next payment date<input id="reportDividendDate" type="date" required></label>
                   <button id="reportDividendSave" type="submit">Save assumption</button><button id="reportDividendRemove" class="ghost" type="button">Remove assumption</button><button id="reportDividendReload" class="ghost" type="button">Reload editor</button>
                 </form><p id="reportDividendPositionHint" class="data-note"></p><p id="reportDividendStatus" class="data-note" role="status" aria-live="polite"></p>
@@ -340,10 +340,10 @@
               <details id="reportRetirementEditor" class="secondary-details" open hidden><summary>Scenario assumptions</summary>
                 <form id="reportRetirementForm" class="report-controls">
                   <label>Retirement month<input id="reportRetirementMonth" type="month" required></label>
-                  <label>Monthly contribution · EUR<input id="reportRetirementContribution" type="number" min="0" max="1000000" step="any" required></label>
-                  <label>Annual return · effective %<input id="reportRetirementReturn" type="number" min="-99" max="50" step="any" required></label>
-                  <label>Annual inflation · %<input id="reportRetirementInflation" type="number" min="-10" max="20" step="any" required></label>
-                  <label>Monthly withdrawal · today's EUR<input id="reportRetirementWithdrawal" type="number" min="0" max="1000000" step="any" required></label>
+                  <label>Monthly contribution · EUR<input id="reportRetirementContribution" type="text" required inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+                  <label>Annual return · effective %<input id="reportRetirementReturn" type="text" required inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+                  <label>Annual inflation · %<input id="reportRetirementInflation" type="text" required inputmode="decimal" autocomplete="off" spellcheck="false"></label>
+                  <label>Monthly withdrawal · today's EUR<input id="reportRetirementWithdrawal" type="text" required inputmode="decimal" autocomplete="off" spellcheck="false"></label>
                   <label>Years after retirement<input id="reportRetirementYears" type="number" min="1" max="60" step="1" value="30" required></label>
                   <button type="submit">Calculate preview</button><button id="reportRetirementSave" class="ghost" type="button">Save assumptions</button><button id="reportRetirementReload" class="ghost" type="button">Reload editor</button><button id="reportRetirementRemove" class="ghost" type="button" disabled>Remove saved scenario</button>
                 </form><p class="data-note">Enter your own return and inflation assumptions. Contributions are fixed EUR; withdrawals are entered in today's euros and rise with inflation.</p><p id="reportRetirementStatus" class="data-note" role="status" aria-live="polite"></p>
@@ -436,6 +436,8 @@
     <script type="importmap">
       {
         "imports": {
+          "./js/features/report-dividends.js": "./js/features/report-dividends.js?v=20261028-decimal",
+          "./js/features/report-retirement.js": "./js/features/report-retirement.js?v=20261028-decimal",
           "./js/analysis/portfolio-insights.js": "./js/analysis/portfolio-insights.js?v=20261027-review",
           "./js/ui/navigation.js": "./js/ui/navigation.js?v=20261012-watchlist",
           "./js/data/price-snapshot.js": "./js/data/price-snapshot.js?v=20261012-watchlist",
@@ -457,8 +459,8 @@
           "./js/ui/dashboard.js": "./js/ui/dashboard.js?v=20261012-watchlist",
           "./js/ui/market-chart.js": "./js/ui/market-chart.js?v=20261012-cleanup",
           "./js/features/cloud-sync.js": "./js/features/cloud-sync.js?v=20261012-cleanup",
-          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261012-watchlist",
-          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261012-watchlist",
+          "./js/features/portfolio-editor.js": "./js/features/portfolio-editor.js?v=20261028-decimal",
+          "./js/features/portfolio-book.js": "./js/features/portfolio-book.js?v=20261028-decimal",
           "./js/features/portfolio-performance.js": "./js/features/portfolio-performance.js?v=20261013-polish"
         }
       }

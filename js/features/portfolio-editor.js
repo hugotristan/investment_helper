@@ -3,6 +3,7 @@ import { validateWatchlistTicker } from "../data/market.js";
 import { resolveTickerInput } from "../data/ticker-search.js";
 import { isBlockedAssetTicker } from "../shared/symbols.js";
 import { escapeHtml } from "../shared/text.js";
+import { parseDecimalInput } from "../shared/decimal.js";
 import { persist, state } from "../storage.js";
 import { getPortfolioHoldings, parsePortfolioPositions } from "./portfolio.js";
 import { cloudSession } from "../data/cloud-portfolio-store.js";
@@ -89,8 +90,8 @@ async function saveHolding(event) {
     const ticker = await resolveTickerInput(element("holdingTicker").value);
     if (!ticker) { setMessage("Select a matching stock or ETF, or enter its ticker symbol."); return; }
     const normalized = normalizeHolding({ id: id || crypto.randomUUID(), ticker,
-      label: element("holdingLabel").value, shares: element("holdingShares").value,
-      averageCost: element("holdingCost").value, currency: element("holdingCurrency").value });
+      label: element("holdingLabel").value, shares: parseDecimalInput(element("holdingShares").value, { min: 0.00000001 }),
+      averageCost: parseDecimalInput(element("holdingCost").value), currency: element("holdingCurrency").value });
     if (!normalized.ok) { setMessage(normalized.error); return; }
     const holding = normalized.holding;
     if (!currencies.has(holding.currency)) { setMessage("Choose one of the supported purchase currencies."); return; }

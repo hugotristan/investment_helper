@@ -6,6 +6,7 @@ import { getActivePortfolioBook } from "../portfolio-state.js";
 import { cloudSession } from "../data/cloud-portfolio-store.js";
 import { escapeHtml } from "../shared/text.js";
 import { downloadReport } from "../shared/report-export.js";
+import { parseDecimalInput } from "../shared/decimal.js";
 import { euro, reportEmpty, reportTable } from "../shared/report-ui.js";
 
 const fields = { retirementMonth: "Month", monthlyContribution: "Contribution", annualReturnPercent: "Return", annualInflationPercent: "Inflation", monthlyWithdrawal: "Withdrawal", withdrawalYears: "Years" };
@@ -35,7 +36,7 @@ export function createRetirementReportController({ document: doc = globalThis.do
   const readForm = () => normalizeRetirementScenario(Object.fromEntries(Object.entries(fields).map(([key, id]) => {
     const value = el(id).value;
     if (!value.trim()) throw new TypeError("Complete every scenario field; enter zero for no contribution or withdrawal.");
-    return [key, key === "retirementMonth" ? value : Number(value)];
+    return [key, key === "retirementMonth" ? value : parseDecimalInput(value)];
   })));
 
   function loadForm(book) {

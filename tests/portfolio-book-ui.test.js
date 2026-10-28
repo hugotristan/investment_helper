@@ -467,10 +467,11 @@ test("the existing holding editor saves opening positions after a transaction, w
   bindPortfolioEvents(() => {});
   fill(f.controller, { type: "deposit", amount: "100" });
   await f.controller.saveTransaction();
-  for (const [field, value] of [["Ticker", "MSFT"], ["Label", "Microsoft"], ["Shares", "3"], ["Cost", "200"], ["Currency", "USD"]]) node(`holding${field}`).value = value;
+  for (const [field, value] of [["Ticker", "MSFT"], ["Label", "Microsoft"], ["Shares", "3,25"], ["Cost", "200,50"], ["Currency", "USD"]]) node(`holding${field}`).value = value;
   await node("holdingForm").listeners.submit({ preventDefault() {} });
   assert.equal(f.stored.openingHoldings.length, 2);
-  assert.equal(getPortfolioHoldings().find((h) => h.ticker === "MSFT").shares, 3);
+  assert.equal(getPortfolioHoldings().find((h) => h.ticker === "MSFT").shares, 3.25);
+  assert.equal(getPortfolioHoldings().find((h) => h.ticker === "MSFT").averageCost, 200.5);
   assert.equal(state.holdings.length, 1);
   const added = f.stored.openingHoldings.find((h) => h.ticker === "MSFT");
   const click = async (dataset) => {
@@ -483,6 +484,28 @@ test("the existing holding editor saves opening positions after a transaction, w
   await click({ undoHolding: "" });
   assert.equal(f.stored.openingHoldings.length, 2);
   assert.equal(f.stored.openingHoldings.find((h) => h.ticker === "MSFT").id, added.id);
+});
+
+test("comma-decimal purchases and deposits preserve shares, fees and the exact EUR cash payment", async () => {
+  const f = fixture(createPortfolioBook({ holdings: [], startDate: "2026-10-01", now: timestamp }));
+  await f.controller.initialize();
+  fill(f.controller, { type: "deposit", currency: "EUR", amount: "1000,50" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  fill(f.controller, { ticker: "MSFT", quantity: "1,25", price: "100,20", fee: "0,35", cashAmount: "113,40" });
+  assert.match(node("transactionFxPreview").textContent, /113\.40/);
+  assert.equal(await f.controller.saveTransaction(), true);
+  const entry = f.stored.transactions[1];
+  assert.deepEqual([entry.quantity, entry.price, entry.fee, entry.cashAmount], [1.25, 100.2, .35, 113.4]);
+  const projection = projectPortfolioBook(f.stored);
+  assert.ok(Math.abs(projection.reportingCash.amount - 887.1) < 1e-8);
+  assert.equal(projection.holdings[0].shares, 1.25);
+  assert.ok(Math.abs(projection.holdings[0].averageCost - 100.48) < 1e-8);
+  const writes = f.writes;
+  for (const price of ["1,000.50", "1.000,50", "1,,2", "€100,20"]) {
+    fill(f.controller, { ticker: "MSFT", price, cashAmount: "113,40" });
+    assert.equal(await f.controller.saveTransaction(), false);
+    assert.equal(f.writes, writes);
+  }
 });
 
 test("EUR funding and EUR/USD purchases share one cash balance with no double fee", async () => {

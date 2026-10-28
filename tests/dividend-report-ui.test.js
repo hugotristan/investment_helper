@@ -17,7 +17,7 @@ function fixture(extra = {}) {
     save: async (assumptions, revision) => { assert.equal(revision, book.updatedAt); writes.push(assumptions); book = { ...book, dividendAssumptions: assumptions, updatedAt: new Date(Date.parse(book.updatedAt) + 1).toISOString() }; return true; },
     download: (...args) => exports.push(args), ...extra });
   controller.initialize();
-  const fill = () => { node("reportDividendAmount").value = "0.75"; node("reportDividendDate").value = "2026-10-31"; node("reportDividendForm").handlers.input(); };
+  const fill = () => { node("reportDividendAmount").value = "0,75"; node("reportDividendDate").value = "2026-10-31"; node("reportDividendForm").handlers.input(); };
   return { controller, node, doc, exports, writes, fill, get book() { return book; }, set book(value) { book = value; } };
 }
 

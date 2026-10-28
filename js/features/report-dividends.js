@@ -8,6 +8,7 @@ import { cloudSession } from "../data/cloud-portfolio-store.js";
 import { escapeHtml } from "../shared/text.js";
 import { portfolioMoney } from "../shared/portfolio-money.js";
 import { downloadReport } from "../shared/report-export.js";
+import { parseDecimalInput } from "../shared/decimal.js";
 import { euro, reportEmpty, reportTable } from "../shared/report-ui.js";
 
 const money = (value, currency, eurValue) => escapeHtml(portfolioMoney(value, currency, { eurValue }));
@@ -129,7 +130,7 @@ export function createDividendReportController({ document: doc = globalThis.docu
         const firstPaymentDate = previous?.frequency === frequency && selectedDate === nextDividendDate(previous, portfolioToday(now()))
           ? previous.firstPaymentDate : selectedDate;
         next.push({ ticker: position.ticker, currency: position.currency,
-          amountPerShare: frequency === "none" ? 0 : Number(el("reportDividendAmount").value), frequency,
+          amountPerShare: frequency === "none" ? 0 : parseDecimalInput(el("reportDividendAmount").value), frequency,
           firstPaymentDate: frequency === "none" ? null : firstPaymentDate });
       }
       const assumptions = normalizeDividendAssumptions(next);
