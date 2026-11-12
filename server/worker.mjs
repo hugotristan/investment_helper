@@ -7,6 +7,7 @@ import { createMcpHandler } from "./mcp.mjs";
 import { loadAnalystContext } from "./analyst-context.mjs";
 import { createFundData } from "./fund-data.mjs";
 import { saveChange } from "./development-changes.mjs";
+import { normalizeErrors } from "./data-errors.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -37,7 +38,8 @@ export function createApp(assets, options = {}) {
   const fundData = createFundData(options);
   const clock = () => typeof options.now === "function" ? options.now() : options.now ?? Date.now();
   const passwordGate = createPasswordAuth({ now: clock });
-  const mcp = createMcpHandler({ data: createMcpData({ ...options, assets, market, now: clock }), now: clock });
+  const diagnostics = createMcpData({ ...options, assets, market, now: clock });
+  const mcp = createMcpHandler({ data: diagnostics, now: clock });
   return {
     async fetch(request, env = {}) {
       const url = new URL(request.url);
@@ -63,7 +65,7 @@ export function createApp(assets, options = {}) {
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
           const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx", "/api/fund-holdings",
-            "/api/analyst", "/api/analyst/status", "/api/analyst/context", "/api/development-changes"].includes(url.pathname);
+            "/api/analyst", "/api/analyst/status", "/api/analyst/context", "/api/development-changes", "/api/loading-status"].includes(url.pathname);
           if (!recognized) return json({ error: "API route not found.", code: "NOT_FOUND" }, 404);
           const methods = ["/api/analyst", "/api/development-changes"].includes(url.pathname) ? ["POST"] : ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
           const denied = methodAllowed(request, methods);
@@ -74,6 +76,18 @@ export function createApp(assets, options = {}) {
             throw new ApiError(409, "ACCOUNT_CHANGED", "Your signed-in account changed. Reload the app before opening or saving data.");
           }
           if (url.pathname === "/api/session") return userJson({ cloud: true, authMode, storageAvailable: storageAvailable(env) });
+          if (url.pathname === "/api/loading-status") {
+            const args = {};
+            for (const [key, value] of url.searchParams) {
+              if (!["offset", "batchSize", "concurrency", "component"].includes(key) || url.searchParams.getAll(key).length !== 1) throw new ApiError(400, "INVALID_OPTIONS", "Use supported diagnostic pagination options.");
+              args[key] = key === "component" ? value : /^\d+$/.test(value) ? Number(value) : NaN;
+            }
+            if (args.offset !== undefined && (!Number.isSafeInteger(args.offset) || args.offset > 10000)
+              || args.batchSize !== undefined && (!Number.isInteger(args.batchSize) || args.batchSize < 1 || args.batchSize > 20)
+              || args.concurrency !== undefined && (!Number.isInteger(args.concurrency) || args.concurrency < 1 || args.concurrency > 3)
+              || args.component !== undefined && !["all", "records", "prices", "financialMetrics"].includes(args.component)) throw new ApiError(400, "INVALID_OPTIONS", "Choose batchSize 1–20 and concurrency 1–3 with a valid offset/component.");
+            return userJson(normalizeErrors(await diagnostics.status(env, userId, undefined, args)));
+          }
           if (url.pathname === "/api/development-changes") {
             checkSameOrigin(request);
             return userJson(await saveChange(env, userId, await readJsonRequest(request, 65536), clock()));

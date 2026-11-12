@@ -15,6 +15,7 @@ import { bindPortfolioEvents, initializePortfolio } from "./js/features/portfoli
 import { initializePortfolioBook, openPortfolioTransactionEditor } from "./js/features/portfolio-book.js";
 import { initializePortfolioOrganization, refreshPortfolioOrganization } from "./js/features/portfolio-organization.js";
 import { initializeCloudSync } from "./js/features/cloud-sync.js";
+import { initializeLoadingDiagnostics } from "./js/features/loading-diagnostics.js";
 import { getActivePortfolioBook } from "./js/portfolio-state.js";
 import { getRecommendationTickers, initializePerformance, recordRecommendations, renderPerformance } from "./js/features/performance.js";
 import { initializePortfolioPerformance, refreshPortfolioPerformance, refreshPerformanceMetadata } from "./js/features/portfolio-performance.js";
@@ -57,6 +58,12 @@ init();
 
 async function init() {
   initializeSidebar();
+  initializeLoadingDiagnostics();
+  let marketRefreshTimer;
+  window.addEventListener("investment-market-refresh", () => {
+    clearTimeout(marketRefreshTimer);
+    marketRefreshTimer = setTimeout(() => void refreshPortfolioPrices(), 150);
+  });
   await initializeWatchlist();
   hydrateInputs();
   initializePerformance();

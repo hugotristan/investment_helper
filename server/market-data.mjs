@@ -237,8 +237,11 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
       try { embedded = snapshotHistory(await readMarketAsset("data/prices.json"), ticker, time); }
       catch { /* A corrupt backup must not prevent a live request. */ }
       if (embedded) {
-        const published = await publishedHistory(ticker, time, []);
-        return saveHistory(ticker, newerHistory(embedded, published), time);
+        const failures = [];
+        const published = await publishedHistory(ticker, time, failures);
+        const chosen = newerHistory(embedded, published);
+        return saveHistory(ticker, failures.length ? { ...chosen, stale: true,
+          refreshError: "The published refresh failed; using the dated embedded snapshot." } : chosen, time);
       }
       if (clock() < yahooRetryAt) {
         const failures = [yahooRateLimit];

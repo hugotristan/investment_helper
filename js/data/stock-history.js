@@ -2,6 +2,7 @@ import { loadPriceSnapshot, readSnapshotHistory, readSnapshotQuote } from "./pri
 import { parseYahooChart, parseYahooQuote } from "./yahoo-chart.js";
 import { usesCloudMarket } from "./cloud-mode.js";
 import { isMarketQuoteSource } from "./quote-provenance.js";
+import { mapBatch } from "../shared/batch.js";
 
 export const STOCK_HISTORY_CACHE_KEY = "investment-helper-stock-history-v1";
 const DAY = 86400000;
@@ -18,7 +19,7 @@ let activeRequests = 0;
 
 // These records contain public market data only. A request sends the ticker,
 // never a portfolio's transactions, quantities, cost basis, or balances.
-export async function loadStockHistory(ticker, { snapshot, now = Date.now(), storage = browserStorage() } = {}) {
+export async function loadStockHistory(ticker, { snapshot, now = Date.now(), storage = browserStorage(), backgroundRefresh = false } = {}) {
   ticker = normalizeTicker(ticker);
   if (!ticker || !Number.isFinite(now)) return null;
   if (snapshot === undefined) snapshot = await loadPriceSnapshot();
@@ -33,7 +34,7 @@ export async function loadStockHistory(ticker, { snapshot, now = Date.now(), sto
   const checkedAt = memory.get(ticker)?.checkedAt;
   if (saved && Number.isFinite(checkedAt) && checkedAt <= now && now - checkedAt < FRESH_MS
     || Number.isFinite(checkedAt) && checkedAt <= now && now - checkedAt < RETRY_MS) return best;
-  if (requests.has(ticker)) return requests.get(ticker);
+  if (requests.has(ticker)) return backgroundRefresh && best && now - Date.parse(best.historyAsOf) <= 7 * DAY ? best : requests.get(ticker);
   const request = withNetworkSlot(async () => {
     const loaded = await fetchStockHistory(ticker, now);
     const history = newerHistory(best, loaded);
@@ -42,17 +43,20 @@ export async function loadStockHistory(ticker, { snapshot, now = Date.now(), sto
     else memory.set(ticker, { history: null, checkedAt: now });
     trimMemory();
     if (loaded) persistHistory(ticker, history, now, storage);
+    if (loaded && typeof globalThis.window?.dispatchEvent === "function" && typeof globalThis.CustomEvent === "function") {
+      globalThis.window.dispatchEvent(new CustomEvent("investment-market-refresh", { detail: { ticker } }));
+    }
     return history;
-  }).finally(() => requests.delete(ticker));
+  }).catch(() => best).finally(() => requests.delete(ticker));
   requests.set(ticker, request);
-  return request;
+  return backgroundRefresh && best && now - Date.parse(best.historyAsOf) <= 7 * DAY ? best : request;
 }
 
 export async function loadStockHistories(tickers, options = {}) {
   const symbols = [...new Set((Array.isArray(tickers) ? tickers : []).map(normalizeTicker).filter(Boolean))];
   const snapshot = options.snapshot === undefined ? await loadPriceSnapshot() : options.snapshot;
-  const entries = await Promise.all(symbols.map(async (ticker) => [ticker, await loadStockHistory(ticker, { ...options, snapshot })]));
-  return Object.fromEntries(entries);
+  const entries = await mapBatch(symbols, async ticker => [ticker, await loadStockHistory(ticker, { backgroundRefresh: true, ...options, snapshot })], { concurrency: options.concurrency ?? 2 });
+  return Object.fromEntries(entries.map((result, index) => result.status === "fulfilled" ? result.value : [symbols[index], null]));
 }
 
 export function readCachedStockHistory(ticker, { now = Date.now(), storage = browserStorage() } = {}) {

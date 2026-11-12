@@ -22,6 +22,25 @@ const inputHistory = (overrides = {}) => ({ ticker: "SNDK", source: "Yahoo Finan
 let sequence = 0;
 const moduleForTest = () => import(`../js/data/stock-history.js?test=${++sequence}`);
 
+test("cloud published data is visible immediately while a deduplicated refresh updates its cache", async t => {
+  const originalFetch = globalThis.fetch, originalDocument = globalThis.document;
+  t.after(() => { globalThis.fetch = originalFetch; globalThis.document = originalDocument; });
+  globalThis.document = { documentElement: { dataset: { cloudMode: "sites" } } };
+  let finish, calls = 0;
+  globalThis.fetch = async () => { calls++; return new Promise(resolve => { finish = resolve; }); };
+  const { loadStockHistory, readCachedStockHistory } = await moduleForTest();
+  const snapshot = { schemaVersion: 1, byTicker: { SNDK: inputHistory({ source: "Yahoo Finance published snapshot" }) } };
+  const storage = store();
+  const first = await loadStockHistory("SNDK", { snapshot, now: NOW, storage, backgroundRefresh: true });
+  assert.equal(first.prices.at(-1).close, 115);
+  const second = await loadStockHistory("SNDK", { snapshot, now: NOW, storage, backgroundRefresh: true });
+  assert.equal(second.historyAsOf, first.historyAsOf);
+  assert.equal(calls, 1);
+  finish(Response.json(inputHistory({ prices: [{ date: "2026-10-09T14:30:00Z", close: 120 }] })));
+  await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(readCachedStockHistory("SNDK", { now: NOW, storage }).prices.at(-1).close, 120);
+});
+
 test("a portfolio ticker outside the preset loads real five-year daily history and a dated quote without a 200-day minimum", async (t) => {
   const original = globalThis.fetch;
   t.after(() => { globalThis.fetch = original; });

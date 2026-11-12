@@ -181,6 +181,28 @@ test("status checks report actual source timestamps and explicitly bound ticker 
   const explicit = await toolResult(handler, env, "get_data_loading_status", { tickers: ["MISSING"] });
   assert.equal(explicit.value.prices.status, "unavailable");
   assert(explicit.value.prices.errors.length);
+  const pages = [];
+  let offset = 0;
+  do {
+    const page = await toolResult(handler, env, "get_data_loading_status", { offset, batchSize: 7, concurrency: 1, component: "records" });
+    pages.push(...page.value.inspectedTickers);
+    assert.equal(page.value.prices, null);
+    assert.equal(page.value.portfolio.savedAt, SAVED);
+    assert.equal(page.value.latestSuccessfulUpdateAt, null, "A record save must not masquerade as a market update");
+    offset = page.value.pagination.nextOffset;
+  } while (offset !== null);
+  assert.equal(pages.length, 26);
+  assert.equal(new Set(pages).size, 26);
+  assert.equal((await toolResult(handler, env, "get_data_loading_status", { concurrency: 9 })).body.error.data.code, "INVALID_OPTIONS");
+});
+
+test("valid company metrics failures differ from genuinely unsupported ETF metrics", async t => {
+  const { handler, env } = await setup(t);
+  const { value } = await toolResult(handler, env, "get_financial_metrics", { tickers: ["VICR", "SPY", "MSFT"] });
+  assert.equal(value.companies[0].errors[0].code, "METRICS_UNAVAILABLE");
+  assert.equal(value.companies[1].errors[0].code, "ETF_METRICS_UNSUPPORTED");
+  assert.equal(value.companies[2].status, "available");
+  for (const error of value.errors) for (const field of ["code", "message", "ticker", "provider", "retryable", "lastSuccessfulQuoteAt"]) assert(Object.hasOwn(error, field));
 });
 
 test("published financial refresh keeps a newer retained success and never relabels it as a new success", async () => {

@@ -471,6 +471,46 @@ function publishedFxFixture() {
 
 const embeddedJson = (value) => ({ encoding: "gzip-base64", data: gzipSync(JSON.stringify(value)).toString("base64"), contentType: "application/json" });
 
+test("VICR primary 429 uses published fallback; total provider failure retains cached quote with its original timestamp", async () => {
+  let now = NOW, offline = false, yahoo = 0;
+  const app = createApp(assets, { now: () => now, reportFailure() {}, fetchImpl: async url => {
+    if (String(url).includes("finance.yahoo.com")) { yahoo++; return new Response("Rate limited", { status: 429, headers: { "Retry-After": "600" } }); }
+    return offline ? new Response("Unavailable", { status: 503 }) : Response.json(publishedFixture(["VICR"]));
+  } });
+  const first = await response(app, {}, "/api/market/history?ticker=VICR");
+  assert.equal(first.status, 200);
+  assert.equal(first.data.source, "Yahoo Finance published snapshot");
+  const originalQuoteTime = first.data.quote.quoteTime;
+  offline = true; now += 6 * 60000;
+  const retained = await response(app, {}, "/api/market/history?ticker=VICR");
+  assert.equal(retained.status, 200);
+  assert.equal(retained.data.stale, true);
+  assert.equal(retained.data.quote.quoteTime, originalQuoteTime);
+  assert.equal(yahoo, 1, "Retry-After suppresses additional Yahoo requests");
+  const missing = await response(app, {}, "/api/market/history?ticker=MISSING");
+  assert.equal(missing.status, 503);
+  assert.equal(missing.data.code, "PRICES_UNAVAILABLE");
+  assert.equal(missing.data.price, undefined);
+});
+
+test("website diagnostics are read-only, validate pagination and distinguish record saves from market freshness", async t => {
+  const DB = await sqliteBinding(t);
+  const app = createApp(assets, { now: NOW });
+  await response(app, { DB }, "/api/portfolio", { method: "PUT", value: { book: makeBook(), expectedRevision: 0 } });
+  await response(app, { DB }, "/api/watchlist", { method: "PUT", value: { tickers: ["MSFT", "VICR"], expectedRevision: 0 } });
+  const before = DB.calls.length;
+  const page = await response(app, { DB }, "/api/loading-status?component=records&batchSize=1&concurrency=1");
+  assert.equal(page.status, 200);
+  assert.equal(page.data.pagination.totalTickers, 3);
+  assert.equal(page.data.pagination.nextOffset, 1);
+  assert.equal(page.data.portfolio.savedAt, new Date(NOW).toISOString());
+  assert.equal(page.data.latestSuccessfulUpdateAt, null);
+  assert(DB.calls.slice(before).every(call => call.sql.startsWith("SELECT")));
+  for (const query of ["concurrency=99", "offset=-1", "batchSize=0", "component=invalid", "batchSize=2&batchSize=3", "url=https://example.com"]) {
+    assert.equal((await response(app, { DB }, "/api/loading-status?" + query)).status, 400);
+  }
+});
+
 test("default market fetch resolves the current global method with its receiver", async () => {
   const original = globalThis.fetch;
   const app = createApp(assets, { now: NOW });

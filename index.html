@@ -425,6 +425,14 @@
           </section>
 
           <section class="view-page" data-page="sources" aria-label="Data sources" hidden>
+            <section class="panel" id="loadingDiagnostics" hidden>
+              <div class="section-heading"><h2>Data loading</h2><button type="button" id="loadingRefresh">Refresh checks</button></div>
+              <p>Record save times and market observation times are shown separately.</p>
+              <label>Tickers per batch <select id="loadingBatchSize"><option>10</option><option selected>20</option></select></label>
+              <label>Concurrent requests <select id="loadingConcurrency"><option>1</option><option selected>2</option><option>3</option></select></label>
+              <div id="loadingComponents" role="status" aria-live="polite"></div>
+              <details><summary>Per-ticker results</summary><div id="loadingTickerResults"></div></details>
+            </section>
             <section class="panel"><div class="section-heading"><h2>Source coverage</h2></div><div id="sourceStatus" class="source-grid"><p class="empty-state">Checking news sources.</p></div></section>
             <details class="panel data-disclosure"><summary>Update diagnostics</summary><div id="dashboardStats" class="dashboard-stats"></div><div id="scanActivity" class="scan-activity"></div><h2 id="marketPulseTitle">Scan coverage</h2><div id="marketPulse" class="pulse-grid"></div></details>
             <details class="panel data-disclosure"><summary>Data and limitations</summary><p class="source-note">Prices come from Yahoo Finance. Annual financials use SEC companyfacts, with Yahoo annual statements as a fallback. Earnings dates come from a limited set of issuer announcements. News is collected through GDELT and available RSS feeds. Scores use fixed rules; they are not probabilities. Missing or stale price history cannot produce signals. The app does not place trades.</p></details>
