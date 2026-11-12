@@ -103,5 +103,25 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
   const packed = JSON.parse(await readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"));
   assert.equal(packed.d1, "DB");
   assert.equal(packed.static, undefined);
+  assert.deepEqual(packed.capabilities, ["mcp"]);
+  // Exercise the published bundle, not only source modules. The MCP identity
+  // must reach the same password workspace without unlocking website APIs.
+  const mcp = (method, params, identity = {}) => app.fetch(new Request("https://investment.example/mcp", {
+    method: "POST", headers: { "Content-Type": "application/json", ...identity },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  }), { ...environment, INVESTMENT_MCP_OWNER_EMAIL: "build-owner@example.com" });
+  const listed = await (await mcp("tools/list", {})).json();
+  assert.equal(listed.result.tools.length, 5);
+  assert(listed.result.tools.every(tool => tool.annotations.readOnlyHint));
+  assert.equal((await mcp("tools/call", { name: "get_watchlists", arguments: {} })).status, 401);
+  const owner = { "oai-authenticated-user-id": "build-owner-id", "oai-authenticated-user-email": "build-owner@example.com" };
+  const mapping = await database.prepare("SELECT user_id FROM password_workspace WHERE workspace_key = ?").bind("personal").first();
+  await database.prepare("INSERT INTO watchlists (user_id, tickers, revision, updated_at) VALUES (?, ?, ?, ?)")
+    .bind(mapping.user_id, '["MSFT"]', 3, "2026-10-01T00:00:00.000Z").run();
+  const savedWatchlist = await (await mcp("tools/call", { name: "get_watchlists", arguments: {} }, owner)).json();
+  assert.deepEqual(savedWatchlist.result.structuredContent.watchlists[0].tickers, ["MSFT"]);
+  assert.equal(savedWatchlist.result.structuredContent.revision, 3);
+  assert.equal(savedWatchlist.result.structuredContent.latestSuccessfulUpdateAt, "2026-10-01T00:00:00.000Z");
+  assert.equal((await app.fetch(new Request("https://investment.example/api/portfolio", { headers: owner }), environment)).status, 401);
   database.close();
 });

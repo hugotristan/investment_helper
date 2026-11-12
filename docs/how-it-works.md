@@ -4,6 +4,26 @@ The frontend is plain HTML, CSS and JavaScript. A Cloudflare Worker serves it th
 
 Portfolio insights use the same JavaScript calculations as Portfolio and Reports. The authenticated evidence endpoint reads the saved portfolio and public market data; it does not change records or call an AI provider. The browser writes plain-language explanations from those figures. A manually prepared ChatGPT summary can include optional position notes and is copied only on an explicit click. Opening ChatGPT sends no portfolio data in the URL. The paid analyst endpoint is retired; no `OPENAI_API_KEY` is required.
 
+## Personal ChatGPT plugin (MCP)
+
+The same Worker exposes a stateless JSON-RPC `POST /mcp` endpoint. The `mcp` capability in `.openai/hosting.json` lets Sites provision a private personal plugin when published and refresh its tool catalogue on later publications. Use the plugin Sites creates under **Plugins → Personal → Created by you → Investment Helper**; no separate server, AI API key or local MCP configuration is needed. Sites provides the connection URL and handles its authentication. The website still opens with its existing password.
+
+`server/mcp.mjs` handles discovery (`server/discover`), legacy client initialization, tool listing and five retrieval tools:
+
+| Tool | Returns |
+| --- | --- |
+| `get_portfolio_holdings` | All recorded positions, quantities, native/actual EUR cost bases and cash; no raw transactions or notes. These are recorded positions, not current valuations. |
+| `get_watchlists` | The saved cloud watchlist, revision and successful save time. Missing saved data is not replaced with browser defaults. |
+| `get_stock_prices` | Validated prices for 1–20 exact symbols, currencies, quote/close distinction, sources and observation times. Uses the website's existing price loader and backups. |
+| `get_financial_metrics` | Annual company financial metrics, reporting periods, source links, successful retrieval times, and stale/missing/retained warnings. ETF company metrics can be unavailable. |
+| `get_data_loading_status` | Server-side record and provider checks, per-symbol errors and timestamps. Defaults to at most 20 held/watched tickers and reports unchecked coverage; browser scan progress is unavailable. |
+
+For privacy on this public-entrance Site, every tool call requires Sites' authenticated user ID and verified email matching the server-only `INVESTMENT_MCP_OWNER_EMAIL` runtime secret. Configure that value from the verified Site owner before deployment. Discovery exposes only the fixed tool definitions, never personal data. An anonymous caller, another signed-in visitor, a browser password cookie, an arbitrary bearer value or a supplied workspace ID cannot authorize a tool call. Normal pages and APIs retain the password gate; MCP authorization never grants access to them.
+
+The MCP data layer only reads the existing `password_workspace` mapping and its saved records. It cannot create a workspace, change a revision, import a book, save a watchlist or execute a trade. No database migration is required. Tool annotations also mark every operation as read-only, but enforcement comes from the fixed dispatch table, strict input validation and storage reads. Inputs cannot supply SQL, arbitrary URLs or account IDs. Public provider requests carry only public ticker information, never portfolio quantities, costs, cash or notes.
+
+`latestSuccessfulUpdateAt` means the successful save time for portfolio/watchlist, the actual market observation time for prices, and the successful per-company retrieval time for financial metrics. It is never overwritten by a failed refresh or by the current `checkedAt` response time. The price source does not retain a separate successful download time, so the original quote/daily-close observation time is explicitly labelled instead. Financial `lastUpdateAttemptAt` and accounting `periodEnd` are separate fields. Multi-symbol responses include individual timestamps and the oldest/newest successful timestamps; the newest is not a claim that every item is current. Unavailable fields are null with error codes, not estimated or converted to zero. Stale financial figures can be returned with their original dates and explicit warnings. A completely unavailable result sets MCP `isError: true`; partial responses retain usable rows and identify failures.
+
 ## Access and storage
 
 The Site entrance is publicly reachable and the Worker protects the app with a personal password. ChatGPT sign-in is not required. The password hash and a random session-signing key are runtime secrets, never source or browser assets. Successful login creates a signed, HttpOnly session cookie that lasts 30 days. HTTPS cookies are Secure and scoped to this host; POST sign-out clears the current browser cookie. Changing either secret invalidates existing sessions.

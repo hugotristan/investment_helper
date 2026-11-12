@@ -12,7 +12,8 @@ const MAX_HISTORY_ENTRIES = 80;
 const PUBLISHED_BASE_URL = "https://hugotristan.github.io/investment_helper/data/";
 const PUBLISHED_PRICES_URL = `${PUBLISHED_BASE_URL}prices.json`;
 const PUBLIC_ASSET_LIMITS = Object.freeze({ "data/prices.json": 14 * 1024 * 1024,
-  "data/exchange-rate.json": 16 * 1024, "data/portfolio-fx.json": 4 * 1024 * 1024 });
+  "data/exchange-rate.json": 16 * 1024, "data/portfolio-fx.json": 4 * 1024 * 1024,
+  "data/fundamentals.json": 4 * 1024 * 1024 });
 const DAY = 86400000;
 
 // Only these embedded public market files can be read. Decompressed bytes are

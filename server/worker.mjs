@@ -2,6 +2,8 @@ import { ApiError, checkSameOrigin, readJsonRequest } from "./request-body.mjs";
 import { readCloudRecord, saveCloudRecord, sitesUserId, storageAvailable, validateSaveEnvelope } from "./cloud-store.mjs";
 import { createMarketAssetReader, createMarketData, marketTicker } from "./market-data.mjs";
 import { createPasswordAuth } from "./auth.mjs";
+import { createMcpData } from "./mcp-data.mjs";
+import { createMcpHandler } from "./mcp.mjs";
 import { loadAnalystContext } from "./analyst-context.mjs";
 import { createFundData } from "./fund-data.mjs";
 
@@ -34,6 +36,7 @@ export function createApp(assets, options = {}) {
   const fundData = createFundData(options);
   const clock = () => typeof options.now === "function" ? options.now() : options.now ?? Date.now();
   const passwordGate = createPasswordAuth({ now: clock });
+  const mcp = createMcpHandler({ data: createMcpData({ ...options, assets, market, now: clock }), now: clock });
   return {
     async fetch(request, env = {}) {
       const url = new URL(request.url);
@@ -44,6 +47,9 @@ export function createApp(assets, options = {}) {
         // flags cannot expose static assets through the legacy native path.
         const authMode = options.authMode ?? env.INVESTMENT_AUTH_MODE ?? "chatgpt";
         if (!["password", "chatgpt"].includes(authMode)) throw new ApiError(503, "AUTH_UNAVAILABLE", "Private access needs configuration.");
+        // MCP has its own Sites identity + owner authorization. No other route
+        // can use it to bypass the website's unchanged password/session gate.
+        if (url.pathname === "/mcp") return await mcp(request, env);
         if (url.pathname === "/api/health") {
           const denied = methodAllowed(request, ["GET"]);
           return denied || json({ ok: true, cloud: true, storageAvailable: storageAvailable(env) });
