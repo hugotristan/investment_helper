@@ -22,6 +22,13 @@
       "when": 1791716584406,
       "tag": "0002_rainy_puma",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794517264463,
+      "tag": "0003_black_hulk",
+      "breakpoints": true
     }
   ]
 }

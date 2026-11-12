@@ -1,5 +1,6 @@
 import { sitesUserId } from "./cloud-store.mjs";
 import { ApiError, readJsonRequest } from "./request-body.mjs";
+import { latestChanges } from "./development-changes.mjs";
 
 const VERSION = "2026-07-28";
 const versions = [VERSION, "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -10,6 +11,7 @@ const tickerSchema = { type: "array", minItems: 1, maxItems: 20, uniqueItems: tr
 const tool = (name, title, description, inputSchema, openWorldHint = false) => ({ name, title, description, inputSchema,
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint } });
 const tools = [
+  tool("get_latest_changes", "Read recent development changes", "Retrieve the latest completed coding tasks: commit hash, summary, modified files, test results, known limitations and reported deployment status/time. Read-only persistent development history; never returns credentials or runtime settings.", objectSchema({ limit: { type: "integer", minimum: 1, maximum: 20, default: 1 } })),
   tool("get_portfolio_holdings", "Read portfolio holdings", "Retrieve all recorded positions, share quantities, native and actual EUR cost bases, and recorded cash. Values are not current market valuations; use get_stock_prices for dated prices. Does not expose transaction history or notes.", objectSchema({})),
   tool("get_watchlists", "Read watchlists", "Retrieve the saved cloud watchlist and its last successful save timestamp. Does not substitute browser-local defaults for missing saved data.", objectSchema({})),
   tool("get_stock_prices", "Read stock prices", "Retrieve validated dated prices for 1–20 exact stock/ETF/index tickers, including exchange suffixes (e.g. VWCE.DE). Returns quote or completed daily close, currency, source, observation timestamp and individual errors. Prices are not guaranteed real-time.", { ...objectSchema({ tickers: tickerSchema }), required: ["tickers"] }, true),
@@ -64,6 +66,7 @@ export function createMcpHandler({ data, now = Date.now }) {
     const args = input.params.arguments ?? {};
     const keys = Object.keys(definition.inputSchema.properties);
     if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).some(key => !keys.includes(key))
+      || Object.hasOwn(args, "limit") && (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 20)
       || definition.inputSchema.required?.some(key => !Object.hasOwn(args, key))
       || Object.hasOwn(args, "tickers") && (!Array.isArray(args.tickers) || !args.tickers.length || args.tickers.length > 20
         || new Set(args.tickers).size !== args.tickers.length || args.tickers.some(ticker => typeof ticker !== "string" || !/^[A-Z0-9^][A-Z0-9.^-]{0,30}$/.test(ticker)))) {
@@ -71,7 +74,7 @@ export function createMcpHandler({ data, now = Date.now }) {
     }
     try {
       const userId = await workspace(request, env);
-      const value = await ({ get_portfolio_holdings: () => data.portfolio(env, userId), get_watchlists: () => data.watchlists(env, userId),
+      const value = await ({ get_latest_changes: () => latestChanges(env, userId, args.limit ?? 1), get_portfolio_holdings: () => data.portfolio(env, userId), get_watchlists: () => data.watchlists(env, userId),
         get_stock_prices: () => data.prices(args.tickers), get_financial_metrics: () => data.metrics(args.tickers),
         get_data_loading_status: () => data.status(env, userId, args.tickers) })[definition.name]();
       const structuredContent = { ...value, checkedAt: new Date(typeof now === "function" ? now() : now).toISOString(), readOnly: true };

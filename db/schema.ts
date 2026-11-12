@@ -37,3 +37,10 @@ export const analystUsage = sqliteTable("analyst_usage", {
   requests: integer("requests").notNull(),
   nextAllowedAt: integer("next_allowed_at").notNull(),
 }, (table) => [check("analyst_requests_positive", sql`${table.requests} >= 1`)]);
+
+export const developmentChanges = sqliteTable("development_changes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  record: text("record").notNull(),
+  completedAt: text("completed_at").notNull(),
+}, table => [index("development_changes_owner_time").on(table.userId, table.completedAt)]);

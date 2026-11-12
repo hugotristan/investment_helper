@@ -111,7 +111,7 @@ test("Sites build serves the full frontend and rejects anonymous private API acc
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
   }), { ...environment, INVESTMENT_MCP_OWNER_EMAIL: "build-owner@example.com" });
   const listed = await (await mcp("tools/list", {})).json();
-  assert.equal(listed.result.tools.length, 5);
+  assert.equal(listed.result.tools.length, 6);
   assert(listed.result.tools.every(tool => tool.annotations.readOnlyHint));
   assert.equal((await mcp("tools/call", { name: "get_watchlists", arguments: {} })).status, 401);
   const owner = { "oai-authenticated-user-id": "build-owner-id", "oai-authenticated-user-email": "build-owner@example.com" };

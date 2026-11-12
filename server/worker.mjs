@@ -6,6 +6,7 @@ import { createMcpData } from "./mcp-data.mjs";
 import { createMcpHandler } from "./mcp.mjs";
 import { loadAnalystContext } from "./analyst-context.mjs";
 import { createFundData } from "./fund-data.mjs";
+import { saveChange } from "./development-changes.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -62,9 +63,9 @@ export function createApp(assets, options = {}) {
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
           const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx", "/api/fund-holdings",
-            "/api/analyst", "/api/analyst/status", "/api/analyst/context"].includes(url.pathname);
+            "/api/analyst", "/api/analyst/status", "/api/analyst/context", "/api/development-changes"].includes(url.pathname);
           if (!recognized) return json({ error: "API route not found.", code: "NOT_FOUND" }, 404);
-          const methods = url.pathname === "/api/analyst" ? ["POST"] : ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
+          const methods = ["/api/analyst", "/api/development-changes"].includes(url.pathname) ? ["POST"] : ["/api/portfolio", "/api/watchlist"].includes(url.pathname) ? ["GET", "PUT"] : ["GET"];
           const denied = methodAllowed(request, methods);
           if (denied) return denied;
           userId ||= sitesUserId(request);
@@ -73,6 +74,10 @@ export function createApp(assets, options = {}) {
             throw new ApiError(409, "ACCOUNT_CHANGED", "Your signed-in account changed. Reload the app before opening or saving data.");
           }
           if (url.pathname === "/api/session") return userJson({ cloud: true, authMode, storageAvailable: storageAvailable(env) });
+          if (url.pathname === "/api/development-changes") {
+            checkSameOrigin(request);
+            return userJson(await saveChange(env, userId, await readJsonRequest(request, 65536), clock()));
+          }
           if (url.pathname === "/api/analyst/status") return userJson({ ready: true, mode: "calculated", message: "Portfolio insights use recorded figures. No AI API is used." });
           if (url.pathname === "/api/analyst/context") {
             if ([...url.searchParams.keys()].some((key) => key !== "includeNotes") || url.searchParams.getAll("includeNotes").length > 1

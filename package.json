@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "task:complete": "node scripts/complete-task.mjs",
     "test": "node --test",
     "dev": "node dev-server.mjs",
     "build": "node scripts/build-sites.mjs",

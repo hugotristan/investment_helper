@@ -13,7 +13,7 @@ const SAVED = "2026-11-10T10:00:00.000Z";
 const ORIGIN = "https://investment.example.chatgpt.site";
 const OWNER = "synthetic-owner@example.com";
 const identity = { "oai-authenticated-user-id": "site-scoped-owner", "oai-authenticated-user-email": OWNER };
-const names = ["get_portfolio_holdings", "get_watchlists", "get_stock_prices", "get_financial_metrics", "get_data_loading_status"];
+const names = ["get_latest_changes", "get_portfolio_holdings", "get_watchlists", "get_stock_prices", "get_financial_metrics", "get_data_loading_status"];
 const noNetwork = async () => { throw new Error("Private network detail must not leak"); };
 
 function rpc(method, params, { headers = identity, id = 1, raw, path = "/mcp" } = {}) {
@@ -60,7 +60,7 @@ async function toolResult(handler, env, name, args = {}, options) {
   return { response, body, result: body.result, value: body.result?.structuredContent };
 }
 
-test("MCP discovers exactly five read-only tools and supports stateless protocol negotiation", async t => {
+test("MCP discovers six read-only tools and supports stateless protocol negotiation", async t => {
   const { handler, env, statements } = await setup(t);
   const discovery = await (await handler(rpc("server/discover", {}, { headers: {} }), env)).json();
   assert(discovery.result.supportedVersions.includes("2026-07-28"));
