@@ -111,6 +111,7 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
   let active = 0;
   let yahooRetryAt = 0;
   let yahooRateLimit = null;
+  let yahooFailures = 0;
   const clock = () => typeof now === "function" ? now() : now;
 
   function failure(provider, error) {
@@ -243,6 +244,7 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
         const failures = [yahooRateLimit];
         const published = await publishedHistory(ticker, time, failures);
         if (published) return saveHistory(ticker, published, time);
+        if (saved) return { ...saved.history, stale: true, refreshError: "Provider backoff; returning the last successful cached observation." };
         throw unavailable("PRICES_UNAVAILABLE", "Yahoo is rate-limiting price requests. A dated backup is not available for this ticker yet.", failures);
       }
       try {
@@ -260,11 +262,13 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
         }
         const history = normalizeStockHistory(parsed, ticker, { now: time });
         if (!history) throw new Error("Invalid daily history.");
+        yahooFailures = 0;
         return saveHistory(ticker, history, time);
       } catch (error) {
         const failures = [failure("yahoo", error)];
-        if (error.publicStatus === 429) {
-          yahooRetryAt = clock() + error.retryAfterMs;
+        if (error.publicStatus === 429 || !error.publicStatus || error.publicStatus >= 500) {
+          yahooFailures += 1;
+          yahooRetryAt = clock() + Math.max(error.retryAfterMs || 0, Math.min(30 * 60000, 30000 * 2 ** Math.min(yahooFailures - 1, 6)));
           yahooRateLimit = failures[0];
         }
         const published = await publishedHistory(ticker, time, failures);
@@ -274,7 +278,8 @@ export function createMarketData({ fetchImpl = (url, init) => globalThis.fetch(u
           if (embedded) return saveHistory(ticker, embedded, time);
           throw new Error("Invalid embedded prices.");
         } catch (embeddedError) { failures.push(failure("embedded-prices", embeddedError)); }
-        throw unavailable("PRICES_UNAVAILABLE", "The price provider is temporarily unavailable. Previously dated prices can still be used.", failures);
+        if (saved) return { ...saved.history, stale: true, refreshError: "All available price sources failed; returning the last successful cached observation." };
+        throw unavailable("PRICES_UNAVAILABLE", "The price provider is temporarily unavailable and no valid cached observation exists.", failures);
       }
     }).finally(() => pending.delete(ticker));
     pending.set(ticker, request);

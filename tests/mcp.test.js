@@ -145,6 +145,9 @@ test("financial metrics retain successful retrieval dates after failed refreshes
   assert.equal(value.companies[0].metrics.revenue, 10);
   assert(value.companies[0].warnings.some(error => error.code === "FUNDAMENTALS_REFRESH_FAILED"));
   assert.equal(value.companies[1].metrics, null);
+  const vicr = await toolResult(handler, env, "get_financial_metrics", { tickers: ["VICR"] });
+  assert.equal(vicr.value.companies[0].errors[0].code, "METRICS_UNAVAILABLE");
+  assert.match(vicr.value.companies[0].errors[0].message, /coverage or provider failure/);
   const snapshot = financialSnapshot("2026-10-01T00:00:00Z");
   snapshot.byTicker.MSFT.metrics.netIncome = null;
   const data = createMcpData({ market: {}, assets: { "data/fundamentals.json": JSON.stringify(snapshot) }, now: NOW, fetchImpl: noNetwork });
@@ -153,6 +156,16 @@ test("financial metrics retain successful retrieval dates after failed refreshes
   assert.equal(stale.companies[0].metrics.netIncome, null);
   assert.equal(stale.latestSuccessfulUpdateAt, "2026-10-01T00:00:00.000Z");
   assert(stale.errors.some(error => error.code === "METRICS_STALE"));
+});
+
+test("MCP explicitly labels retained quotes stale without changing their observation time", async () => {
+  const data = createMcpData({ market: { loadHistory: async ticker => ({ ...history(ticker), stale: true, refreshError: "Provider unavailable" }) }, assets: {}, now: NOW });
+  const result = await data.prices(["MSFT"]);
+  assert.equal(result.prices[0].stale, true);
+  assert.equal(result.prices[0].status, "stale");
+  assert.equal(result.prices[0].price, 110);
+  assert.equal(result.prices[0].quoteTimestamp, "2026-11-11T21:00:00.000Z");
+  assert.equal(result.prices[0].errors[0].code, "STALE_PRICE");
 });
 
 test("status checks report actual source timestamps and explicitly bound ticker coverage", async t => {

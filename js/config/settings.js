@@ -35,6 +35,7 @@ export const marketProxyTickers = [
 ];
 
 export const opportunityUniverse = [
+  "VICR",
   "SPY", "QQQ", "IWM", "VTI", "VEA", "VWO", "TLT", "HYG", "LQD", "GLD", "USO", "UUP",
   "XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLU", "XLRE", "XLB", "SMH", "XBI",
   "AAPL", "MSFT", "NVDA", "AVGO", "AMD", "INTC", "TSM", "ORCL", "CRM", "ADBE", "NOW", "PANW",

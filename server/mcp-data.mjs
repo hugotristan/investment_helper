@@ -1,5 +1,6 @@
 import { projectPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 import { FUNDAMENTAL_METRICS } from "../js/analysis/fundamentals.js";
+import { broadFunds } from "../js/config/settings.js";
 import { normalizeStockHistory } from "../js/data/stock-history.js";
 import { readCloudRecord } from "./cloud-store.mjs";
 import { createMarketAssetReader } from "./market-data.mjs";
@@ -78,14 +79,15 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
   async function prices(tickers) {
     const rows = await Promise.all(tickers.map(async ticker => {
       try {
-        const history = normalizeStockHistory(await market.loadHistory(ticker), ticker, { now: clock() });
+        const loaded = await market.loadHistory(ticker);
+        const history = normalizeStockHistory(loaded, ticker, { now: clock() });
         if (!history || clock() - Date.parse(history.historyAsOf) > 7 * DAY) throw new ApiError(503, "PRICES_UNAVAILABLE", "No recent validated daily history is available for this ticker.");
         const quote = history.quote && Date.parse(history.quote.quoteTime) >= Date.parse(history.historyAsOf) ? history.quote : null;
         const observed = quote ? date(quote.quoteTime, clock()) : history.historyAsOf;
-        return { ticker, status: "available", price: quote?.price ?? history.prices.at(-1).close, currency: history.currency,
+        return { ticker, status: loaded.stale ? "stale" : "available", stale: !!loaded.stale, quoteTimestamp: observed, price: quote?.price ?? history.prices.at(-1).close, currency: history.currency,
           priceType: quote ? "dated_quote" : "completed_daily_close", source: quote?.source ?? history.source,
           latestSuccessfulUpdateAt: observed, dataAsOf: observed, historyAsOf: history.historyAsOf,
-          delayMinutes: quote?.delayMinutes ?? null, realtime: false, errors: [] };
+          delayMinutes: quote?.delayMinutes ?? null, realtime: false, errors: loaded.stale ? [failed("STALE_PRICE", loaded.refreshError)] : [] };
       } catch (error) {
         return { ticker, status: "unavailable", price: null, currency: null, latestSuccessfulUpdateAt: null, dataAsOf: null,
           errors: [error instanceof ApiError ? failed(error.code, error.message) : failed("PRICES_UNAVAILABLE", "A validated price is unavailable for this ticker.")] };
@@ -105,7 +107,8 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
       }).sort((a, b) => b.retrieved.localeCompare(a.retrieved) || b.snapshot.generatedAt.localeCompare(a.snapshot.generatedAt));
       const selected = candidates[0];
       if (!selected) return { ticker, status: "unavailable", metrics: null, latestSuccessfulUpdateAt: null,
-        errors: [failed("METRICS_UNAVAILABLE", "No supported company financial metrics are available. Corporate metrics may not apply to an ETF.")], ...(refreshError ? { warnings: [refreshError] } : {}) };
+        errors: [broadFunds.has(ticker) ? failed("ETF_METRICS_UNSUPPORTED", "Company financial metrics do not apply to this known fund.")
+          : failed("METRICS_UNAVAILABLE", "Company financial data has not been successfully published for this ticker. This is a coverage or provider failure, not an ETF classification.")], ...(refreshError ? { warnings: [refreshError] } : {}) };
       const { record, retrieved } = selected;
       const stale = clock() - Date.parse(retrieved) >= 10 * DAY;
       const values = Object.fromEntries(FUNDAMENTAL_METRICS.map(key => [key, Number.isFinite(record.metrics?.[key]) ? record.metrics[key] : null]));
