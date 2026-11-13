@@ -6,7 +6,7 @@ const NOW=Date.parse('2026-11-13T12:00Z');
 function fixture(ticker='ACME'){
  const keys={revenue:100,netIncome:10,operatingIncome:20,operatingCashFlow:20,capitalExpenditures:5,freeCashFlow:15,dilutedEPS:10,debt:50,cash:20,currentAssets:200,currentLiabilities:100,equity:100,taxExpense:4,pretaxIncome:20,depreciation:5,interestExpense:5,dilutedShares:10,preferredStock:0,minorityInterest:0};
  const annualHistory=Array.from({length:6},(_,i)=>{const end=`${2020+i}-12-31`,factor=1.1**(i-5),values=Object.fromEntries(Object.entries(keys).map(([key,value])=>[key,key==='dilutedShares'?value*.99**(i-5):value*factor]));return {end,start:`${2020+i}-01-01`,periodType:'annual',currency:'USD',values,sources:Object.fromEntries(Object.keys(keys).map(key=>[key,[{provider:'SEC companyfacts',end,start:`${2020+i}-01-01`,filed:`${2021+i}-02-01`,unit:key==='dilutedShares'?'shares':key==='dilutedEPS'?'USD/shares':'USD'}]]))};});
- return {record:{ticker,available:true,provider:'SEC companyfacts',retrievedAt:'2026-11-12T12:00Z',currency:'USD',periodEnd:'2025-12-31',annualHistory,issuerMetadata:{sic:'3571',source:'SEC submissions',verifiedAt:'2026-11-12T12:00Z'}},item:{ticker,quote:{ticker,currency:'USD',price:100,marketCap:1000,quoteTime:'2026-11-12T21:00Z'}}};
+ return {record:{ticker,available:true,provider:'SEC companyfacts',retrievedAt:'2026-11-12T12:00Z',currency:'USD',periodEnd:'2025-12-31',annualHistory,issuerMetadata:{sic:'3571',source:'SEC submissions',verifiedAt:'2026-11-12T12:00Z'}},item:{ticker,splitsComplete:true,splitHistoryFrom:'2020-01-01',splits:[],quote:{ticker,currency:'USD',price:100,marketCap:1000,quoteTime:'2026-11-12T21:00Z'}}};
 }
 const derive=f=>deriveFundamentals(f.record,f.item,{now:NOW});const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-8,`${a} vs ${b}`);
 test('all financial formulas use aligned annual values and explicit market capitalization',()=>{
@@ -50,3 +50,5 @@ test('Yahoo extra concepts retain periods, share units, source links and annual 
  const raw={timeseries:{result:Object.entries(types).map(([type,value])=>({meta:{symbol:['ACME'],type:[type]},[type]:[{asOfDate:'2025-12-31',periodType:'12M',currencyCode:'USD',reportedValue:{raw:value}}]}))}};
  const r=normalizeYahooFinancials(raw,{ticker:'ACME',retrievedAt:new Date(NOW).toISOString()});assert.equal(r.historyVersion,1);assert.equal(r.annualHistory[0].values.operatingIncome,20);assert.equal(r.annualHistory[0].sources.dilutedShares[0].unit,'shares');
 });
+
+test('splits inside a multi-year window block EPS CAGR and apparent dilution',()=>{const f=fixture();f.item.splits=[{date:'2023-06-01'}];const a=derive(f);assert.equal(a.metrics.epsCagr.value,null);assert.equal(a.metrics.dilution.value,null);const missing=fixture();missing.item.splitsComplete=false;assert.equal(derive(missing).metrics.pe.value,null);});

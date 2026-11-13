@@ -140,7 +140,7 @@ export async function loadMarketSeries(ticker, { snapshot, cachedSeries } = {}) 
   if (published && !usesCloudMarket()) return saved && Date.parse(evaluateDataQuality(saved).asOf) > Date.parse(published.historyAsOf) ? saved : published;
   const history = await loadStockHistory(ticker, { snapshot });
   if (history && (!saved || Date.parse(history.historyAsOf) >= Date.parse(saved.historyAsOf || evaluateDataQuality(saved).asOf))) {
-    return { ...history, prices: history.prices.slice(-400) };
+    return { ...history, splitHistoryFrom:history.prices[0]?.date, prices: history.prices.slice(-400) };
   }
   if (saved) return { ...saved, source: `${saved.source.replace(/ \(saved history\)$/, "")} (saved history)` };
   return unavailableSeries(ticker);

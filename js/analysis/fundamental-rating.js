@@ -19,11 +19,14 @@ export function deriveFundamentals(record,item={}, {now=Date.now()}={}){
  const before=prior(1),three=prior(3);
  const historical=(r,key)=>{if(Date.parse(record?.retrievedAt)>now)return null;const sources=r?.sources?.[key];return sources?.length&&sources.every(s=>s.end===r.end&&s.unit===(key==='dilutedShares'?'shares':key==='dilutedEPS'?record.currency+'/shares':record.currency)&&(!s.filed||Date.parse(s.filed)<=now))&&finite(r.values?.[key])?r.values[key]:null;};
  const quote=item.quote||{},qtime=Date.parse(quote.quoteTime),quoteValid=quote.ticker===record?.ticker&&quote.currency===record?.currency&&finite(quote.price)&&quote.price>0&&qtime<=now&&now-qtime<=7*DAY;
- const split=(item.splits||[]).some(s=>Date.parse(s.date)>Date.parse(row.end)&&Date.parse(s.date)<=now);
+ const splitFrom=Date.parse(item.splitHistoryFrom||item.prices?.[0]?.date);
+ const verifiedSince=date=>item.splitsComplete===true&&Number.isFinite(splitFrom)&&splitFrom<=Date.parse(date);
+ const hasSplitSince=date=>!verifiedSince(date)||(item.splits||[]).some(event=>Date.parse(event.date)>Date.parse(date)&&Date.parse(event.date)<=now);
+ const split=hasSplitSince(row.end)||(item.splits||[]).some(s=>Date.parse(s.date)>Date.parse(row.end)&&Date.parse(s.date)<=now);
  const adr=/depositary|\bADR\b|\bADS\b/i.test(quote.name||'');
  const marketCap=quoteValid&&finite(quote.marketCap)&&quote.marketCap>0?quote.marketCap:null;
  const eps=split||adr?null:values.dilutedEPS;
- if(split||adr)warnings.push('Per-share valuation/growth requires split or ADR-basis verification.');
+ if(split||adr)warnings.push('Per-share valuation/growth requires complete split-history or ADR-basis verification.');
  const ebitda=finite(values.operatingIncome)&&finite(values.depreciation)&&values.depreciation>=0?values.operatingIncome+values.depreciation:null;
  const netDebt=finite(values.debt)&&values.debt>=0&&finite(values.cash)&&values.cash>=0?values.debt-values.cash:null;
  // Missing preferred interests are never silently assumed to be zero.
@@ -33,14 +36,14 @@ export function deriveFundamentals(record,item={}, {now=Date.now()}={}){
  const capital=invested(values),oldCapital=before?invested(Object.fromEntries(['debt','equity','cash'].map(k=>[k,historical(before,k)]))):null;
  const nopat=finite(taxRate)&&taxRate>=0&&taxRate<=1&&finite(values.operatingIncome)?values.operatingIncome*(1-taxRate):null;
  const capAverage=capital>0&&oldCapital>0?(capital+oldCapital)/2:null;
- const epsGrowth=split||adr?null:growthRate(eps,historical(before,'dilutedEPS'));
- const oldest=history.filter(r=>{const days=(Date.parse(row.end)-Date.parse(r.end))/DAY;return r.periodType===row.periodType&&days>=3*335&&days<=5*400&&historical(r,'dilutedShares')>0;})[0];
+ const epsGrowth=hasSplitSince(before?.end)||adr?null:growthRate(eps,historical(before,'dilutedEPS'));
+ const oldest=history.filter(r=>{const days=(Date.parse(row.end)-Date.parse(r.end))/DAY;return r.periodType===row.periodType&&days>=3*335&&days<=5*400&&verifiedSince(r.end)&&historical(r,'dilutedShares')>0;})[0];
  const dilutionYears=oldest?(Date.parse(row.end)-Date.parse(oldest.end))/(365.25*DAY):null;
  const consistent=history.slice(-5).filter(r=>finite(historical(r,'netIncome'))&&finite(historical(r,'freeCashFlow')));
  const pe=quoteValid&&eps>0?quote.price/eps:null;
  const computed={ps:ratio(marketCap,values.revenue),pe,fcfYield:ratio(values.freeCashFlow,marketCap),evEbitda:ratio(enterpriseValue,ebitda),peg:epsGrowth>0?ratio(pe,epsGrowth*100):null,
  netDebtEbitda:ratio(netDebt,ebitda),currentRatio:ratio(values.currentAssets,values.currentLiabilities),cash:values.cash,interestCoverage:ratio(values.operatingIncome,values.interestExpense),roic:ratio(nopat,capAverage),operatingMargin:ratio(values.operatingIncome,values.revenue),freeCashFlow:values.freeCashFlow,fcfMargin:ratio(values.freeCashFlow,values.revenue),netMargin:ratio(values.netIncome,values.revenue),
- revenueGrowth:growthRate(values.revenue,historical(before,'revenue')),revenueCagr:growthRate(values.revenue,historical(three,'revenue'),3),epsGrowth,epsCagr:split||adr?null:growthRate(eps,historical(three,'dilutedEPS'),3),fcfGrowth:growthRate(values.freeCashFlow,historical(before,'freeCashFlow')),dilution:oldest?growthRate(values.dilutedShares,historical(oldest,'dilutedShares'),dilutionYears):null,
+ revenueGrowth:growthRate(values.revenue,historical(before,'revenue')),revenueCagr:growthRate(values.revenue,historical(three,'revenue'),3),epsGrowth,epsCagr:hasSplitSince(three?.end)||adr?null:growthRate(eps,historical(three,'dilutedEPS'),3),fcfGrowth:growthRate(values.freeCashFlow,historical(before,'freeCashFlow')),dilution:oldest&&!hasSplitSince(oldest.end)?growthRate(values.dilutedShares,historical(oldest,'dilutedShares'),dilutionYears):null,
  consistency:consistent.length>=3?consistent.filter(r=>historical(r,'netIncome')>0&&historical(r,'freeCashFlow')>0).length/consistent.length:null};
  const stale=!record?.available||!finite(Date.parse(record.retrievedAt))||Date.parse(record.retrievedAt)>now||now-Date.parse(record.retrievedAt)>10*DAY||!finite(Date.parse(row.end))||now-Date.parse(row.end)>550*DAY||record.stale===true;
  const sector=Date.parse(record?.issuerMetadata?.verifiedAt)<=now?industryGroup(record?.issuerMetadata):null,financial=sector!==null&&+sector>=60&&+sector<=67;
