@@ -52,3 +52,5 @@ test('Yahoo extra concepts retain periods, share units, source links and annual 
 });
 
 test('splits inside a multi-year window block EPS CAGR and apparent dilution',()=>{const f=fixture();f.item.splits=[{date:'2023-06-01'}];const a=derive(f);assert.equal(a.metrics.epsCagr.value,null);assert.equal(a.metrics.dilution.value,null);const missing=fixture();missing.item.splitsComplete=false;assert.equal(derive(missing).metrics.pe.value,null);});
+
+test('one-year losses remain negative growth while sign-changing CAGR stays unavailable',()=>{assert.equal(growthRate(-5,10),-1.5);assert.equal(growthRate(0,10),-1);assert.equal(growthRate(-5,10,3),null);const f=fixture();f.record.annualHistory.at(-1).values.dilutedEPS=-1;assert.ok(derive(f).metrics.epsGrowth.value < -1);});
