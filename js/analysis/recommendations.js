@@ -1,3 +1,4 @@
+import {TECHNICAL_SCORE_VERSION,LEGACY_SCORE_VERSION,technicalSignalFor} from "./technical-policy.js";
 import { evaluateDataQuality, hasQualifiedSignal, isEtfSeries, validHistoryPoints } from "./data-quality.js";
 
 const DAY_MS = 86400000;
@@ -35,8 +36,8 @@ export function recordRecommendations(journal, candidates, results, {
       currency: stock.currency,
       baseline: { price: point.close, asOf: point.date, currency: stock.currency },
       benchmark: { ticker: "SPY", price: comparison.close, asOf: comparison.date, currency: benchmark.currency },
-      score: candidate.score,
-      signal: String(candidate.setup?.signal || candidate.label || "Research signal"),
+      score: candidate.score, scoreVersion:candidate.scoreVersion || TECHNICAL_SCORE_VERSION, scoreCoverage:candidate.scoreCoverage ?? null,
+      signal: technicalSignalFor(candidate).label,
       evidence: evidence.slice(0, 5),
       reasons: stringArray(candidate.reasons), risks: stringArray(candidate.risks),
       horizon: String(candidate.horizon || candidate.setup?.timeframe || ""),
@@ -115,6 +116,10 @@ export function observeRecommendations(journal, results, { now = Date.now() } = 
     summary[`averageExcess${sessions}`] = matured.length ? matured.reduce((sum, outcome) => sum + outcome.excessReturn, 0) / matured.length : null;
     summary[`outperformanceRate${sessions}`] = matured.length ? matured.filter((outcome) => outcome.excessReturn > 0).length / matured.length : null;
   }
+  summary.byModel = Object.fromEntries([...new Set(entries.map(entry=>entry.scoreVersion || LEGACY_SCORE_VERSION))].map(version => {
+    const rows=entries.filter(entry=>(entry.scoreVersion || LEGACY_SCORE_VERSION)===version);
+    return [version,{recorded:rows.length,...Object.fromEntries(WINDOWS.flatMap(sessions=>{const matured=rows.map(row=>row.outcomes[sessions]).filter(outcome=>outcome.status==="matured");return [["matured"+sessions,matured.length],["averageExcess"+sessions,matured.length?matured.reduce((sum,row)=>sum+row.excessReturn,0)/matured.length:null]];}))}];
+  }));
   return { entries, summary };
 }
 

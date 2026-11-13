@@ -50,9 +50,9 @@ test("qualified scoring is independent of local history and allocations retain l
     .sort(stableRankSort);
   // Raw technical scores are preserved; previous browser scores no longer alter signals.
   assert.deepEqual(results.map(({ ticker, score, rawScore }) => ({ ticker, score, rawScore })), [
-    { ticker: "SPY", score: 83, rawScore: 83 },
-    { ticker: "ACME", score: 77, rawScore: 77 },
-    { ticker: "FALL", score: 26, rawScore: 26 },
+    { ticker: "ACME", score: 78, rawScore: 78 },
+    { ticker: "SPY", score: 78, rawScore: 78 },
+    { ticker: "FALL", score: 27, rawScore: 27 },
   ]);
   const actions = buildModelAllocation(results, { score: 0, available: true }).actions;
   assert.deepEqual(actions.map(({ ticker, percent }) => ({ ticker, percent })), [

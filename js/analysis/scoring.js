@@ -1,3 +1,5 @@
+import { TECHNICAL_SCORE_VERSION, TECHNICAL_WEIGHTS, MIN_DAILY_TURNOVER_USD, dailyTurnoverUSD, recentTechnicalNews, technicalSignalFor } from './technical-policy.js';
+import { assessDataConfidence } from './data-confidence.js';
 import { broadFunds } from "../config/settings.js";
 import { evaluateDataQuality, hasQualifiedSignal, isEtfSeries, validHistoryPoints } from "./data-quality.js";
 import { compactMoney, formatNumber, formatPercent } from "../shared/format.js";
@@ -5,115 +7,119 @@ import { average, averageTrueRange, bollingerBands, clamp, dailyReturns, macdSig
 import { unique } from "../shared/text.js";
 import { latestLearningPoint } from "../storage.js";
 
-export function scoreSeries(series, headlines) {
-  const dataQuality = evaluateDataQuality(series);
+export function scoreSeries(series, headlines = [], {now = Date.now(), fxReference = null} = {}) {
+  // Recover a v1 cached quote overlay conservatively. Original OHLC/volume were
+  // not saved, so those observations cannot be reconstructed from the quote.
+  if (series.dailyClose && series.prices?.length) {
+    const saved = series.dailyClose, last = series.prices.at(-1);
+    if (saved.currency !== series.currency || !Number.isFinite(saved.price) || saved.price <= 0
+      || Date.parse(saved.asOf) !== new Date(last.date).getTime()) {
+      return unavailableSignal(series,headlines,{eligible:false,asOf:null,reason:'The original completed daily bar is unavailable; refresh price history.'},isEtfSeries(series));
+    }
+    series = {...series,prices:series.prices.map((point,index)=>index===series.prices.length-1 ? {...point,close:saved.price,high:null,low:null,volume:null} : point)};
+  }
+  const initialQuality = evaluateDataQuality(series,now);
+  if (initialQuality.eligible) {
+    const today = new Date(now).toISOString().slice(0,10);
+    const completed = validHistoryPoints(series).filter(point=>new Date(point.date).toISOString().slice(0,10)<today);
+    if (completed.length !== validHistoryPoints(series).length) series = {...series,prices:completed,historyAsOf:completed.at(-1)?.date || null};
+  }
+  const dataQuality = evaluateDataQuality(series,now);
   const isFund = broadFunds.has(series.ticker) || isEtfSeries(series);
   if (!dataQuality.eligible) return unavailableSignal(series, headlines, dataQuality, isFund);
-  const outlooks = headlines.filter((headline) => headline.kind === "outlook");
-  const newsHeadlines = headlines.filter((headline) => headline.kind !== "outlook");
+  const recentHeadlines = recentTechnicalNews(headlines,now);
+  const outlooks = recentHeadlines.filter((headline) => headline.kind === "outlook");
+  const newsHeadlines = recentHeadlines.filter((headline) => headline.kind !== "outlook");
   const prices = validHistoryPoints(series);
   const closes = prices.map((point) => point.close);
   const highs = prices.map((point) => Number.isFinite(point.high) ? point.high : point.close);
   const lows = prices.map((point) => Number.isFinite(point.low) ? point.low : point.close);
   const latest = closes.at(-1);
+  const quoteTime = new Date(series.quote?.quoteTime || '').getTime();
+  const quoteUsable = Number.isFinite(series.quote?.price) && series.quote.price>0
+    && (!series.currency || series.quote.currency===series.currency)
+    && (!series.quote.ticker || series.quote.ticker===series.ticker)
+    && Number.isFinite(quoteTime) && quoteTime<=now && now-quoteTime<=7*86400000
+    && quoteTime>=Date.parse(dataQuality.asOf);
   const sma20 = average(closes.slice(-20));
   const sma50 = average(closes.slice(-50));
   const sma200 = average(closes.slice(-200));
   const previousSma50 = average(closes.slice(-100, -50));
   const oneWeek = returnOver(closes, 5);
-  const oneDay = Number.isFinite(series.quote?.dayChangePercent) ? series.quote.dayChangePercent : returnOver(closes, 1);
+  const oneDay = quoteUsable && Number.isFinite(series.quote?.dayChangePercent) ? series.quote.dayChangePercent : returnOver(closes, 1);
   const oneMonth = returnOver(closes, 21);
   const threeMonth = returnOver(closes, 63);
   const sixMonth = returnOver(closes, 126);
   const returns = dailyReturns(closes);
   const volatility = stdev(returns) * Math.sqrt(252);
-  const high = series.quote?.high52Week || Math.max(...highs.slice(-252));
-  const low52Week = series.quote?.low52Week || Math.min(...lows.slice(-252));
+  const high = Math.max(...highs.slice(-252));
+  const low52Week = Math.min(...lows.slice(-252));
   const drawdown = high ? latest / high - 1 : 0;
-  const volumes = prices.map((point) => point.volume).filter((volume) => Number.isFinite(volume) && volume > 0);
-  const averageVolume60 = series.quote?.averageVolume || average(volumes.slice(-60));
-  const averageDollarVolume = latest * averageVolume60;
-  const volumePressure = average(volumes.slice(-10)) / Math.max(average(volumes.slice(-60)), 1) - 1;
-  const headlineScore = newsHeadlines.length ? average(newsHeadlines.map((headline) => headline.sentiment)) : headlines.length ? average(headlines.map((headline) => headline.sentiment)) : 0;
-  const headlineSourceCount = unique(newsHeadlines.map((headline) => headline.sourceId)).length;
-  const outlookScore = outlooks.length ? average(outlooks.map((outlook) => outlook.sentiment)) : 0;
-  const outlookSourceCount = unique(outlooks.map((outlook) => outlook.sourceId)).length;
-  const yearOutlooks = outlooks.filter((outlook) => outlook.horizon === "recent-year");
-  const yearOutlookScore = yearOutlooks.length ? average(yearOutlooks.map((outlook) => outlook.sentiment)) : 0;
-  const yearOutlookSourceCount = unique(yearOutlooks.map((outlook) => outlook.sourceId)).length;
+  const recentVolumes = prices.slice(-60), shortVolumes = prices.slice(-10);
+  const validVolume = point => Number.isFinite(point.volume) && point.volume >= 0;
+  const volumeAvailable = recentVolumes.every(validVolume) && shortVolumes.every(validVolume);
+  const averageVolume60 = volumeAvailable ? average(recentVolumes.filter(validVolume).map(p=>p.volume)) : null;
+  const averageNativeTurnover = volumeAvailable ? latest*averageVolume60 : null;
+  const averageDollarVolume = dailyTurnoverUSD(averageNativeTurnover,series.currency,fxReference,now);
+  const shortVolume = volumeAvailable ? average(shortVolumes.filter(validVolume).map(p=>p.volume)) : null;
+  const volumePressure = !volumeAvailable ? null : averageVolume60 > 0 ? shortVolume/averageVolume60-1 : 0;
+  const sentiment = rows => rows.length ? rows.reduce((sum,row)=>sum+(Number.isFinite(row.sentiment)?row.sentiment:0)*row.freshnessWeight,0)/rows.reduce((sum,row)=>sum+row.freshnessWeight,0) : null;
+  const headlineScore = sentiment(newsHeadlines);
+  const headlineSourceCount = unique(newsHeadlines.map(row=>row.sourceId).filter(Boolean)).length;
+  const outlookScore = sentiment(outlooks);
+  const outlookSourceCount = unique(outlooks.map(row=>row.sourceId).filter(Boolean)).length;
+  const yearOutlooks = outlooks.filter(row=>row.horizon==='recent-year');
+  const yearOutlookScore = sentiment(yearOutlooks);
+  const yearOutlookSourceCount = unique(yearOutlooks.map(row=>row.sourceId).filter(Boolean)).length;
   const rsi14 = relativeStrengthIndex(closes, 14);
   const macd = macdSignal(closes);
   const bands = bollingerBands(closes, 20);
-  const atrValue = averageTrueRange(prices, 14);
-  const atrPercent = latest ? atrValue / latest : 0;
+  const rangeAvailable = prices.slice(-14).filter(p=>Number.isFinite(p.high) && Number.isFinite(p.low) && p.high>=p.low && p.low>0).length === 14;
+  const atrValue = rangeAvailable ? averageTrueRange(prices,14) : null;
+  const atrPercent = rangeAvailable ? atrValue/latest : null;
   const support = Math.min(...lows.slice(-60));
   const resistance = Math.max(...highs.slice(-60));
   const sma50Slope = previousSma50 ? sma50 / previousSma50 - 1 : 0;
-  const eventRisk = detectEventRisk(headlines);
+  const eventRisk = recentHeadlines.length ? detectEventRisk(recentHeadlines) : {score:null,level:'Unknown',hits:[]};
 
   const trendRaw = (latest > sma20 ? 0.2 : 0) + (latest > sma50 ? 0.35 : 0) + (latest > sma200 ? 0.45 : 0);
   const momentumRaw = clamp((oneMonth + 0.08) / 0.22, 0, 1) * 0.35 + clamp((threeMonth + 0.1) / 0.35, 0, 1) * 0.3 + clamp((sixMonth + 0.15) / 0.5, 0, 1) * 0.35;
   const riskRaw = 1 - clamp((volatility - 0.12) / 0.55, 0, 1);
   const drawdownRaw = 1 - clamp(Math.abs(Math.min(drawdown, 0)) / 0.35, 0, 1);
-  const volumeRaw = clamp((volumePressure + 0.15) / 0.45, 0, 1);
-  const liquidityRaw = clamp(Math.log10(Math.max(averageDollarVolume, 1)) / 9, 0, 1);
+  const volumeRaw = volumeAvailable ? clamp((volumePressure + 0.15) / 0.45, 0, 1) : null;
+  const liquidityRaw = Number.isFinite(averageDollarVolume) ? clamp(Math.log10(Math.max(averageDollarVolume,1))/9,0,1) : null;
   const rsiRaw = Number.isFinite(rsi14) ? rsi14 > 75 ? 0.35 : rsi14 >= 45 && rsi14 <= 70 ? 1 : rsi14 >= 35 && rsi14 < 45 ? 0.65 : rsi14 < 30 ? 0.45 : 0.55 : 0.5;
   const macdRaw = macd.histogram > 0 ? 0.72 + clamp(macd.histogram / Math.max(latest * 0.02, 1), 0, 0.28) : 0.45 + clamp(macd.histogram / Math.max(latest * 0.02, 1), -0.35, 0);
   const bollingerRaw = Number.isFinite(bands.position) ? bands.position > 1.05 ? 0.42 : bands.position >= 0.35 && bands.position <= 0.85 ? 0.9 : bands.position < 0.15 ? 0.55 : 0.66 : 0.5;
-  const atrRiskRaw = 1 - clamp((atrPercent - 0.018) / 0.06, 0, 1);
-  const technicalRaw = average([trendRaw, momentumRaw, rsiRaw, macdRaw, bollingerRaw, atrRiskRaw]);
-  const headlineRaw = clamp((headlineScore + 1) / 2, 0, 1);
+  const atrRiskRaw = rangeAvailable ? 1 - clamp((atrPercent - 0.018) / 0.06, 0, 1) : null;
+  const technicalRaw = average([rsiRaw,macdRaw,bollingerRaw,atrRiskRaw]);
+  const headlineRaw = headlineScore === null ? null : clamp((headlineScore+1)/2,0,1);
   const sourceRaw = clamp(headlineSourceCount / 6, 0, 1);
-  const outlookRaw = clamp((outlookScore + 1) / 2, 0, 1);
-  const outlookBreadthRaw = clamp(outlookSourceCount / 4, 0, 1);
-  const diversificationRaw = isFund ? 1 : 0.48;
-  const eventRiskRaw = 1 - clamp(eventRisk.score / 100, 0, 1);
+  const outlookRaw = outlookScore === null ? null : clamp((outlookScore+1)/2,0,1);
+  const eventRiskRaw = eventRisk.score === null ? null : 1-clamp(eventRisk.score/100,0,1);
 
-  let score = (
-    trendRaw * 18 +
-    momentumRaw * 17 +
-    technicalRaw * 14 +
-    riskRaw * 11 +
-    drawdownRaw * 9 +
-    headlineRaw * 7 +
-    sourceRaw * 4 +
-    volumeRaw * 5 +
-    liquidityRaw * 5 +
-    eventRiskRaw * 5 +
-    diversificationRaw * 5
-  );
-
-  if (outlooks.length) {
-    score += (outlookRaw - 0.5) * 12;
-    score += outlookScore >= 0 ? outlookBreadthRaw * 2 : -outlookBreadthRaw;
-  }
-
-  if (yearOutlooks.length) {
-    const yearBreadthRaw = clamp(yearOutlookSourceCount / 4, 0, 1);
-    score += clamp(yearOutlookScore * 6, -5, 5);
-    score += yearOutlookScore >= 0 ? yearBreadthRaw * 1.5 : -yearBreadthRaw * 1.5;
-  }
-
-  if (!isFund) score -= 4;
-  if (volatility > 0.65) score -= 8;
-  if (latest < sma200 && sixMonth < 0) score -= 8;
-  if (eventRisk.level === "High") score -= 8;
-  if (liquidityRaw < 0.38 && !isFund) score = Math.min(score, 44);
-  score = Math.round(clamp(score, 0, 100));
+  const rawParts = {trend:trendRaw,momentum:momentumRaw,rsi:rsiRaw,macd:macdRaw,
+    bollinger:bollingerRaw,atr:atrRiskRaw,volatility:riskRaw,drawdown:drawdownRaw,volume:volumeRaw,liquidity:liquidityRaw};
+  const scoreBreakdown = Object.entries(TECHNICAL_WEIGHTS).map(([key,weight])=>({key,weight,raw:rawParts[key],available:Number.isFinite(rawParts[key])}));
+  const scoreCoverage = scoreBreakdown.filter(part=>part.available).reduce((sum,part)=>sum+part.weight,0);
+  const score = Math.round(clamp(scoreBreakdown.reduce((sum,part)=>sum+(part.available?part.raw*part.weight:0),0)/scoreCoverage*100,0,100));
   const categories = buildCategoryScores({
     trendRaw, momentumRaw, technicalRaw, headlineRaw, outlookRaw, yearOutlookScore,
     liquidityRaw, riskRaw, drawdownRaw, eventRiskRaw, sourceRaw
   });
   const setup = buildTradeSetup({
     latest, sma50, sma200, support, resistance, atrValue, atrPercent, rsi14, macd,
-    volumePressure, averageDollarVolume, eventRisk, score, isFund
+    volumePressure, averageDollarVolume, eventRisk, score, isFund, rangeAvailable
   });
 
-  return {
+  const result = {
     ...series,
     prices,
     dataQuality,
-    score,
+    score, scoreVersion:TECHNICAL_SCORE_VERSION, scoreCoverage, scoreBreakdown, provisional:scoreCoverage<100,
+    currentPrice:quoteUsable ? series.quote.price : latest, currentPriceAsOf:quoteUsable ? new Date(quoteTime).toISOString() : dataQuality.asOf,
+    currentPriceSource:quoteUsable ? series.quote.source : series.source, technicalAsOf:dataQuality.asOf,
+    averageNativeTurnover, turnoverCurrency:series.currency, volumeAvailable, rangeAvailable,
     latest,
     oneDay,
     sma20,
@@ -152,21 +158,26 @@ export function scoreSeries(series, headlines) {
     eventRisk,
     setup,
     scoreDelta: 0,
-    label: scoreLabel(score),
+    label: null,
     reasons: buildReasons({ latest, sma20, sma50, sma200, sma50Slope, oneMonth, threeMonth, sixMonth, volatility, drawdown, volumePressure, headlineScore, headlineSourceCount, outlookScore, outlookSourceCount, yearOutlookScore, yearOutlookSourceCount, rsi14, macd, averageDollarVolume, eventRisk, isFund }),
     flags: buildFlags({ latest, sma200, sixMonth, volatility, drawdown, atrPercent, averageDollarVolume, eventRisk, isFund })
   };
+  const signal = technicalSignalFor(result);
+  result.label = signal.label; result.signalKey = signal.key; result.setup.signal = signal.label;
+  result.dataConfidence = assessDataConfidence(result,{now});
+  return result;
+
 }
 
 function buildCategoryScores(parts) {
-  const recentYearRaw = clamp((parts.yearOutlookScore + 1) / 2, 0, 1);
+  const recentYearRaw = parts.yearOutlookScore === null ? null : clamp((parts.yearOutlookScore+1)/2,0,1);
   return {
     trend: Math.round(parts.trendRaw * 100),
     momentum: Math.round(parts.momentumRaw * 100),
     technical: Math.round(parts.technicalRaw * 100),
-    news: Math.round(((parts.headlineRaw * 0.55) + (parts.outlookRaw * 0.3) + (parts.sourceRaw * 0.15)) * 100),
-    recentYear: Math.round(recentYearRaw * 100),
-    liquidity: Math.round(parts.liquidityRaw * 100),
+    news: parts.headlineRaw === null && parts.outlookRaw === null ? null : Math.round(average([parts.headlineRaw,parts.outlookRaw])*100),
+    recentYear: recentYearRaw === null ? null : Math.round(recentYearRaw*100),
+    liquidity: parts.liquidityRaw === null ? null : Math.round(parts.liquidityRaw*100),
     risk: Math.round(average([parts.riskRaw, parts.drawdownRaw, parts.eventRiskRaw]) * 100)
   };
 }
@@ -178,32 +189,27 @@ function buildTradeSetup(data) {
   const invalidation = Math.max(0, Math.min(supportStop, movingStop));
   const entryLow = Math.max(invalidation, data.latest - stopBuffer * 0.35);
   const entryHigh = data.score >= 70 ? data.latest + stopBuffer * 0.45 : Math.min(data.latest + stopBuffer * 0.2, data.resistance || data.latest + stopBuffer * 0.2);
-  const riskLevel = data.eventRisk.level === "High" || data.atrPercent > 0.055 || data.score < 45
+  const riskLevel = !data.rangeAvailable ? "Range data incomplete" : data.eventRisk.level === "High" || data.atrPercent > 0.055 || data.score < 45
     ? "High"
     : data.atrPercent > 0.03 || data.eventRisk.level === "Medium"
       ? "Medium"
       : "Lower";
-  const timeframe = data.score >= 70 ? "1 day to 4 weeks" : data.score >= 55 ? "1 to 4 weeks" : "Now / avoid new buys";
+  const timeframe = data.score >= 70 ? "1 day to 4 weeks" : data.score >= 55 ? "1 to 4 weeks" : "Conditions need review";
   return {
     signal: signalForScore(data.score, data.eventRisk.level),
-    confidence: Math.round(clamp(data.score - (data.eventRisk.level === "High" ? 10 : data.eventRisk.level === "Medium" ? 5 : 0), 0, 100)),
+    confidence: null, // Retired: dataConfidence is a separate evidence-quality indicator.
     timeframe,
-    entryZone: `${formatNumber(entryLow)}-${formatNumber(Math.max(entryLow, entryHigh))}`,
-    invalidation,
+    entryZone: data.rangeAvailable ? `${formatNumber(entryLow)}-${formatNumber(Math.max(entryLow, entryHigh))}` : "Range data unavailable",
+    invalidation: data.rangeAvailable ? invalidation : null,
     riskLevel,
     support: data.support,
     resistance: data.resistance,
-    note: data.eventRisk.level === "High" ? "Event risk is high; avoid new entries unless the setup improves." : "Entry is a signal zone, not a guaranteed fill."
+    note: data.eventRisk.level === "High" ? "Recent event risk needs review; this is not a trade recommendation." : "Entry is a signal zone, not a guaranteed fill."
   };
 }
 
-function signalForScore(score, eventRiskLevel) {
-  if (eventRiskLevel === "High" && score < 72) return "Avoid new buys";
-  if (score >= 76) return "Buy signal";
-  if (score >= 62) return "Hold / buy-watch";
-  if (score >= 48) return "Watch";
-  if (score >= 38) return "Avoid new buys";
-  return "Sell / reduce";
+function signalForScore(score,eventRiskLevel) {
+  return technicalSignalFor({score,dataQuality:{eligible:true},eventRisk:{level:eventRiskLevel}}).label;
 }
 
 function detectEventRisk(headlines) {
@@ -223,14 +229,14 @@ function detectEventRisk(headlines) {
 export function applyLearningSignal(item) {
   if (!hasQualifiedSignal(item)) return { ...item, rawScore: null, scoreDelta: 0 };
   const previous = latestLearningPoint(item.ticker);
-  if (!previous || !Number.isFinite(previous.score)) return { ...item, rawScore: item.score, scoreDelta: 0 };
+  if (!previous || previous.scoreVersion !== item.scoreVersion || previous.scoreCoverage !== item.scoreCoverage || !Number.isFinite(previous.score)) return { ...item, rawScore:item.score, scoreDelta:0, scoreComparison:{comparable:false,reason:"No previous scan with the same score version and available input weights."} };
   const rawScore = item.score;
   const scoreDelta = rawScore - previous.score;
 
   return {
     ...item,
     rawScore,
-    scoreDelta,
+    scoreDelta, scoreComparison:{comparable:true},
     reasons: [
       ...item.reasons,
       scoreDelta >= 5
@@ -259,7 +265,8 @@ function unavailableSignal(series, headlines, dataQuality, isFund) {
   ].map((key) => [key, null]));
   const outlooks = headlines.filter((headline) => headline.kind === "outlook");
   return {
-    ...series, ...unavailable, dataQuality, isFund, score: null, rawScore: null, scoreDelta: 0,
+    ...series, ...unavailable, dataQuality, isFund, score: null, scoreVersion:TECHNICAL_SCORE_VERSION, scoreCoverage:0, rawScore: null, scoreDelta: 0,
+    dataConfidence:assessDataConfidence({...series,isFund,headlines}),
     headlines, outlooks, yearOutlooks: outlooks.filter((item) => item.horizon === "recent-year"),
     headlineSourceCount: unique(headlines.filter((item) => item.kind !== "outlook").map((item) => item.sourceId)).length,
     outlookSourceCount: unique(outlooks.map((item) => item.sourceId)).length,
@@ -281,15 +288,15 @@ function buildReasons(data) {
   if (Number.isFinite(data.rsi14) && data.rsi14 >= 45 && data.rsi14 <= 70) reasons.push(`RSI ${data.rsi14.toFixed(0)} is constructive without being extremely overbought.`);
   if (data.macd?.histogram > 0) reasons.push("MACD momentum is positive.");
   if (data.volumePressure > 0.08) reasons.push(`Recent volume is ${formatPercent(data.volumePressure)} above its 60-day baseline.`);
-  if (data.averageDollarVolume > 5000000) reasons.push(`Liquidity screen passed with about ${compactMoney(data.averageDollarVolume)} average daily dollar volume.`);
+  if (data.averageDollarVolume >= MIN_DAILY_TURNOVER_USD) reasons.push(`Liquidity screen passed with about ${compactMoney(data.averageDollarVolume)} average daily dollar volume.`);
   if (data.headlineScore > 0.1) reasons.push("Current headline tone is positive.");
-  if (data.headlineSourceCount >= 3) reasons.push(`${data.headlineSourceCount} independent sources mention this ticker or its market context.`);
+  if (data.headlineSourceCount >= 3) reasons.push(`${data.headlineSourceCount} distinct publishers mention this ticker or its market context.`);
   if (data.outlookSourceCount >= 2 && data.outlookScore > 0.05) reasons.push(`${data.outlookSourceCount} trusted outlook sources are constructive on this exposure or its market theme.`);
   if (data.outlookSourceCount >= 2 && data.outlookScore < -0.05) reasons.push(`${data.outlookSourceCount} trusted outlook sources are cautious on this exposure or its market theme.`);
   if (data.yearOutlookSourceCount >= 2 && data.yearOutlookScore > 0.05) reasons.push(`${data.yearOutlookSourceCount} recent-year research sources support this stock or sector theme.`);
   if (data.yearOutlookSourceCount >= 2 && data.yearOutlookScore < -0.05) reasons.push(`${data.yearOutlookSourceCount} recent-year research sources are cautious on this stock or sector theme.`);
   if (data.eventRisk?.level === "Low") reasons.push("No major event-risk blocker was detected in matched headlines.");
-  if (data.isFund) reasons.push("Broad ETF exposure reduces single-company risk.");
+
   if (!reasons.length) reasons.push("No strong positive signal stands out today.");
   return reasons;
 }
@@ -300,17 +307,11 @@ function buildFlags(data) {
   if (data.sixMonth < 0) flags.push(`Negative six-month momentum at ${formatPercent(data.sixMonth)}.`);
   if (data.volatility > 0.45) flags.push(`High volatility at ${formatPercent(data.volatility)} annualized.`);
   if (data.atrPercent > 0.05) flags.push(`ATR risk is high at ${formatPercent(data.atrPercent)} of price.`);
-  if (data.averageDollarVolume < 5000000 && !data.isFund) flags.push(`Liquidity warning: only about ${compactMoney(data.averageDollarVolume)} average daily dollar volume.`);
-  if (data.eventRisk?.level !== "Low") flags.push(`${data.eventRisk.level} event risk detected${data.eventRisk.hits.length ? `: ${data.eventRisk.hits.join(", ")}` : ""}.`);
+  if (Number.isFinite(data.averageDollarVolume) && data.averageDollarVolume < MIN_DAILY_TURNOVER_USD) flags.push(`Liquidity warning: only about ${compactMoney(data.averageDollarVolume)} average daily dollar volume.`);
+  if (["High","Medium"].includes(data.eventRisk?.level)) flags.push(`${data.eventRisk.level} event risk detected${data.eventRisk.hits.length ? `: ${data.eventRisk.hits.join(", ")}` : ""}.`);
   if (data.drawdown < -0.18) flags.push(`Still ${formatPercent(data.drawdown)} below its recent high.`);
-  if (!data.isFund) flags.push("Single-stock exposure adds company-specific risk.");
+  if (data.eventRisk?.level === "Unknown") flags.push("Recent news coverage is unavailable; event risk is unknown.");
+  if (!Number.isFinite(data.averageDollarVolume)) flags.push("USD turnover is unavailable; check trading volume and currency conversion.");
   if (!flags.length) flags.push("No major risk flag, but all market investments can lose money.");
   return flags;
-}
-
-function scoreLabel(score) {
-  if (score >= 75) return "Strong buy-model candidate";
-  if (score >= 60) return "Buy-model candidate";
-  if (score >= 45) return "Watch only";
-  return "Avoid today";
 }

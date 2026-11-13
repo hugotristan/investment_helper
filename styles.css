@@ -839,3 +839,7 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 #loadingTickerResults { overflow-x: auto; }
 .coverage-table { width:100%; border-collapse:collapse; text-align:left; font-size:.85rem; }
 .coverage-table th, .coverage-table td { padding:12px 10px; border-bottom:1px solid var(--border, #bbc2c8); vertical-align:top; min-width:120px; overflow-wrap:anywhere; }
+
+.data-confidence { display:block; font-size:.75rem; font-weight:400; margin-top:5px; color:var(--muted, #52606b); }
+.data-confidence-panel { border-block:1px solid var(--border, #bbc2c8); padding:16px 0; margin:16px 0; }
+.data-confidence-panel h3 { font-size:1rem; }

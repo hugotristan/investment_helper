@@ -28,6 +28,7 @@ export function compactMoney(value) {
 }
 
 export function formatSignal(value) {
+  if (!Number.isFinite(value)) return "Unavailable";
   if (value > 0.1) return "positive";
   if (value < -0.1) return "negative";
   return "mixed";

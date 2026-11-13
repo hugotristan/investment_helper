@@ -1,3 +1,4 @@
+import {getExchangeRate} from "./js/data/exchange-rate.js";
 // App entry point: initializes feature controls, navigation, and the scan/refresh lifecycle.
 
 import { applyLearningSignal, scoreSeries, stableRankSort } from "./js/analysis/scoring.js";
@@ -300,7 +301,7 @@ async function runAnalysis(options = {}) {
 
 function rankSeries(series, quotes, byTicker) {
   return series.map((item) => applyQuoteSnapshot(item, quotes.byTicker))
-    .map((item) => scoreSeries(item, byTicker[item.ticker] || []))
+    .map((item) => scoreSeries(item, byTicker[item.ticker] || [], {fxReference:getExchangeRate()}))
     .map(applyLearningSignal).sort(stableRankSort);
 }
 

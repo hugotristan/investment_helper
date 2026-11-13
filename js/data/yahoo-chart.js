@@ -21,8 +21,8 @@ export function parseYahooChart(json, ticker) {
     const date = typeof time === "number" && Number.isFinite(time) ? new Date(time * 1000) : new Date(NaN);
     if (!close || !Number.isFinite(date.getTime())) continue;
     days.set(date.toISOString().slice(0, 10), { date, close,
-      high: positive(quote.high?.[index]) || close, low: positive(quote.low?.[index]) || close,
-      volume: Math.max(0, Number(quote.volume?.[index]) || 0) });
+      high: positive(quote.high?.[index]), low: positive(quote.low?.[index]),
+      volume: typeof quote.volume?.[index] === "number" && Number.isFinite(quote.volume[index]) && quote.volume[index] >= 0 ? quote.volume[index] : null });
   }
   const prices = [...days.values()].sort((a, b) => a.date - b.date);
   if (!prices.length) return null;

@@ -19,7 +19,7 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
   const average = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
   const stats = [
     ["Instruments scanned", results.length, "Watchlist and research universe"],
-    ["Average technical score", average === null ? "—" : `${average}/100`, "Qualified price histories"],
+    ["Average Technical Score v2", average === null ? "—" : `${average}/100`, "Qualified price histories"],
     ["Quote snapshots", quotes?.count || 0, quotes?.count ? `Of ${quotes.total} requested symbols` : "Using daily prices"],
     ["Research sources", researchPending ? "Pending" : activeSources, researchPending ? "Research scan running" : `Of ${news?.configured || 0} configured sources`]
   ];
@@ -37,7 +37,7 @@ export function renderDashboardOverview(results, priceSource, news, marketContex
   const activity = [
     ["Market regime", marketContext?.label || "Not available", `${marketContext?.liveCount || 0}/${marketContext?.total || 11} qualified market proxies`],
     ["Research coverage", researchPending ? "Research scan running" : `${news?.items?.length || 0} matched headlines`, researchPending ? "Headlines pending" : `${activeSources} sources responded`],
-    ["Top technical score", top ? `${top.ticker} · ${top.score}/100` : "Unavailable", top?.setup?.signal || top?.label || "No qualified result"],
+    ["Top Technical Score v2", top ? `${top.ticker} · ${top.score}/100` : "Unavailable", top?.setup?.signal || top?.label || "No qualified result"],
     ["Price data", `${qualified.length}/${results.length} histories qualified`, excludedCount ? `${excludedCount} sample, stale, or incomplete histories excluded` : "Recent real daily prices"]
   ];
   setHtml("scanActivity", activity.map(([label, title, note]) => `

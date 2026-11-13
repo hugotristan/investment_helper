@@ -91,7 +91,8 @@ test("the first ticker/UTC-day baseline and evidence stay immutable across resca
   assert.deepEqual(rescanned, journal);
   idea.evidence[0].title = "Changed source object";
   assert.equal(journal[0].evidence[0].title, "Acme reports");
-  assert.equal(journal[0].signal, "Buy signal");
+  assert.equal(journal[0].signal,"Favorable technical setup");
+  assert.equal(journal[0].scoreVersion,"technical-v2");
   const nextDay = recordRecommendations(journal, [changed], [history(), history("SPY")], {
     now: NOW + DAY, complete: true, fresh: true
   });

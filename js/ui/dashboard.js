@@ -107,7 +107,7 @@ function renderEvidence(results, allocation) {
   els.researchEvidence.innerHTML = selected.map((item) => {
     const articles = uniqueArticles([...(item.outlooks || []), ...(item.headlines || [])])
       .map((article) => ({ ...article, link: safeUrl(article.link) })).filter((article) => article.link).slice(0, 5);
-    return `<details class="secondary-details evidence-card"><summary>${escapeHtml(item.ticker)} · ${item.score}/100 · ${articles.length} matched articles</summary>
+    return `<details class="secondary-details evidence-card"><summary>${escapeHtml(item.ticker)} · Technical Score v2 ${item.score}/100 · ${articles.length} matched articles</summary>
       <p>${escapeHtml(item.setup?.signal || item.label)}</p>
       <ul>${(item.reasons || []).slice(0, 3).map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
       ${articles.length ? articles.map((article) => `<div class="detail-source-entry"><a href="${escapeHtml(article.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(article.source)}: ${escapeHtml(article.title)}</a><small>${escapeHtml(evidenceScope(article, item.ticker))} · ${escapeHtml(dateLabel(article.pubDate))}</small></div>`).join("") : '<p>No usable article links matched this instrument.</p>'}
@@ -154,7 +154,7 @@ async function renderMarketFramework(results, marketContext, news) {
   <details class="secondary-details"><summary>Data coverage and scoring</summary>
     <p>${available.length ? `Company figures come from ${escapeHtml(providers.join(" and ") || "the published snapshot")}. Reporting periods and source links appear on each company detail page.` : escapeHtml(snapshot.reason || "Company financial records are unavailable for the scanned companies.")}</p>
     <p>Company financials and the limited confirmed earnings calendar are shown on Detail. They are not part of the technical score.</p>
-    <p>Scores combine price trend, momentum, volatility, drawdown, volume, and matched news or outlooks. Sample or stale histories cannot generate a signal.</p>
+    <p>Technical Score v2 uses completed daily trend, momentum, oscillators, volatility, drawdown and trading activity. News is dated context and a separate risk check. Company financials do not change the Technical Score; technical strength does not mean undervaluation.</p>
     <p>Bid-ask spreads, analyst revisions, and options activity are not included.</p>
     ${earnings.length ? `<ul>${earnings.map((record) => `<li><a href="${escapeHtml(safeUrl(record.earnings.sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(record.ticker)} · ${escapeHtml(record.earnings.date)}</a></li>`).join("")}</ul>` : ""}
   </details>`;

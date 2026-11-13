@@ -78,11 +78,13 @@ test("real quotes never repair sample, stale, or insufficient history", () => {
   }
 });
 
-test("dated current quotes update qualified history while preserving its actual timestamp and zero daily change", () => {
+test("dated current quotes remain separate from completed daily bars and preserve zero daily change", () => {
   const series = history();
   const originalTime = series.prices.at(-1).date.toISOString();
   const updated = applyQuoteSnapshot(series, new Map([["ACME", { price: 220, quoteTime: new Date(), dayChangePercent: 0, quoteType: "EQUITY" }]]));
-  assert.equal(updated.prices.at(-1).close, 220);
+  assert.equal(updated.prices.at(-1).close, series.prices.at(-1).close);
+  assert.equal(updated.quote.price,220);
+  assert.equal(scoreSeries(updated,[]).score,scoreSeries(series,[]).score);
   assert.equal(series.prices.at(-1).close === 220, false);
   assert.equal(updated.historyAsOf, originalTime);
   assert.equal(evaluateDataQuality(updated).asOf, originalTime);
@@ -106,7 +108,7 @@ test("mixed rankings and allocation use qualified instruments only", () => {
 
 test("browser scan history changes only scoreDelta, preserving current-data scores and ranking", () => {
   const item = scoreSeries(history("ACME"), []);
-  state.learningHistory = [{ scores: [{ ticker: "ACME", score: 10 }] }];
+  state.learningHistory = [{ scores: [{ ticker: "ACME", score: 10, scoreVersion:item.scoreVersion,scoreCoverage:item.scoreCoverage }] }];
   const withHistory = applyLearningSignal(item);
   assert.equal(withHistory.score, item.score);
   assert.equal(withHistory.setup.signal, item.setup.signal);

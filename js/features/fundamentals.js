@@ -7,7 +7,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const metrics = [
   ["revenue", "Annual revenue"], ["netIncome", "Annual net profit"],
   ["operatingCashFlow", "Operating cash flow"], ["freeCashFlow", "Free cash flow"],
-  ["totalDebt", "Reported debt"], ["revenueGrowth", "Annual revenue growth"]
+  ["totalDebt", "Reported debt"], ["revenueGrowth", "Annual revenue growth"],
+  ["operatingCashFlowGrowth", "Operating cash flow growth"], ["freeCashFlowGrowth", "Free cash flow growth"], ["netIncomeGrowth", "Net income growth"]
 ];
 
 export async function renderFundamentals(item, snapshot, { now = Date.now() } = {}) {
@@ -31,6 +32,7 @@ export async function renderFundamentals(item, snapshot, { now = Date.now() } = 
   const note = `${stale ? "Refresh is needed. " : ""}Data retrieved ${dateLabel(record.retrievedAt)}. ${periodNote}`;
   return panel("Company fundamentals", `<p class="fundamentals-note">${escapeHtml(note)}</p>
     ${record.reason ? `<p class="fundamentals-note">${escapeHtml(record.reason)}</p>` : ""}
+    <p class="fundamentals-note">Company financials are separate from the Technical Score. Reported figures do not establish fair value.</p>
     <div class="fundamentals-grid">${grid}</div>
     ${renderValuation(item, record, now)}${diagnostics.html}${renderEarnings(record.earnings, verifier, now)}
     ${renderProvenance(record)}`, badge);
@@ -107,6 +109,8 @@ function renderValuation(item, record, now) {
     note = "A recent real quote with a stated currency is required to derive P/E.";
   } else if (eps && quote.currency !== eps.currency) {
     note = `Quote currency ${quote.currency || "unknown"} does not match annual EPS currency ${eps.currency}; no conversion is assumed.`;
+  } else if (eps && (item.splits || []).some(split=>timestamp(split.date)>timestamp(record.periodEnd) && timestamp(split.date)<=now)) {
+    note = "A share split followed this EPS reporting period; the per-share adjustment must be verified before deriving P/E.";
   } else if (eps) {
     ratio = `${(quote.price / eps.value).toFixed(1)}×`;
     const basis = eps.provider === "Yahoo Finance" ? `Yahoo Finance diluted EPS for its 12-month reporting period ended ${dateLabel(eps.end)}.`

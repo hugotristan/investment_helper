@@ -127,25 +127,9 @@ export function applyQuoteSnapshot(series, quoteMap) {
     || quoteTime > now || now - quoteTime > 7 * dayMs
     || quoteTime < new Date(quality.asOf).getTime()
     || !Number.isFinite(quote.price) || quote.price <= 0) return series;
-  const prices = series.prices.slice();
-  const latest = prices.at(-1);
-  if (latest && Number.isFinite(quote.price) && quote.price > 0) {
-    prices[prices.length - 1] = {
-      ...latest,
-      close: quote.price,
-      high: quote.dayHigh || (Number.isFinite(latest.high) ? Math.max(latest.high, quote.price) : quote.price),
-      low: quote.dayLow || (Number.isFinite(latest.low) ? Math.min(latest.low, quote.price) : quote.price),
-      volume: quote.volume || latest.volume
-    };
-  }
-  return {
-    ...series,
-    prices,
-    quote,
-    dailyClose: series.dailyClose || { price: latest?.close, currency: series.currency, asOf: quality.asOf },
-    historyAsOf: series.historyAsOf ?? quality.asOf,
-    source: `${series.source} + ${quote.source || "Yahoo intraday"}`
-  };
+  // Quotes remain separate from completed daily bars. Technical indicators use
+  // the original daily history, while valuation/UI can use the dated quote.
+  return { ...series, quote, quoteOverlay:false, historyAsOf:series.historyAsOf ?? quality.asOf };
 }
 
 export async function loadMarketSeries(ticker, { snapshot, cachedSeries } = {}) {

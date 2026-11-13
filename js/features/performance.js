@@ -1,3 +1,4 @@
+import {TECHNICAL_SCORE_VERSION,LEGACY_SCORE_VERSION} from "../analysis/technical-policy.js";
 import { calculateHoldings } from "../analysis/holdings.js";
 import { buildOpportunities } from "../analysis/opportunities.js";
 import { observeRecommendations, recordRecommendations as buildRecordedEntries } from "../analysis/recommendations.js";
@@ -56,6 +57,7 @@ export function renderPerformance(results = []) {
   const stored = loadRecommendationJournal();
   latestReport = observeRecommendations(stored.entries, results);
   const entries = latestReport.entries;
+  const currentSummary = latestReport.summary.byModel?.[TECHNICAL_SCORE_VERSION] || {matured5:0,matured21:0,averageExcess5:null,averageExcess21:null};
   const outcomes = entries.flatMap((entry) => [entry.outcomes["5"], entry.outcomes["21"]]);
   const counts = [
     ["Completed outcomes", outcomes.filter((outcome) => outcome.status === "matured").length, "Observed after 5 or 21 matched sessions"],
@@ -68,7 +70,7 @@ export function renderPerformance(results = []) {
   const exportButton = element("exportRecommendations");
   if (exportButton) exportButton.disabled = !stored.entries.length;
   const description = entries.length
-    ? `${entries.length} saved record${entries.length === 1 ? "" : "s"}. Average excess vs SPY: 5 sessions ${excessLabel(latestReport.summary.averageExcess5)} (${latestReport.summary.matured5} completed), 21 sessions ${excessLabel(latestReport.summary.averageExcess21)} (${latestReport.summary.matured21} completed). Overlapping daily picks are correlated; averages are descriptive, not success probabilities.`
+    ? `${entries.length} saved record${entries.length === 1 ? "" : "s"}. Technical Score v2 average excess vs SPY: 5 sessions ${excessLabel(currentSummary.averageExcess5)} (${currentSummary.matured5} completed), 21 sessions ${excessLabel(latestReport.summary.averageExcess21)} (${latestReport.summary.matured21} completed). Legacy v1 results are retained and excluded from v2 averages. Overlapping daily picks are correlated; averages are descriptive, not success probabilities.`
     : "Tracking starts with future qualified picks. Historical picks are not reconstructed from today's data.";
   const status = element("performanceStatus");
   if (status) status.textContent = `${!stored.ok ? `${stored.error} ` : lastRecordStatus ? `${lastRecordStatus} ` : ""}${description}`;
@@ -79,7 +81,7 @@ export function renderPerformance(results = []) {
 
 function renderRecord(entry) {
   return `<tr><td class="performance-record"><a href="#detail" data-detail-ticker="${escapeHtml(entry.ticker)}">${escapeHtml(entry.ticker)}</a>
-    <small>${escapeHtml(dateLabel(entry.recordedAt))} · ${escapeHtml(entry.score)}/100</small>
+    <small>${escapeHtml(dateLabel(entry.recordedAt))} · ${escapeHtml(entry.score)}/100 · ${escapeHtml(entry.scoreVersion || LEGACY_SCORE_VERSION)}${entry.scoreCoverage == null ? "" : " · "+escapeHtml(entry.scoreCoverage)+"% input weight available"}</small>
     <small>Baseline ${escapeHtml(priceLabel(entry.baseline.price))} ${escapeHtml(entry.currency)} · as of ${escapeHtml(dateLabel(entry.baseline.asOf))}</small></td>
     ${outcomeCells(entry.outcomes["5"])}${outcomeCells(entry.outcomes["21"])}
     <td>${renderFrozenEvidence(entry)}</td></tr>`;
@@ -97,7 +99,7 @@ function outcomeCells(outcome) {
 
 function renderFrozenEvidence(entry) {
   return `<details class="performance-evidence"><summary>Signal &amp; evidence (${entry.evidence.length})</summary>
-    <p>${escapeHtml(entry.name || entry.ticker)} · ${escapeHtml(entry.signal || "Research signal")} · ${escapeHtml(entry.horizon || "Timeframe not specified")}</p>
+    <p>${escapeHtml(entry.name || entry.ticker)} · ${escapeHtml(entry.scoreVersion ? entry.signal || "Technical observation" : "Historical v1 label: "+(entry.signal || "Research signal"))} · ${escapeHtml(entry.horizon || "Timeframe not specified")}</p>
     <p>Recorded ${escapeHtml(dateLabel(entry.recordedAt))}. Invalidation ${Number.isFinite(entry.invalidation) ? `${escapeHtml(priceLabel(entry.invalidation))} ${escapeHtml(entry.currency)}` : "unavailable"}.</p>
     <strong>Original reasons</strong><ul>${entry.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join("")}</ul>
     <strong>Original risks</strong><ul>${entry.risks.map((risk) => `<li>${escapeHtml(risk)}</li>`).join("")}</ul>

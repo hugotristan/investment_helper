@@ -37,7 +37,8 @@ export async function loadStockHistory(ticker, { snapshot, now = Date.now(), sto
   if (requests.has(ticker)) return backgroundRefresh && best && now - Date.parse(best.historyAsOf) <= 7 * DAY ? best : requests.get(ticker);
   const request = withNetworkSlot(async () => {
     const loaded = await fetchStockHistory(ticker, now);
-    const history = newerHistory(best, loaded);
+    const chosen = newerHistory(best,loaded);
+    const history = chosen ? {...chosen, ...(loaded?.stale || !loaded ? {stale:true,refreshError:loaded?.refreshError || "The latest history refresh failed; dated cached observations were retained."} : {stale:false})} : null;
     // A later retrieval never gives older bars or quotes a new observation date.
     if (history) memory.set(ticker, { history, checkedAt: now });
     else memory.set(ticker, { history: null, checkedAt: now });
@@ -108,7 +109,7 @@ export function normalizeStockHistory(input, ticker, { now = Date.now() } = {}) 
   })) : [];
   const quote = normalizeQuote(input.quote, ticker, input.currency, now);
   return { ticker, currency: input.currency, instrumentType: String(input.instrumentType).toUpperCase(),
-    source: input.source, prices, historyAsOf: prices.at(-1).date.toISOString(), splits, splitsComplete,
+    source: input.source, ...(input.stale === true ? {stale:true,refreshError:String(input.refreshError || "Provider refresh failed.").slice(0,300)} : {}), prices, historyAsOf: prices.at(-1).date.toISOString(), splits, splitsComplete,
     ...(quote ? { quote } : {}) };
 }
 

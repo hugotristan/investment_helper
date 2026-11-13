@@ -136,14 +136,14 @@
               <details class="filter-disclosure" id="watchlistFilters">
                 <summary>Filters</summary>
                 <div class="screener-controls">
-                  <label><span>Signal</span><select id="screenerSignal"><option value="all" selected>All</option><option value="actionable">Buy or watch</option><option value="buy">Buy</option><option value="hold">Hold</option><option value="avoid">Avoid</option><option value="sell">Sell or reduce</option></select></label>
-                  <label><span>Minimum score</span><input id="screenerMinScore" type="number" min="0" max="100" step="1" value="0"></label>
-                  <label><span>Minimum liquidity, $M</span><input id="screenerMinLiquidity" type="number" min="0" step="1" value="0"></label>
+                  <label><span>Signal</span><select id="screenerSignal"><option value="all" selected>All</option><option value="actionable">Constructive or mixed</option><option value="buy">Favorable technical setup</option><option value="hold">Constructive technical trend</option><option value="avoid">Weak technical conditions</option><option value="sell">Technical risk review</option><option value="provisional">Provisional technical conditions</option></select></label>
+                  <label><span>Minimum Technical Score</span><input id="screenerMinScore" type="number" min="0" max="100" step="1" value="0"></label>
+                  <label><span>Minimum daily turnover, USD millions</span><input id="screenerMinLiquidity" type="number" min="0" step="1" value="0"></label>
                 </div>
               </details>
               <div class="watchlist-browse-controls">
                 <label><span>Search watchlist</span><input id="watchlistSearch" type="search" placeholder="Ticker or company, e.g. VST" maxlength="80" autocomplete="off" spellcheck="false" aria-controls="screenerResults watchlistChips"></label>
-                <label><span>Sort by</span><select id="screenerSort"><option value="ticker">Ticker</option><option value="name">Company name</option><option value="change">Daily change</option><option value="score" selected>Score</option><option value="momentum">Momentum</option><option value="risk">Risk control</option><option value="liquidity">Liquidity</option><option value="volume">Volume pressure</option></select></label>
+                <label><span>Sort by</span><select id="screenerSort"><option value="ticker">Ticker</option><option value="name">Company name</option><option value="change">Daily change</option><option value="score" selected>Technical Score</option><option value="momentum">Momentum</option><option value="risk">Risk control</option><option value="liquidity">Liquidity</option><option value="volume">Volume pressure</option></select></label>
                 <label><span>Direction</span><select id="screenerSortDirection"><option value="asc">Ascending ↑</option><option value="desc" selected>Descending ↓</option></select></label>
                 <button id="watchlistSearchClear" class="ghost" type="button" disabled>Clear search</button>
               </div>
@@ -416,12 +416,12 @@
 
           <section class="view-page" data-page="signals" aria-label="Signals" hidden>
             <section class="panel"><div class="section-heading"><h2>Allocation signals</h2></div><div id="modelInstructions" class="model-instructions"><p class="empty-state">Waiting for the scan.</p></div></section>
-            <details class="panel analysis-disclosure"><summary>Sell and hold signals</summary><div id="sellGuidance" class="sell-guidance"><p class="empty-state">Waiting for prices.</p></div></details>
+            <details class="panel analysis-disclosure"><summary>Technical conditions</summary><div id="sellGuidance" class="sell-guidance"><p class="empty-state">Waiting for prices.</p></div></details>
             <details class="panel analysis-disclosure"><summary>Full stock ranking</summary><div id="analysisResults" class="analysis-results"><p class="empty-state">Waiting for the scan.</p></div></details>
           </section>
 
           <section class="view-page" data-page="ask" aria-label="Stock check" hidden>
-            <section class="panel ask-panel"><h2>Check a stock</h2><p class="helper-text">Checks the same price and news rules as the stock detail page.</p><div class="ask-controls"><input id="askInput" type="search" aria-label="Stock or company to check" placeholder="Should I sell Microsoft?"><button id="askButton" type="button">Check</button></div><div id="askAnswer" class="ask-answer"><p class="empty-state">Enter a stock or company name.</p></div></section>
+            <section class="panel ask-panel"><h2>Check a stock</h2><p class="helper-text">Checks the same price and news rules as the stock detail page.</p><div class="ask-controls"><input id="askInput" type="search" aria-label="Stock or company to check" placeholder="Check Microsoft technical conditions"><button id="askButton" type="button">Check</button></div><div id="askAnswer" class="ask-answer"><p class="empty-state">Enter a stock or company name.</p></div></section>
           </section>
 
           <section class="view-page" data-page="sources" aria-label="Data sources" hidden>
@@ -435,7 +435,7 @@
             </section>
             <section class="panel"><div class="section-heading"><h2>Source coverage</h2></div><div id="sourceStatus" class="source-grid"><p class="empty-state">Checking news sources.</p></div></section>
             <details class="panel data-disclosure"><summary>Update diagnostics</summary><div id="dashboardStats" class="dashboard-stats"></div><div id="scanActivity" class="scan-activity"></div><h2 id="marketPulseTitle">Scan coverage</h2><div id="marketPulse" class="pulse-grid"></div></details>
-            <details class="panel data-disclosure"><summary>Data and limitations</summary><p class="source-note">Prices come from Yahoo Finance. Annual financials use SEC companyfacts, with Yahoo annual statements as a fallback. Earnings dates come from a limited set of issuer announcements. News is collected through GDELT and available RSS feeds. Scores use fixed rules; they are not probabilities. Missing or stale price history cannot produce signals. The app does not place trades.</p></details>
+            <details class="panel data-disclosure"><summary>Data and limitations</summary><p class="source-note">Prices come from Yahoo Finance. Annual financials use SEC companyfacts, with Yahoo annual statements as a fallback. Earnings dates come from a limited set of issuer announcements. News is collected through GDELT and available RSS feeds. Technical Score v2 uses completed daily price and trading-volume rules. It is separate from company valuation. News affects risk checks; Data Confidence measures evidence coverage and freshness, not a probability. Missing or stale price history cannot produce signals. The app does not place trades.</p></details>
           </section>
         </main>
       </div>

@@ -1,3 +1,4 @@
+import {MIN_DAILY_TURNOVER_USD} from "./technical-policy.js";
 import { broadFunds } from "../config/settings.js";
 import { formatPercent } from "../shared/format.js";
 import { hasQualifiedSignal, isEtfSeries } from "./data-quality.js";
@@ -68,14 +69,16 @@ function exclusionFor(item, evidence, holdingWeight, now) {
     || !Number.isFinite(historyTime) || now - historyTime > 7 * DAY_MS || historyTime > now + DAY_MS) {
     return { code: "data_quality", reason: item.dataQuality?.reason || "Recent real daily price history is unavailable." };
   }
+  if (item.provisional) return {code:"data_coverage",reason:"Some Technical Score components are unavailable; research entry conditions remain provisional."};
   if (item.score < 65) return { code: "score", reason: "Signal strength is below the 65/100 research threshold." };
+  if (item.stale) return {code:"data_quality",reason:"The latest price refresh failed; retained daily observations support a dated technical score but not a fresh research candidate."};
   if (item.eventRisk?.level === "High") return { code: "event_risk", reason: "High event risk blocks a new research candidate." };
   if (!Number.isFinite(item.rsi14) || !Number.isFinite(item.volatility) || !Number.isFinite(item.averageDollarVolume)) {
     return { code: "risk_data", reason: "Momentum, volatility, or liquidity checks are unavailable." };
   }
   if (item.rsi14 > 75) return { code: "stretched", reason: "RSI above 75 indicates a stretched setup." };
   if (item.volatility > 0.5) return { code: "volatility", reason: "Annualized volatility exceeds the 50% research limit." };
-  if (item.averageDollarVolume < 5000000) return { code: "liquidity", reason: "Average daily dollar liquidity is below $5 million." };
+  if (item.averageDollarVolume < MIN_DAILY_TURNOVER_USD) return { code: "liquidity", reason: "Average daily dollar liquidity is below $5 million." };
   if (!Number.isFinite(item.latest) || !Number.isFinite(item.sma200) || !Number.isFinite(item.sixMonth)
     || item.latest <= item.sma200 || item.sixMonth <= 0) {
     return { code: "trend", reason: "A positive 200-day trend and six-month momentum are both required." };

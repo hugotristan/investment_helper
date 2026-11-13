@@ -1,3 +1,6 @@
+import {getExchangeRate} from "../data/exchange-rate.js";
+import {renderDataConfidence} from "../ui/components.js";
+import {TECHNICAL_EXPLANATION} from "../analysis/technical-policy.js";
 import { applyLearningSignal, scoreSeries } from "../analysis/scoring.js";
 import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
 import { validHistoryPoints } from "../analysis/data-quality.js";
@@ -49,7 +52,7 @@ export async function runStockDetail() {
       loadMarketContext(),
       loadFundamentalsSnapshot(parsed.ticker)
     ]);
-    const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[series.ticker] || news.byTicker[parsed.ticker] || []));
+    const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[series.ticker] || news.byTicker[parsed.ticker] || [],{fxReference:getExchangeRate()}));
     await renderStockDetail(scored, news, marketContext, quotes, fundamentals);
   } catch (error) {
     console.error(error);
@@ -64,8 +67,8 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
   const quote = item.quote || {};
   const fundamentals = await renderFundamentals(item, snapshot);
   if (!item.dataQuality?.eligible) {
-    els.detailOutput.innerHTML = `<div class="empty-state"><h3>${escapeHtml(item.ticker)} · Analysis unavailable</h3><p>${escapeHtml(item.dataQuality?.reason || "Qualified price history is unavailable.")}</p>${Number.isFinite(quote.price) ? `<p>Latest quote ${formatNumber(quote.price)} ${escapeHtml(quote.currency || "")} · ${escapeHtml(quote.quoteTime?.toLocaleString() || "Timestamp unavailable")}</p>` : ""}<p>No buy, hold, or sell recommendation is generated from this data.</p></div>`;
-    els.detailOutput.insertAdjacentHTML("beforeend", fundamentals);
+    els.detailOutput.innerHTML = `<div class="empty-state"><h3>${escapeHtml(item.ticker)} · Analysis unavailable</h3><p>${escapeHtml(item.dataQuality?.reason || "Qualified price history is unavailable.")}</p>${Number.isFinite(quote.price) ? `<p>Latest quote ${formatNumber(quote.price)} ${escapeHtml(quote.currency || "")} · ${escapeHtml(quote.quoteTime?.toLocaleString() || "Timestamp unavailable")}</p>` : ""}<p>No technical signal is generated from this data.</p></div>`;
+    els.detailOutput.insertAdjacentHTML("beforeend", renderDataConfidence(item,{financial:snapshot?.byTicker?.[item.ticker]})+fundamentals);
     return;
   }
   const links = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []))
@@ -89,15 +92,18 @@ async function renderStockDetail(item, news, marketContext, quoteSnapshot, snaps
           <h3>${escapeHtml(item.ticker)}</h3>
           <p>${escapeHtml(currentVerdict)}</p>
         </div>
-        <strong>${item.score}/100</strong>
+        <strong>Technical Score v2 · ${item.score}/100${item.provisional ? " · provisional" : ""}</strong>
       </div>
+      <p class="data-note">${escapeHtml(TECHNICAL_EXPLANATION)}</p>
+      ${renderDataConfidence(item,{financial: snapshot?.byTicker?.[item.ticker]})}
       <dl class="key-values">
-        ${renderMetric("Price", `${formatNumber(item.latest)} ${currency}`.trim(), quote.quoteTime ? `${quote.source || "Quote"} · ${quoteTime}` : `Daily history · ${historyDate}`)}
+        ${renderMetric("Price", `${formatNumber(item.currentPrice || item.latest)} ${currency}`.trim(), `${item.currentPriceSource || item.source} · ${new Date(item.currentPriceAsOf || item.dataQuality.asOf).toLocaleString()}`)}
         ${renderMetric("1D", formatPercent(item.oneDay))}
-        ${renderMetric("History as of", historyDate)}
+        ${renderMetric("Technical daily history as of", historyDate)}
         ${renderMetric("Event risk", item.eventRisk?.level || "Unavailable")}
       </dl>
       ${item.eventRisk?.level === "High" ? `<p class="data-note">High event risk: ${escapeHtml(item.eventRisk.hits?.join(", ") || item.flags?.[0] || "Review matched articles before acting.")}</p>` : ""}
+      <details class="secondary-details"><summary>Technical Score v2 calculation (${item.scoreCoverage || 0}% input weight available)</summary><p>Missing components are excluded and the available weights are normalized. News and financials are separate; no ETF bonus applies.</p><ul>${(item.scoreBreakdown || []).map(part=>`<li>${escapeHtml(part.key)} · ${part.weight}% weight · ${part.available ? Math.round(part.raw*100)+"/100" : "Unavailable"}</li>`).join("")}</ul></details>
       ${renderDetailChart(item)}
       ${fundamentals}
       <details class="secondary-details"><summary>Signal reasons and risks</summary><div class="detail-columns">

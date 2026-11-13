@@ -1,3 +1,8 @@
+import {getExchangeRate} from "../data/exchange-rate.js";
+import {loadFundamentalsSnapshot} from "../data/fundamentals.js";
+import {renderFundamentals} from "./fundamentals.js";
+import {renderDataConfidence} from "../ui/components.js";
+import {technicalSignalFor,TECHNICAL_EXPLANATION} from "../analysis/technical-policy.js";
 import { applyLearningSignal, scoreSeries } from "../analysis/scoring.js";
 import { holdSignalFor, sellSignalFor } from "../analysis/signals.js";
 import { applyQuoteSnapshot, loadMarketSeries, loadQuoteSnapshots } from "../data/market.js";
@@ -34,17 +39,21 @@ export async function answerQuestion() {
     els.askAnswer.innerHTML = `<div class="empty-state">Checking prices and matched articles for ${escapeHtml(parsed.ticker)}…</div>`;
 
     const contextTickers = unique([parsed.ticker, "SPY", "QQQ", "VTI"]);
-    const [series, quotes, news] = await Promise.all([
+    const [series, quotes, news, financials] = await Promise.all([
       loadMarketSeries(parsed.ticker),
       loadQuoteSnapshots([parsed.ticker]),
-      loadNewsSources(contextTickers, { allowCache: false })
+      loadNewsSources(contextTickers, { allowCache: false }),
+      loadFundamentalsSnapshot(parsed.ticker)
     ]);
-    const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[parsed.ticker] || []));
+    const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[parsed.ticker] || [],{fxReference:getExchangeRate()}));
     if (!scored.dataQuality?.eligible) {
       els.askAnswer.innerHTML = `<div class="empty-state"><h3>${escapeHtml(scored.ticker)} · Analysis unavailable</h3><p>${escapeHtml(scored.dataQuality?.reason || "Qualified price history is unavailable.")}</p><p>No investment signal can be generated until recent real history is available.</p></div>`;
+      els.askAnswer.insertAdjacentHTML("beforeend",renderDataConfidence(scored,{financial:financials.byTicker?.[scored.ticker]})+await renderFundamentals(scored,financials));
       return;
     }
     const answer = buildQuestionAnswer(scored, news, parsed);
+    answer.confidenceHtml = renderDataConfidence(scored,{financial:financials.byTicker?.[scored.ticker]});
+    answer.financialsHtml = await renderFundamentals(scored,financials);
     renderQuestionAnswer(answer);
   } catch (error) {
     console.error(error);
@@ -61,12 +70,10 @@ function buildQuestionAnswer(item, news, parsed) {
   const activeSources = news.sources.filter((source) => source.ok && source.id !== "live-source-index").length;
   const relevantItems = uniqueArticles((news.byTicker[item.ticker] || []).concat(item.outlooks || [], item.headlines || []));
   const links = relevantItems.map((entry) => ({ ...entry, link: safeArticleUrl(entry.link) })).filter((entry) => entry.link).slice(0, 5);
-  const quoteApplied = /\+ Yahoo intraday/.test(item.source || "") && item.quote?.price === item.latest
-    && (!item.currency || item.quote?.currency === item.currency);
-  const priceAsOf = quoteApplied ? item.quote.quoteTime : item.dataQuality?.asOf;
+  const priceAsOf = item.currentPriceAsOf || item.dataQuality?.asOf;
   let verdict = "Wait / watch";
   let className = "ask-verdict-watch";
-  let summary = "Neither the sell nor hold rules are triggered by this scan.";
+  let summary = "Completed daily conditions are mixed; company valuation has not been assessed.";
 
   if (sellSignal) {
     verdict = sellSignal.label;
@@ -82,24 +89,24 @@ function buildQuestionAnswer(item, news, parsed) {
     ticker: item.ticker,
     question: parsed.question,
     company: parsed.company,
-    verdict,
+    verdict:technicalSignalFor(item).label,
     className,
     summary,
     score: item.score,
     keyStats: [
-      ["Price", `${formatNumber(item.latest)} ${item.currency || item.quote?.currency || ""}`.trim(), `As of ${articleDateLabel(priceAsOf)}`],
+      ["Price", `${formatNumber(item.currentPrice || item.latest)} ${item.currency || item.quote?.currency || ""}`.trim(), `As of ${articleDateLabel(priceAsOf)}`],
       ["1D", formatPercent(item.oneDay)],
-      ["Score", `${item.score}/100`],
+      ["Technical Score v2", `${item.score}/100`],
       ["Event risk", item.eventRisk?.level || "Unavailable"]
     ],
     stats: [
       ["Signal", item.setup?.signal || item.label],
-      ["Signal strength", `${item.score}/100`],
+      ["Technical Score v2", `${item.score}/100`],
       ["Timeframe", item.setup?.timeframe || "1-4 weeks"],
       ["1M", formatPercent(item.oneMonth)],
       ["3M", formatPercent(item.threeMonth)],
       ["6M", formatPercent(item.sixMonth)],
-      ["Entry", item.setup?.entryZone || "-"],
+      ["Technical reference range", item.setup?.entryZone || "-"],
       ["Invalidation", item.setup ? formatNumber(item.setup.invalidation) : "-"],
       ["RSI", Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "-"],
       ["ATR", formatPercent(item.atrPercent)],
@@ -125,9 +132,10 @@ function renderQuestionAnswer(answer) {
           <span>Rule-based result · ${escapeHtml(answer.company || answer.ticker)}</span>
           <h3>${escapeHtml(answer.verdict)}</h3>
         </div>
-        <strong>${answer.score}/100</strong>
+        <strong>Technical Score v2 · ${answer.score}/100</strong>
       </div>
-      <p>${escapeHtml(answer.summary)}</p>
+      <p>${escapeHtml(answer.summary)}</p><p class="data-note">${escapeHtml(TECHNICAL_EXPLANATION)}</p>
+      ${answer.confidenceHtml || ""}${answer.financialsHtml || ""}
       <dl class="key-values">${answer.keyStats.map(renderMetric).join("")}</dl>
       <details class="secondary-details"><summary>Checks behind this result</summary>
         <dl class="key-values">${answer.stats.map(renderMetric).join("")}</dl>

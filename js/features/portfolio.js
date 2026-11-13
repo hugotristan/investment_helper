@@ -1,3 +1,5 @@
+import {technicalSignalFor,TECHNICAL_EXPLANATION} from "../analysis/technical-policy.js";
+import {renderDataConfidence} from "../ui/components.js";
 import { broadFunds } from "../config/settings.js";
 import { calculateHoldings } from "../analysis/holdings.js";
 import { calculatePortfolioTotals } from "../analysis/portfolio-totals.js";
@@ -79,75 +81,14 @@ export function buildPortfolioReview(results, marketContext) {
   };
 }
 
-function portfolioHoldingReview(holding, marketContext) {
-  const item = holding.analysis;
-  if (!item || !item.dataQuality?.eligible || marketContext?.available === false) {
-    return {
-      label: "Analysis unavailable",
-      className: "holding-watch",
-      reason: marketContext?.available === false ? "Market context is unavailable; the model cannot issue a position signal." : item?.dataQuality?.reason || "This holding was not returned by the live price scan. Check the ticker.",
-      detail: "Saved holdings and available prices remain visible while analysis is unavailable."
-    };
-  }
-
-  const down = holding.status === "down";
-  const overweightSatellite = !holding.isCore && holding.weight > 8;
-  const largeCore = holding.isCore && holding.weight > 80;
-  const broken = item.score <= 44 || (item.latest < item.sma200 && item.sixMonth < 0) || item.eventRisk?.level === "High";
-  const healthy = item.score >= 58 && item.latest > item.sma200 && item.eventRisk?.level !== "High";
-  const stretched = item.rsi14 > 72 || item.volatility > (holding.isCore ? 0.28 : 0.5);
-
-  if (broken && down) {
-    return {
-      label: "Review / possible trim",
-      className: "holding-danger",
-      reason: `${holding.ticker} has a loss and a weak trend, score, or event-risk check.`,
-      detail: `${item.label} (${item.score}/100). ${item.flags[0] || "Trend, momentum, or risk filters are weak."}`
-    };
-  }
-
-  if (broken) {
-    return {
-      label: "Avoid adding",
-      className: "holding-warning",
-      reason: `${holding.ticker} has a weak trend, score, or event-risk check.`,
-      detail: `${item.label} (${item.score}/100). ${item.flags[0] || "Review the price trend and matched articles."}`
-    };
-  }
-
-  if (healthy && down) {
-    return {
-      label: "Hold signal",
-      className: "holding-good",
-      reason: `${holding.ticker} has a loss, but its price remains above the 200-day average.`,
-      detail: `${item.label} (${item.score}/100); no high event-risk flag was found in the matched articles.`
-    };
-  }
-
-  if (largeCore && healthy) {
-    return {
-      label: "Fund concentration",
-      className: "holding-good",
-      reason: `${holding.ticker} represents ${holding.weight.toFixed(1)}% of tracked ${holding.currency} value.`,
-      detail: `The current price is above the 200-day average and its score is ${item.score}/100.`
-    };
-  }
-
-  if (overweightSatellite || stretched) {
-    return {
-      label: "Hold / avoid adding",
-      className: "holding-warning",
-      reason: overweightSatellite ? `${holding.ticker} exceeds 8% of tracked ${holding.currency} value.` : `${holding.ticker} has elevated RSI or volatility.`,
-      detail: `${item.label} (${item.score}/100). RSI ${Number.isFinite(item.rsi14) ? item.rsi14.toFixed(0) : "unavailable"}; annualized volatility ${formatPercent(item.volatility)}.`
-    };
-  }
-
-  return {
-    label: marketContext?.score < 45 ? "Watch · weak market" : "Hold / watch",
-    className: "holding-watch",
-    reason: `${holding.ticker} does not trigger the position review rules in this scan.`,
-    detail: `${item.label} (${item.score}/100). Watch the invalidation area near ${formatNumber(item.setup?.invalidation || item.sma50)}.`
-  };
+function portfolioHoldingReview(holding,marketContext) {
+  const item = holding.analysis, signal = technicalSignalFor(item);
+  const concentration = Number.isFinite(holding.weight) && holding.weight > 10
+    ? ' Position concentration is '+holding.weight.toFixed(1)+'% of its tracked currency group; this is separate from the technical signal.' : '';
+  return {label:signal.label,
+    className:['review','weak'].includes(signal.key)?'holding-danger':['favorable','constructive'].includes(signal.key)?'holding-good':'holding-watch',
+    reason:item?.dataQuality?.eligible ? 'Technical Score '+item.score+'/100 from completed daily observations.' : item?.dataQuality?.reason || 'Qualified technical data is unavailable.',
+    detail:TECHNICAL_EXPLANATION+concentration+(marketContext?.available===false?' Broader market context is unavailable.':'')};
 }
 
 export function renderPortfolioReview(portfolio, priceSource, { now = Date.now(), exchangeRate = getExchangeRate({ now }), projection = getPortfolioProjection(), sort = portfolioSort } = {}) {
@@ -243,7 +184,7 @@ function renderHoldingCard(holding, money) {
         : escapeHtml(holding.valuationError || "A qualified price in the purchase currency is unavailable.")}</p>
       <details class="secondary-details"><summary>Position checks · ${escapeHtml(holding.review.label)}</summary>
         <p>${escapeHtml(holding.review.reason)} ${escapeHtml(holding.review.detail)}</p>
-        ${item?.dataQuality?.eligible ? `<dl class="key-values"><div><dt>Score</dt><dd>${item.score}/100</dd></div><div><dt>1M</dt><dd>${formatPercent(item.oneMonth)}</dd></div><div><dt>Risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>` : ""}
+        ${item?.dataQuality?.eligible ? renderDataConfidence(item,{compact:true})+`<dl class="key-values"><div><dt>Technical Score v2</dt><dd>${item.score}/100</dd></div><div><dt>1M</dt><dd>${formatPercent(item.oneMonth)}</dd></div><div><dt>Technical risk</dt><dd>${escapeHtml(item.setup?.riskLevel || "Unavailable")}</dd></div></dl>` : ""}
       </details>
       ${holding.annotation.note ? `<details class="secondary-details"><summary>Note</summary><p class="portfolio-position-note">${escapeHtml(holding.annotation.note)}</p></details>` : ""}
       ${getActivePortfolioBook() ? `<div class="holding-actions"><button type="button" class="ghost" data-portfolio-transactions>View transactions</button><button type="button" class="ghost" data-portfolio-note="${escapeHtml(positionKey(holding))}">Group &amp; note</button></div>` : `<button type="button" class="ghost" data-edit-holding="${escapeHtml(holding.id)}">Edit holding</button>`}

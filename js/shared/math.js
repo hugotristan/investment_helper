@@ -26,7 +26,7 @@ export function relativeStrengthIndex(values, period = 14) {
   const gains = changes.map((change) => Math.max(change, 0));
   const losses = changes.map((change) => Math.abs(Math.min(change, 0)));
   const avgLoss = average(losses);
-  if (!avgLoss) return 100;
+  if (!avgLoss) return average(gains) ? 100 : 50;
   const rs = average(gains) / avgLoss;
   return 100 - (100 / (1 + rs));
 }

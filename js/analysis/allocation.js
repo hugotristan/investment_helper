@@ -1,3 +1,4 @@
+import {technicalSignalFor} from "./technical-policy.js";
 import { average, clamp, roundPercent } from "../shared/math.js";
 import { hasQualifiedSignal } from "./data-quality.js";
 
@@ -60,8 +61,8 @@ function modelAction(item, percent) {
     kind: "invest",
     ticker: item.ticker,
     percent: roundPercent(percent),
-    label: item.label,
-    signal: item.setup?.signal || item.label,
+    label: technicalSignalFor(item).label,
+    signal: technicalSignalFor(item).label,
     setup: item.setup,
     reason: outlook
       ? `${item.label}. Trusted outlook: ${outlook.source}: ${outlook.title}`
