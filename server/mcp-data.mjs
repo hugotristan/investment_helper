@@ -200,7 +200,7 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
         const price = priceData?.prices?.find(row => row.ticker === ticker), financial = financialData?.companies?.find(row => row.ticker === ticker);
         const holding = p.holdings?.find(row => row.ticker === ticker);
         const unsupported = financial?.errors?.some(error => error.code === "ETF_METRICS_UNSUPPORTED");
-        return {ticker, companyName:financial?.companyName || price?.companyName || holding?.name || ticker,
+        return {ticker, companyName:financial?.companyName || (price?.companyName !== ticker ? price?.companyName : null) || holding?.name || ticker,
           trackedBy:[...(holding ? ["portfolio"] : []), ...(w.watchlists?.some(list => list.tickers.includes(ticker)) ? ["watchlist"] : [])],
           assetType:unsupported ? "ETF" : price?.instrumentType || "company_or_unknown", price:price?.price ?? null, currency:price?.currency ?? null,
           priceObservationAt:price?.quoteTimestamp ?? price?.dataAsOf ?? null, priceType:price?.priceType ?? null,

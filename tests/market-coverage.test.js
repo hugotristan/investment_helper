@@ -75,3 +75,8 @@ test('an older provider response cannot downgrade a newer persistent observation
   const retained=await cache.get('history:TTWO',async()=>({...history('TTWO'),historyAsOf:'2026-11-10T00:00:00Z',prices:[{date:'2026-11-10',close:100}]}));
   assert.equal(retained.stale,true);assert.equal(retained.value.prices[0].close,125);
 });
+test('international names and exchanges are retained from validated quotes when the directory has no listing',async t=>{
+  const provider=createCompanyProvider({cache:createPersistentMarketCache(db(t),{now:()=>NOW}),now:()=>NOW,readAsset:async()=>null,
+    resolveHistory:async ticker=>({...history(ticker),instrumentType:'ETF',quote:{name:'Example international fund',exchange:'XETRA'}})});
+  const info=await provider.identity('EXAMPLE.DE');assert.equal(info.companyName,'Example international fund');assert.equal(info.exchange,'XETRA');
+});

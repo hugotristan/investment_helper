@@ -98,7 +98,7 @@ export function createCompanyProvider({ cache, readAsset, fetchImpl = (url, init
     instruments ||= readAsset('data/instruments.json').then(raw => raw?.schemaVersion === 1 && raw.sourceUrl === 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqtraded.txt' && Date.parse(raw.generatedAt) <= now() && Array.isArray(raw.entries) && raw.entries.length <= 20000 ? raw : null).catch(() => null);
     const entry = (await instruments)?.entries.find(item => item.ticker === ticker);
     const history = !entry && resolveHistory ? await resolveHistory(ticker).catch(() => null) : null;
-    return { ticker, companyName: typeof entry?.label === 'string' ? entry.label.slice(0,300) : ticker, exchange: entry?.exchange || null,
+    return { ticker, companyName: String(entry?.label || history?.quote?.name || ticker).slice(0,300), exchange: entry?.exchange || history?.quote?.exchange || null,
       type: broadFunds.has(ticker) || VWCE_TICKERS.includes(ticker) || entry?.type === 'ETF' || history?.instrumentType === 'ETF' ? 'ETF' : entry || history?.instrumentType === 'EQUITY' ? 'stock' : 'unknown' };
   }
   async function issuerIndex() {
