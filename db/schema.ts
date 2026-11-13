@@ -1,4 +1,4 @@
-import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // Sites supplies a stable, trusted identity for this private app. Each browser
@@ -44,3 +44,17 @@ export const developmentChanges = sqliteTable("development_changes", {
   record: text("record").notNull(),
   completedAt: text("completed_at").notNull(),
 }, table => [index("development_changes_owner_time").on(table.userId, table.completedAt)]);
+
+export const cashOperations = sqliteTable("cash_operations", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(), actor: text("actor").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(), request: text("request").notNull(),
+  status: text("status").notNull(), expectedRevision: integer("expected_revision").notNull(),
+  csrf: text("csrf").notNull(), createdAt: text("created_at").notNull(), expiresAt: integer("expires_at").notNull(),
+  confirmedAt: text("confirmed_at"), result: text("result"), reversesId: text("reverses_id"),
+}, table => [uniqueIndex("cash_operation_idempotency").on(table.userId, table.idempotencyKey),
+  uniqueIndex("cash_operation_one_reversal").on(table.reversesId).where(sql`${table.status} = 'confirmed'`)]);
+
+export const cashAudit = sqliteTable("cash_audit", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull(), operationId: text("operation_id").notNull(),
+  event: text("event").notNull(), actor: text("actor").notNull(), occurredAt: text("occurred_at").notNull(),
+}, table => [index("cash_audit_operation").on(table.userId, table.operationId)]);

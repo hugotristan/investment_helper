@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 // It is imported by the preview server/tests, never by the hosted Worker.
 export function createLocalDatabase(filename = ":memory:") {
   const database = new DatabaseSync(filename);
+  const runners = new WeakMap();
   try {
     const journal = JSON.parse(readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8"));
     if (!Array.isArray(journal.entries)) throw new Error("Invalid migration journal.");
@@ -31,7 +32,12 @@ export function createLocalDatabase(filename = ":memory:") {
   return {
     prepare(sql) {
       const statement = database.prepare(sql);
-      const prepared = (args) => ({
+      const prepared = (args) => {
+        const execute = () => {
+          const result = statement.run(...args);
+          return { success: true, meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
+        };
+        const value = {
         bind: (...values) => prepared(values),
         async first(column) {
           const row = statement.get(...args) ?? null;
@@ -39,11 +45,24 @@ export function createLocalDatabase(filename = ":memory:") {
         },
         async all() { return { success: true, results: statement.all(...args) }; },
         async run() {
-          const result = statement.run(...args);
-          return { success: true, meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } };
+          return execute();
         },
-      });
+        };
+        runners.set(value, execute);
+        return value;
+      };
       return prepared([]);
+    },
+    async batch(statements) {
+      database.exec("BEGIN");
+      try {
+        const results = statements.map(statement => {
+          const run = runners.get(statement);
+          if (!run) throw new Error("Batch statement belongs to another database.");
+          return run();
+        });
+        database.exec("COMMIT"); return results;
+      } catch (error) { database.exec("ROLLBACK"); throw error; }
     },
     close() { database.close(); },
   };

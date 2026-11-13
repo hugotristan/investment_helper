@@ -8,6 +8,7 @@ import { loadAnalystContext } from "./analyst-context.mjs";
 import { createFundData } from "./fund-data.mjs";
 import { saveChange } from "./development-changes.mjs";
 import { normalizeErrors } from "./data-errors.mjs";
+import { cashConfirmation } from "./cash-confirmation.mjs";
 
 const privateHeaders = {
   "Cache-Control": "private, no-store",
@@ -62,6 +63,11 @@ export function createApp(assets, options = {}) {
           const access = await passwordGate(request, env);
           if (access.response) return access.response;
           userId = access.userId;
+        }
+        const confirmation = /^\/cash-operations\/([a-f0-9]{32})$/.exec(url.pathname);
+        if (confirmation) {
+          if (authMode !== "password" || !userId) throw new ApiError(403, "PASSWORD_CONFIRMATION_REQUIRED", "Open this confirmation page with the app's password login.");
+          return await cashConfirmation(request, env, userId, confirmation[1], clock());
         }
         if (url.pathname.startsWith("/api/") || url.pathname === "/api") {
           const recognized = ["/api/session", "/api/portfolio", "/api/watchlist", "/api/market/history", "/api/exchange-rate", "/api/portfolio-fx", "/api/fund-holdings",

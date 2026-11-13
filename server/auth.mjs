@@ -139,7 +139,7 @@ async function reserveLoginAttempt(request, env, now) {
 function returnPath(value) {
   // The app uses hash navigation. Only its root page and known views may be
   // destinations; URL hosts, query parameters and arbitrary paths are rejected.
-  return typeof value === "string" && /^\/(?:#(?:dashboard|portfolio|portfolio-performance|screener|research|opportunities))?$/.test(value) ? value : "/";
+  return typeof value === "string" && /^(?:\/(?:#(?:dashboard|portfolio|portfolio-performance|screener|research|opportunities))?|\/cash-operations\/[a-f0-9]{32})$/.test(value) ? value : "/";
 }
 
 function loginPage(message = "", status = 200, next = "/", extraHeaders = {}) {
@@ -195,7 +195,8 @@ export function createPasswordAuth({ now: suppliedNow } = {}) {
         const response = loginPage("", 200, returnPath(url.searchParams.get("next")));
         return { response: request.method === "HEAD" ? new Response(null, { status: response.status, headers: response.headers }) : response };
       }
-      return { response: url.pathname.startsWith("/api/") || url.pathname === "/api" ? unauthorized() : redirect("/login") };
+      const next = /^\/cash-operations\/[a-f0-9]{32}$/.test(url.pathname) ? `?next=${encodeURIComponent(url.pathname)}` : "";
+      return { response: url.pathname.startsWith("/api/") || url.pathname === "/api" ? unauthorized() : redirect(`/login${next}`) };
     }
     const userId = await resolvePasswordWorkspace(env);
     if (url.pathname === "/login") return { response: redirect(returnPath(url.searchParams.get("next"))) };
