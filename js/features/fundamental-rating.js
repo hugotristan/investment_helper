@@ -6,7 +6,7 @@ export function renderFundamentalRating(item,snapshot,{now=Date.now()}={}){
  if(item.isFund||item.instrumentType==='ETF')return '<section class="fundamental-rating"><h3>Fundamental Score · Not applicable</h3><p>Company financial ratios do not rate ETF units. No company score is inferred from a fund price.</p></section>';
  const record=snapshot?.byTicker?.[item.ticker];
  const analysis=deriveFundamentals(record,item,{now});
- const peers=(snapshot?.peers||[]).map(row=>deriveFundamentals(row,{quote:row.analysisQuote,ticker:row.ticker},{now}));
+ const peers=(snapshot?.peers||[]).map(row=>deriveFundamentals(row,{...row.analysisMarket,quote:row.analysisQuote,ticker:row.ticker},{now}));
  const rating=rateFundamentals(analysis,peers,{now});
  const observed=[];const v=analysis.values;
  if(Number.isFinite(v.cash)&&Number.isFinite(v.debt))observed.push('Reported cash '+display('cash',v.cash)+' '+(record?.currency||'')+'; debt '+display('cash',v.debt)+' '+(record?.currency||'')+'.');

@@ -220,7 +220,7 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
     if (env?.DB) { const cached=await env.DB.prepare("SELECT payload FROM market_cache WHERE key LIKE ? AND payload IS NOT NULL LIMIT 250").bind("financial:%").all();
       for(const row of cached.results)try{const company=JSON.parse(row.payload);if(company?.ticker&&company.available)peerMap.set(company.ticker,company);}catch{} }
     return {schemaVersion:1, generatedAt:new Date(clock()).toISOString(), peers:await Promise.all([...peerMap.values()].filter(row=>row.ticker!==ticker&&record?.issuerMetadata?.sic&&String(row.issuerMetadata?.sic).slice(0,2)===String(record.issuerMetadata.sic).slice(0,2)).slice(0,40).map(async row=>{
-      let quote=null;if(env?.DB)try{const saved=await env.DB.prepare("SELECT payload FROM market_cache WHERE key = ?").bind("history:"+row.ticker).first();quote=JSON.parse(saved?.payload||"null")?.quote||null;}catch{}return {...row,analysisQuote:quote};})), byTicker:record ? {[ticker]:record} : {}, providerStatus:record?.available ? "available" : "unavailable"};
+      let quote=null,analysisMarket={};if(env?.DB)try{const saved=await env.DB.prepare("SELECT payload FROM market_cache WHERE key = ?").bind("history:"+row.ticker).first();const prices=JSON.parse(saved?.payload||"null");quote=prices?.quote||null;analysisMarket={splitsComplete:prices?.splitsComplete===true,splits:prices?.splits||[],splitHistoryFrom:prices?.prices?.[0]?.date};}catch{}return {...row,analysisQuote:quote,analysisMarket};})), byTicker:record ? {[ticker]:record} : {}, providerStatus:record?.available ? "available" : "unavailable"};
   }
   return { portfolio, watchlists, prices, metrics, status, financialSnapshot };
 }
