@@ -1,6 +1,7 @@
 import { readCloudRecord, validateCloudBook } from "./cloud-store.mjs";
 import { normalizeTransaction, portfolioToday, projectPortfolioBook } from "../js/analysis/portfolio-ledger.js";
 import { ApiError } from "./request-body.mjs";
+import { purchaseInput, purchaseEntry, validatePurchaseForBook } from "./stock-purchase.mjs";
 
 const currencies = ["EUR", "USD", "GBP", "JPY", "CHF", "CAD", "AUD"];
 const id = () => crypto.randomUUID().replaceAll("-", "");
@@ -35,12 +36,12 @@ function receipt(row, origin, now) {
       : status === "confirmed" ? "This bookkeeping operation was recorded. Retrying this idempotency key does not create another transaction."
         : "No new transaction can be recorded from this proposal. Prepare a new request with a new idempotency key if needed." };
 }
-export async function prepareCashOperation(env, userId, actor, input, { reverse = false, origin, now = Date.now() }) {
+export async function prepareCashOperation(env, userId, actor, input, { reverse = false, purchase = false, origin, now = Date.now() }) {
   const idempotencyKey = key(input.idempotency_key);
   if (!reverse && (Object.hasOwn(input, "date") && typeof input.date !== "string" || Object.hasOwn(input, "currency") && typeof input.currency !== "string")) fail(400, "INVALID_DEPOSIT", "Date and currency must be strings when supplied.");
   const currency = input.currency ?? "EUR";
   if (!currencies.includes(currency)) fail(400, "INVALID_CURRENCY", "Choose EUR, USD, GBP, JPY, CHF, CAD or AUD.");
-  const request = reverse ? { kind: "reversal", operationId: operationId(input.operation_id) }
+  const request = purchase ? purchaseInput(input, now) : reverse ? { kind: "reversal", operationId: operationId(input.operation_id) }
     : { kind: "deposit", amount: cashAmount(input.amount, currency), currency, requestedDate: input.date ?? null };
   const previous = await env.DB.prepare("SELECT * FROM cash_operations WHERE user_id = ? AND idempotency_key = ?").bind(userId, idempotencyKey).first();
   if (previous) {
@@ -50,6 +51,17 @@ export async function prepareCashOperation(env, userId, actor, input, { reverse 
   const record = await readCloudRecord(env, userId, "portfolio", now);
   if (!record.book) fail(409, "NO_PORTFOLIO", "Start portfolio tracking before recording cash deposits.");
   let amount = request.amount, date = request.requestedDate ?? portfolioToday(now), nativeCurrency = currency, reversesId = null, settlement = null;
+  let purchasePreview;
+  if (purchase) {
+    const entry = validatePurchaseForBook(request, record.book, now);
+    amount = request.totalNativeCost; nativeCurrency = request.currency; date = entry.date; settlement = request.eurCostBasis;
+    const before = projectPortfolioBook(record.book), after = projectPortfolioBook({ ...record.book, transactions: [...record.book.transactions, entry] });
+    const current = before.holdings.find(h => h.ticker === request.ticker && h.currency === request.currency);
+    const updated = after.holdings.find(h => h.ticker === request.ticker && h.currency === request.currency);
+    purchasePreview = { sharesBefore: current?.shares ?? 0, sharesAfter: updated?.shares ?? 0, averageCostAfter: updated?.averageCost ?? null,
+      eurCostBasisAfter: after.eurCostBases.find(h => h.ticker === request.ticker && h.currency === request.currency)?.costBasis ?? null,
+      cashMovement: request.cashTreatment === "already_recorded" ? 0 : -request.eurCostBasis, recordedCashAfter: after.reportingCash.amount };
+  }
   if (reverse) {
     const original = await operation(env, userId, request.operationId);
     const proposal = JSON.parse(original.request);
@@ -67,7 +79,8 @@ export async function prepareCashOperation(env, userId, actor, input, { reverse 
     { startDate: record.book.settings.startDate, baseCurrency: record.book.settings.baseCurrency, now });
   if (!check.ok) fail(400, "INVALID_DEPOSIT", check.error);
   const operationIdValue = id(), createdAt = new Date(now).toISOString();
-  const proposal = { input: request, amount, currency: nativeCurrency, date, baseCurrency: record.book.settings.baseCurrency, settlement };
+  const proposal = { input: request, amount, currency: nativeCurrency, date, baseCurrency: record.book.settings.baseCurrency, settlement,
+    ...(purchase ? { purchasePreview } : {}) };
   const payload = JSON.stringify(proposal);
   try {
     await env.DB.batch([
@@ -88,7 +101,7 @@ export async function cashOperationStatus(env, userId, operationIdValue, origin,
   return { ...receipt(row, origin, now), audit: audit.results };
 }
 
-export async function confirmCashOperation(env, userId, operationIdValue, csrf, { cancel = false, settledAmount, now = Date.now() } = {}) {
+export async function confirmCashOperation(env, userId, operationIdValue, csrf, { cancel = false, settledAmount, purchaseAcknowledged = false, now = Date.now() } = {}) {
   const row = await operation(env, userId, operationIdValue);
   if (typeof csrf !== "string" || csrf !== row.csrf) fail(403, "INVALID_CONFIRMATION", "Open the authenticated confirmation page before submitting.");
   if (row.status === "confirmed") return { status: "confirmed", duplicate: true };
@@ -105,16 +118,20 @@ export async function confirmCashOperation(env, userId, operationIdValue, csrf, 
   const record = await readCloudRecord(env, userId, "portfolio", now);
   if (!record.book || record.revision !== row.expected_revision) fail(409, "PORTFOLIO_CHANGED", "The portfolio changed after this proposal was prepared. No cash was added. Prepare a new request with a new idempotency key and review it again.");
   const isReversal = proposal.input.kind === "reversal";
+  const isPurchase = proposal.input.kind === "purchase";
+  if (isPurchase && purchaseAcknowledged !== true) fail(400, "PURCHASE_REVIEW_REQUIRED", "Review the cash treatment and confirm the purchase is not already included in your holdings/history.");
+  if (isPurchase) validatePurchaseForBook(proposal.input, record.book, now);
   if (proposal.baseCurrency !== record.book.settings.baseCurrency) fail(409, "PORTFOLIO_CHANGED", "The reporting currency changed. Prepare a new proposal.");
   const cash = proposal.settlement ?? (proposal.currency === proposal.baseCurrency ? proposal.amount : cashAmount(settledAmount, proposal.baseCurrency));
-  const entry = { id: `mcp-cash-${row.id}`, type: isReversal ? "withdrawal" : "deposit", date: proposal.date, currency: proposal.currency,
+  const entry = isPurchase ? purchaseEntry(proposal.input, `mcp-purchase-${row.id}`) : { id: `mcp-cash-${row.id}`, type: isReversal ? "withdrawal" : "deposit", date: proposal.date, currency: proposal.currency,
     amount: proposal.amount, cashCurrency: proposal.baseCurrency, cashAmount: cash,
     note: isReversal ? `Reversal of MCP deposit operation ${row.reverses_id}` : `MCP deposit operation ${row.id}` };
   const book = validateCloudBook({ ...record.book, transactions: [...record.book.transactions, entry], updatedAt: timestamp }, now);
   const serialized = JSON.stringify(book);
   if (new TextEncoder().encode(serialized).length > 1024 * 1024) fail(413, "BOOK_TOO_LARGE", "The portfolio exceeds the supported record size. No deposit was recorded.");
   const result = { transactionId: entry.id, portfolioRevision: record.revision + 1, baseCurrency: proposal.baseCurrency, cashAmount: cash,
-    recordedCash: projectPortfolioBook(book).reportingCash.amount };
+    recordedCash: projectPortfolioBook(book).reportingCash.amount,
+    ...(isPurchase ? { cashMovement: proposal.purchasePreview.cashMovement, purchase: proposal.input } : {}) };
   let changed;
   try {
     changed = await env.DB.batch([

@@ -16,8 +16,9 @@ export function initializeTransactionReport() {
   reportElement("reportTransactionsNext").addEventListener("click", () => { page++; render(); });
   reportElement("reportTransactionsExport").addEventListener("click", () => {
     if (!current?.rows.length) return;
-    downloadReport("transactions.csv", ["Date", "Type", "Ticker", "Currency", "Quantity", "Price", "Gross amount", "Fee", "Cash currency", "Net cash movement", "Recorded EUR movement", "Note", "ID"],
-      current.rows.map((row) => [row.date, TRANSACTION_LABELS[row.type], row.ticker, row.currency, row.quantity, row.price, row.amount, row.fee || 0, row.cash.currency, row.cash.amount, row.cash.eurAmount, row.note, row.id]));
+    downloadReport("transactions.csv", ["Date", "Type", "Ticker", "Currency", "Quantity", "Price", "Gross amount", "Fee", "Cash currency", "Net cash movement", "Recorded EUR movement", "Note", "ID", "Execution UTC", "Broker total native cost", "Recorded EUR cost basis", "Cash already recorded"],
+      current.rows.map((row) => [row.date, TRANSACTION_LABELS[row.type], row.ticker, row.currency, row.quantity, row.price, row.amount, row.fee || 0, row.cash.currency, row.cash.amount, row.cash.eurAmount, row.note, row.id,
+        row.executedAt, row.totalCost, row.type === "buy" && row.cashCurrency === "EUR" ? row.cashAmount : null, row.cashAlreadyRecorded ?? false]));
   });
   refreshTransactionReport();
 }
@@ -38,8 +39,8 @@ function render() {
   reportElement("reportTransactionsNext").disabled = (page + 1) * PAGE_SIZE >= rows.length;
   reportElement("reportTransactionsPage").textContent = `Page ${page + 1} of ${Math.ceil(rows.length / PAGE_SIZE)}`;
   const nativeMoney = (row, value) => {
-    const net = row.amount + (row.type === "buy" ? row.fee || 0 : row.type === "sell" ? -(row.fee || 0) : 0);
-    const eurValue = row.currency === "EUR" ? value : row.cash.currency === "EUR" && net > 0 ? value * Math.abs(row.cash.amount) / net : null;
+    const net = row.totalCost ?? row.amount + (row.type === "buy" ? row.fee || 0 : row.type === "sell" ? -(row.fee || 0) : 0);
+    const eurValue = row.currency === "EUR" ? value : row.cash.currency === "EUR" && net > 0 ? value * (row.cashAmount ?? Math.abs(row.cash.amount)) / net : null;
     return escapeHtml(portfolioMoney(value, row.currency, { eurValue }));
   };
   reportHtml("reportTransactionsBody", `<p class="data-note">${rows.length} matching transactions. CSV includes every matching row. EUR cash is the recorded settlement; EUR estimates beside USD prices and fees use its conversion ratio.</p>${reportTable(["Date", "Type", "Ticker", "Quantity", "Price", "Gross amount", "Fee", "Net cash movement", "Note"], rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => [escapeHtml(row.date), escapeHtml(TRANSACTION_LABELS[row.type]), escapeHtml(row.ticker || "—"), row.quantity === undefined ? "—" : escapeHtml(row.quantity), row.price === undefined ? "—" : nativeMoney(row, row.price), nativeMoney(row, row.amount), nativeMoney(row, row.fee || 0), escapeHtml(portfolioMoney(row.cash.amount, row.cash.currency, { eurValue: row.cash.eurAmount })), escapeHtml(row.note || "—")]), "Recorded transactions · latest first")}`);

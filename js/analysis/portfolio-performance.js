@@ -1,4 +1,4 @@
-import { portfolioToday, validatePortfolioBook } from "./portfolio-ledger.js";
+import { portfolioToday, validatePortfolioBook, compareTransactionTime } from "./portfolio-ledger.js";
 import { historicalRate, normalizeHistoricalFx } from "../data/portfolio-history.js";
 
 const DAY = 86400000;
@@ -54,7 +54,7 @@ export function calculatePortfolioPerformance({ book, histories = {}, fxHistory 
   methodology.returnScope = `${selectedStart} through ${last}`;
 
   const entries = ledger.transactions.map((entry, index) => ({ ...entry, index }))
-    .sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
+    .sort((a, b) => compareTransactionTime(a, b) || a.index - b.index);
   const positions = new Map();
   const cash = new Map();
   let cashComplete = true;
@@ -150,8 +150,13 @@ export function calculatePortfolioPerformance({ book, histories = {}, fxHistory 
     return positions.get(key);
   };
   const applyCash = (entry) => {
+    if (entry.cashAlreadyRecorded) {
+      cashComplete = false;
+      reasons.add("A historical purchase is already reflected in recorded cash. Reconcile historical cash/funding before calculating period returns.");
+      return;
+    }
     const cashCurrency = entry.cashCurrency || entry.currency;
-    let amount = entry.cashCurrency ? entry.cashAmount : entry.type === "buy" ? entry.amount + entry.fee
+    let amount = entry.cashCurrency ? entry.cashAmount : entry.type === "buy" ? entry.totalCost ?? entry.amount + entry.fee
       : entry.type === "sell" ? entry.amount - entry.fee : entry.amount;
     if (["buy", "withdrawal", "fee"].includes(entry.type)) amount = -amount;
     cash.set(cashCurrency, add(cash.has(cashCurrency) ? cash.get(cashCurrency) : 0, amount));
@@ -179,7 +184,7 @@ export function calculatePortfolioPerformance({ book, histories = {}, fxHistory 
       let tradeFee = 0;
       if (entry.fee > 0) {
         if (entry.currency !== "EUR") methodology.feesEstimated = true;
-        const nativeNet = entry.type === "buy" ? entry.amount + entry.fee : entry.amount - entry.fee;
+        const nativeNet = entry.type === "buy" ? entry.totalCost ?? entry.amount + entry.fee : entry.amount - entry.fee;
         tradeFee = entry.currency === "EUR" ? entry.fee : euros !== null && nativeNet > 0
           ? finite(euros * entry.fee / nativeNet) : convert(entry.fee, entry.currency, entry.date);
       }

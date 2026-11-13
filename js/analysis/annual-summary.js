@@ -42,7 +42,7 @@ export function calculateAnnualSummary({ book, year, histories = null, fxHistory
     if (entry.type === "fee") return { amount: settled(entry), estimated: entry.cashCurrency && entry.cashCurrency !== "EUR" };
     if (!["buy", "sell"].includes(entry.type) || !entry.fee) return { amount: 0, estimated: false };
     if (entry.currency === "EUR") return { amount: entry.fee, estimated: false };
-    const euros = settled(entry), nativeNet = entry.amount + (entry.type === "buy" ? entry.fee : -entry.fee);
+    const euros = settled(entry), nativeNet = entry.type === "buy" ? entry.totalCost ?? entry.amount + entry.fee : entry.amount - entry.fee;
     if (euros !== null && nativeNet > 0) return { amount: finite(euros * entry.fee / nativeNet), estimated: true };
     const rate = historicalRate(fx, entry.currency, entry.date, { now });
     return { amount: rate ? finite(entry.fee * rate.rate) : null, estimated: true };

@@ -6,7 +6,7 @@ import { normalizeRetirementScenario } from "./retirement-assumptions.js";
 const CURRENCIES = new Set(["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD"]);
 const TYPES = new Set(["buy", "sell", "deposit", "withdrawal", "dividend", "fee", "opening_cash"]);
 const BOOK_KEYS = ["schemaVersion", "id", "settings", "openingHoldings", "transactions", "createdAt", "updatedAt", "legacyPortfolioInput", "organization", "dividendAssumptions", "retirementScenario"];
-const TRANSACTION_KEYS = ["id", "type", "date", "currency", "ticker", "quantity", "price", "amount", "fee", "note", "cashCurrency", "cashAmount"];
+const TRANSACTION_KEYS = ["id", "type", "date", "currency", "ticker", "quantity", "price", "amount", "fee", "note", "cashCurrency", "cashAmount", "executedAt", "totalCost", "cashAlreadyRecorded"];
 const tallinnDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Tallinn", year: "numeric", month: "2-digit", day: "2-digit" });
 
 export function portfolioToday(now = Date.now()) {
@@ -15,6 +15,11 @@ export function portfolioToday(now = Date.now()) {
   if (!Number.isFinite(date.getTime())) throw new TypeError("Current time is invalid.");
   const parts = Object.fromEntries(tallinnDate.formatToParts(date).map(({ type, value }) => [type, value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+export function compareTransactionTime(a, b) {
+  return a.date.localeCompare(b.date) || Number(!!a.executedAt) - Number(!!b.executedAt)
+    || (a.executedAt && b.executedAt ? a.executedAt.localeCompare(b.executedAt) : 0);
 }
 
 export function createPortfolioBook({ holdings = [], legacyPortfolioInput = "", baseCurrency = "EUR", startDate, now = Date.now() } = {}) {
@@ -35,7 +40,7 @@ export function normalizeTransaction(input, { startDate, now = Date.now(), baseC
   try {
     const firstDate = calendarDate(startDate, "Portfolio start date");
     const reportingCurrency = baseCurrency === undefined ? null : currencyCode(baseCurrency);
-    return { ok: true, transaction: transaction(input, firstDate, portfolioToday(now), false, reportingCurrency), error: null };
+    return { ok: true, transaction: transaction(input, firstDate, portfolioToday(now), false, reportingCurrency, now), error: null };
   } catch (error) {
     return { ok: false, transaction: null, error: error.message };
   }
@@ -78,7 +83,7 @@ function normalizeBook(input, now) {
   if (!Array.isArray(input.transactions) || input.transactions.length > 10000) throw new TypeError("Transactions must contain at most 10,000 entries.");
   const legacyPortfolioInput = boundedText(input.legacyPortfolioInput, 1000000, "Legacy portfolio source");
   const openingHoldings = input.openingHoldings.map((holding) => normalizeOpening(holding, true));
-  const transactions = input.transactions.map((entry) => transaction(entry, startDate, today, true, baseCurrency));
+  const transactions = input.transactions.map((entry) => transaction(entry, startDate, today, true, baseCurrency, now));
   const ids = new Set();
   for (const entry of [...openingHoldings, ...transactions]) {
     if (ids.has(entry.id)) throw new TypeError("Portfolio entry IDs must be unique.");
@@ -117,7 +122,7 @@ function normalizeOpening(input, strict, fallbackId) {
   return { id, kind: "manual", ticker, label: label || ticker, amount, status: input.status, currency };
 }
 
-function transaction(input, startDate, today, strict, baseCurrency) {
+function transaction(input, startDate, today, strict, baseCurrency, now) {
   allowedKeys(input, TRANSACTION_KEYS, "Transaction");
   const id = entryId(input.id);
   if (!TYPES.has(input.type)) throw new TypeError("Choose a supported transaction type.");
@@ -155,6 +160,21 @@ function transaction(input, startDate, today, strict, baseCurrency) {
     if (baseCurrency && result.cashCurrency !== baseCurrency) throw new TypeError("Settled cash currency must match the portfolio reporting currency. Update the settlement records before changing reporting currency.");
     if (type === "sell" && result.fee > result.amount) throw new TypeError("A settled sale cannot have fees above gross proceeds. Record the resulting cash debit separately.");
   }
+  if (Object.hasOwn(input, "executedAt")) {
+    if (!isTrade) throw new TypeError("Execution time applies only to trades.");
+    result.executedAt = instant(input.executedAt, "Execution time", true);
+    if (portfolioToday(Date.parse(result.executedAt)) !== date || now !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(String(now)) && Date.parse(result.executedAt) > new Date(now).getTime()) throw new TypeError("Execution time must match the Tallinn transaction date and cannot be in the future.");
+  }
+  if (Object.hasOwn(input, "totalCost")) {
+    if (type !== "buy") throw new TypeError("Broker total cost applies only to purchases.");
+    result.totalCost = number(input.totalCost, "Broker total cost", strict, true);
+    const unit = currency === "JPY" ? 1 : 0.01;
+    if (Math.abs(result.totalCost - (result.amount + result.fee)) > unit / 2 + 1e-8) throw new TypeError("Broker total cost must reconcile with quantity × price plus fees within native currency rounding.");
+  }
+  if (Object.hasOwn(input, "cashAlreadyRecorded")) {
+    if (type !== "buy" || typeof input.cashAlreadyRecorded !== "boolean" || !hasCashCurrency || result.cashCurrency !== "EUR" || result.cashAmount <= 0) throw new TypeError("Previously recorded cash applies only to purchases with an exact positive EUR cost basis.");
+    result.cashAlreadyRecorded = input.cashAlreadyRecorded;
+  }
   return result;
 }
 
@@ -180,7 +200,7 @@ function projectNormalized(book) {
     previous.averageCost = finite(cost / shares);
   }
   const entries = book.transactions.map((entry, index) => ({ entry, index }))
-    .sort((a, b) => a.entry.date.localeCompare(b.entry.date) || a.index - b.index);
+    .sort((a, b) => compareTransactionTime(a.entry, b.entry) || a.index - b.index);
   for (const { entry } of entries) {
     const { type, currency, amount, fee = 0 } = entry;
     let change = amount;
@@ -196,13 +216,13 @@ function projectNormalized(book) {
           positions.set(key, holding);
         }
         const shares = finite(holding.shares + entry.quantity);
-        const cost = finite(finite(holding.shares * holding.averageCost) + finite(amount + fee));
+        const cost = finite(finite(holding.shares * holding.averageCost) + finite(entry.totalCost ?? amount + fee));
         const eurPaid = entry.cashCurrency === "EUR" ? entry.cashAmount
           : !entry.cashCurrency && currency === "EUR" ? finite(amount + fee) : null;
         eurCosts.set(key, addKnownCost(eurCosts.has(key) ? eurCosts.get(key) : 0, eurPaid));
         holding.shares = shares;
         holding.averageCost = finite(cost / shares);
-        change = -finite(amount + fee);
+        change = -finite(entry.totalCost ?? amount + fee);
       } else {
         const tolerance = Number.EPSILON * 8 * Math.max(holding?.shares || 0, entry.quantity);
         if (!holding || entry.quantity - holding.shares > tolerance) throw new TypeError(`Cannot sell more ${entry.ticker} shares than are held in ${currency} on ${entry.date}.`);
@@ -217,6 +237,7 @@ function projectNormalized(book) {
     } else if (type === "withdrawal" || type === "fee") change = -amount;
     const cashCurrency = entry.cashCurrency || currency;
     if (entry.cashCurrency) change = ["buy", "withdrawal", "fee"].includes(type) ? -entry.cashAmount : entry.cashAmount;
+    if (entry.cashAlreadyRecorded === true) change = 0;
     cash.set(cashCurrency, finite((cash.get(cashCurrency) || 0) + change));
     if (!entry.cashCurrency && currency !== baseCurrency) {
       missingTransactionIds.push(entry.id);

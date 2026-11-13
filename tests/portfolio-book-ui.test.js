@@ -254,6 +254,20 @@ test("editing replaces a transaction and does not append a duplicate", async () 
   assert.equal(getPortfolioHoldings()[0].shares, 13);
 });
 
+test("editing a recorded historical purchase preserves its exact cost, execution time and no-second-deduction flag", async () => {
+  const initial = book();
+  initial.transactions.push({ id: "recorded-purchase", type: "buy", date: "2026-10-08", executedAt: "2026-10-08T14:00:00.000Z", ticker: "AAPL", currency: "USD",
+    quantity: 2, price: 150, fee: 1, totalCost: 301, cashCurrency: "EUR", cashAmount: 270, cashAlreadyRecorded: true, note: "Original purchase" });
+  const f = fixture(initial);
+  await f.controller.initialize();
+  fill(f.controller, { id: "recorded-purchase", date: "2026-10-08", cashAmount: "270", note: "Reviewed note" });
+  assert.equal(await f.controller.saveTransaction(), true);
+  const saved = f.stored.transactions[0];
+  assert.equal(saved.executedAt, initial.transactions[0].executedAt);
+  assert.equal(saved.totalCost, 301); assert.equal(saved.cashAlreadyRecorded, true); assert.equal(saved.cashAmount, 270);
+  assert.equal(projectPortfolioBook(f.stored).reportingCash.amount, 0);
+});
+
 test("restore requires a valid preview and explicit action, including a fresh browser", async () => {
   const f = fixture();
   await f.controller.initialize();

@@ -66,9 +66,9 @@ test("MCP preserves six read-only tools and adds separately annotated cash tools
   assert(discovery.result.supportedVersions.includes("2026-07-28"));
   assert.deepEqual(discovery.result.capabilities, { tools: {} });
   const listed = await (await handler(rpc("tools/list", {}, { headers: {} }), env)).json();
-  assert.deepEqual(listed.result.tools.map(tool => tool.name), [...names, "add_cash_deposit", "reverse_cash_deposit", "get_cash_operation"]);
+  assert.deepEqual(listed.result.tools.map(tool => tool.name), [...names, "add_cash_deposit", "reverse_cash_deposit", "get_cash_operation", "record_stock_purchase"]);
   for (const tool of listed.result.tools) {
-    assert.equal(tool.annotations.readOnlyHint, !["add_cash_deposit", "reverse_cash_deposit"].includes(tool.name));
+    assert.equal(tool.annotations.readOnlyHint, !["add_cash_deposit", "reverse_cash_deposit", "record_stock_purchase"].includes(tool.name));
     assert.equal(tool.annotations.destructiveHint, false);
     assert.equal(tool.inputSchema.additionalProperties, false);
   }

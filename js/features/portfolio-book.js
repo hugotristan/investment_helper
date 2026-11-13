@@ -167,7 +167,9 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       }
       const ticker = trade || type === "dividend" ? await resolveTicker(el("transactionTicker").value) : null;
       if ((trade || type === "dividend") && !ticker) throw new TypeError("Select a matching stock or ETF, or enter its ticker symbol.");
-      const normalized = normalizeTransaction({ id: id || uuid(), type,
+      const existing = book.transactions.find(entry => entry.id === id);
+      const preserved = Object.fromEntries(["executedAt", "totalCost", "cashAlreadyRecorded", ...(existing && Object.hasOwn(existing, "cashAlreadyRecorded") ? ["cashCurrency", "cashAmount"] : [])].filter(key => existing && Object.hasOwn(existing, key)).map(key => [key, existing[key]]));
+      const normalized = normalizeTransaction({ ...preserved, id: id || uuid(), type,
         date, currency: el("transactionCurrency").value,
         ...(trade || type === "dividend" ? { ticker } : {}),
         ...(trade ? { quantity: parseDecimalInput(el("transactionQuantity").value, { min: 0.00000001 }),
@@ -181,7 +183,7 @@ export function createPortfolioBookController({ store = portfolioBookStore, docu
       const separateCash = trade || type === "dividend" || (previous?.cashCurrency && previous.cashAmount !== previous.amount);
       const enteredCash = el("transactionCashAmount").value.trim();
       if (foreign && !enteredCash) throw new TypeError(`Enter the actual ${book.settings.baseCurrency} cash amount from your broker, including fees. No exchange rate is assumed.`);
-      const nativeCash = trade ? native.amount + (type === "buy" ? native.fee : -native.fee) : native.amount;
+      const nativeCash = trade ? type === "buy" ? native.totalCost ?? native.amount + native.fee : native.amount - native.fee : native.amount;
       if (nativeCash < 0) throw new TypeError("A sale with fees greater than its proceeds cannot be recorded as net cash received. Record the separately charged fee as a Fee transaction.");
       const settled = normalizeTransaction({ ...native, cashCurrency: book.settings.baseCurrency,
         cashAmount: foreign || (separateCash && enteredCash) ? parseDecimalInput(enteredCash) : nativeCash },
