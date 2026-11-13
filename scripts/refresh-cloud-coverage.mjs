@@ -11,15 +11,15 @@ async function call(path,body){
   return r.json();
 }
 const prices=createYahooPriceFetcher({maxRetries:1,timeoutMs:7000}),financials=createYahooFetcher({timeoutMs:7000});
-const started=Date.now();let successes=0,failures=0;
+const started=Date.now();let successes=0,failures=0,priceRetryAt=0,financialRetryAt=0;
 for(let batch=0;batch<160&&Date.now()-started<25*60000;batch++){
   const plan=await call('/api/market/refresh');
   if(!Array.isArray(plan.tickers)||plan.tickers.length>2)throw Error('Invalid bounded coverage plan');
   const entries=[];
   for(const target of plan.tickers){
     const entry={ticker:target.ticker};
-    if(target.needsPrice)try{entry.chart=await prices(target.ticker);}catch(error){entry.priceFailure=error.status||503;}
-    if(target.needsFinancial)try{entry.yahooFinancials=await financials(target.ticker);}catch(error){entry.financialFailure=error.status||503;}
+    if(target.needsPrice){if(Date.now()<priceRetryAt)entry.priceFailure=429;else try{entry.chart=await prices(target.ticker);}catch(error){entry.priceFailure=error.status||503;priceRetryAt=Date.now()+([403,429].includes(error.status)?300000:30000);}}
+    if(target.needsFinancial){if(Date.now()<financialRetryAt)entry.financialFailure=429;else try{entry.yahooFinancials=await financials(target.ticker);}catch(error){entry.financialFailure=error.status||503;financialRetryAt=Date.now()+([403,429].includes(error.status)?300000:30000);}}
     entries.push(entry);await new Promise(resolve=>setTimeout(resolve,600));
   }
   const result=await call('/api/market/refresh-results',{revision:plan.revision,offset:plan.offset,entries});

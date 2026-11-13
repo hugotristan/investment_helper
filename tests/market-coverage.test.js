@@ -67,3 +67,11 @@ test('an unlisted international ETF is recognized from validated market identity
     resolveHistory:async ticker=>({...history(ticker),instrumentType:'ETF'}),fetchImpl:async()=>{requested++;throw Error();}});
   const result=await provider.company('FUND.L');assert.equal(result.unsupported,true);assert.equal(requested,0);
 });
+test('an older provider response cannot downgrade a newer persistent observation',async t=>{
+  const DB=db(t);let now=NOW;
+  const cache=createPersistentMarketCache(DB,{now:()=>now});
+  await cache.get('history:TTWO',async()=>history('TTWO'));
+  now+=300001;
+  const retained=await cache.get('history:TTWO',async()=>({...history('TTWO'),historyAsOf:'2026-11-10T00:00:00Z',prices:[{date:'2026-11-10',close:100}]}));
+  assert.equal(retained.stale,true);assert.equal(retained.value.prices[0].close,125);
+});

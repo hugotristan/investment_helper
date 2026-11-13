@@ -31,6 +31,15 @@ export function createPersistentMarketCache(DB, { now = Date.now } = {}) {
       try {
         const next = await loader();
         if (!validate(next)) throw new ApiError(503, 'INVALID_MARKET_DATA', 'The provider returned no validated market data.');
+        const current = await DB.prepare('SELECT payload,succeeded_at FROM market_cache WHERE key = ?').bind(key).first();
+        let previous;
+        try { previous = current?.payload && JSON.parse(current.payload); } catch { /* Ignore a malformed cache. */ }
+        const observation = record => Date.parse(record?.quote?.quoteTime || record?.historyAsOf || record?.prices?.at(-1)?.date || record?.periodEnd || '');
+        if (previous && validate(previous) && observation(previous) > observation(next)) {
+          await DB.prepare('UPDATE market_cache SET lease_until = 0, retry_at = ?, error = ? WHERE key = ?')
+            .bind(now()+60000, 'The provider returned an older observation; the newer cached observation was retained.', key).run();
+          return {value:previous,stale:true,fetchedAt:current.succeeded_at,error:'The provider returned an older observation; the newer cached observation was retained.'};
+        }
         // A provider may return a dated fallback. Persist it without pretending a refresh succeeded.
         const stale = next.stale === true;
         const fetchedAt = stale ? row?.succeeded_at || Date.parse(next.quote?.quoteTime || next.historyAsOf) || now() : now();
