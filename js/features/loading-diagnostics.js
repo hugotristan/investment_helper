@@ -14,9 +14,24 @@ export function initializeLoadingDiagnostics({ document: doc = globalThis.docume
   function render() {
     components.replaceChildren(); results.replaceChildren();
     for (const [name, value] of states) append(components, "p", `${name}: ${value}`);
-    for (const [name, values] of rows) {
-      append(results, "h3", name);
-      for (const row of values) append(results, "p", `${row.ticker}: ${row.status} · ${row.priceType || "annual financials"} · ${row.currency || "currency unavailable"} · ${row.source || "source unavailable"} · ${row.latestSuccessfulUpdateAt || "no successful update"}${row.errors?.length ? " · " + row.errors.map(error => `${error.code}: ${error.message}`).join("; ") : ""}`);
+    const merged = new Map();
+    for (const [name, values] of rows) for (const row of values) {
+      const entry = merged.get(row.ticker) || {ticker:row.ticker};
+      entry[name === "Prices" ? "price" : "financial"] = row; merged.set(row.ticker,entry);
+    }
+    const table = append(results,"table",""); table.className = "coverage-table";
+    const head = append(table,"thead",""); const headings = append(head,"tr","");
+    for (const label of ["Stock", "Price", "Observed", "Financial metrics", "Source / last successful update", "Status / errors"]) append(headings,"th",label);
+    const body = append(table,"tbody","");
+    for (const {ticker,price,financial} of merged.values()) {
+      const tr = append(body,"tr","");
+      append(tr,"td",ticker + ((financial?.companyName || price?.companyName) && (financial?.companyName || price?.companyName) !== ticker ? " · " + (financial?.companyName || price?.companyName) : ""));
+      append(tr,"td",price?.price == null ? "Unavailable" : price.price + " " + price.currency);
+      append(tr,"td",(price?.quoteTimestamp || price?.dataAsOf || "Unavailable") + " · " + (price?.priceType || "no observation"));
+      const etf = financial?.errors?.some(error => error.code === "ETF_METRICS_UNSUPPORTED");
+      append(tr,"td",etf ? "ETF · company metrics unsupported" : financial?.status || "Loading");
+      append(tr,"td",[price?.source,financial?.source].filter(Boolean).join(" / ") + " · " + ([price?.latestSuccessfulUpdateAt,financial?.latestSuccessfulUpdateAt].filter(Boolean).sort().at(-1) || "No successful update"));
+      append(tr,"td",[price?.status,financial?.status].filter(Boolean).join(" / ") + " · " + [...(price?.errors || []),...(financial?.errors || []),...(financial?.warnings || [])].map(error => error.code + ": " + error.message).join("; "));
     }
   }
   async function request(component, offset, signal) {
@@ -77,5 +92,8 @@ export function initializeLoadingDiagnostics({ document: doc = globalThis.docume
   doc.getElementById("loadingRefresh").addEventListener("click", refresh);
   const whenVisible = () => { if (win.location.hash === "#sources" && !states.size) void refresh(); };
   win.addEventListener("hashchange", whenVisible); whenVisible();
-  return { refresh };
+  const timer = win.setInterval?.(() => {
+    if (doc.visibilityState !== "hidden") void fetchImpl("/api/loading-status?component=records&batchSize=1", {credentials:"same-origin",cache:"no-store"}).catch(() => {});
+  }, 60000);
+  return { refresh, stop:() => win.clearInterval?.(timer) };
 }

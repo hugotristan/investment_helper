@@ -67,13 +67,13 @@ test("development D1 adapter applies generated migrations once and preserves dat
   try {
     const saved = await response(app, { DB }, "/api/portfolio", { method: "PUT", value: { book: makeBook(), expectedRevision: 0 } });
     assert.equal(saved.status, 200);
-    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 5);
+    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 6);
     assert.equal((await DB.prepare("SELECT user_id FROM portfolio_books").all()).results[0].user_id, "owner-one");
   } finally { DB.close(); }
   DB = createLocalDatabase(filename);
   try {
     assert.equal((await response(app, { DB }, "/api/portfolio")).data.revision, 1);
-    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 5);
+    assert.equal(await DB.prepare("SELECT COUNT(*) AS count FROM local_migrations").first("count"), 6);
     assert.equal((await DB.prepare("UPDATE watchlists SET revision = revision WHERE user_id = ?").bind("none").run()).meta.changes, 0);
   } finally { DB.close(); }
 });
@@ -374,7 +374,7 @@ test("blocked Yahoo requests share one fresh fixed public publisher fallback wit
   assert.equal((await response(stale, {}, "/api/market/history?ticker=SNDK")).status, 503);
 });
 
-test("server limits simultaneous public history provider requests to three", async () => {
+test("server paces public history provider requests within the concurrency ceiling", async () => {
   let active = 0, peak = 0;
   const app = createApp(assets, { now: NOW, fetchImpl: async (url) => {
     active += 1;
@@ -385,7 +385,7 @@ test("server limits simultaneous public history provider requests to three", asy
     return Response.json(yahooChart(ticker));
   } });
   const result = await Promise.all(["AAPL", "SNDK", "MSFT", "TSM", "NVDA", "GOOGL"].map((ticker) => response(app, {}, "/api/market/history?ticker=" + ticker)));
-  assert.equal(peak, 3);
+  assert.equal(peak, 1);
   assert(result.every((value) => value.status === 200));
 });
 

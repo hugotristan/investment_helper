@@ -13,6 +13,7 @@ const PUBLISHED_BASE_URL = "https://hugotristan.github.io/investment_helper/data
 const PUBLISHED_PRICES_URL = `${PUBLISHED_BASE_URL}prices.json`;
 const PUBLIC_ASSET_LIMITS = Object.freeze({ "data/prices.json": 14 * 1024 * 1024,
   "data/exchange-rate.json": 16 * 1024, "data/portfolio-fx.json": 4 * 1024 * 1024,
+  "data/instruments.json": 8 * 1024 * 1024, "data/sec-tickers.json": 4 * 1024 * 1024,
   "data/fundamentals.json": 4 * 1024 * 1024 });
 const DAY = 86400000;
 
@@ -86,6 +87,7 @@ function historicalFxSnapshot(raw, now, from) {
 }
 
 export function marketTicker(input) {
+  if (typeof input === "string") input = input.trim().toUpperCase();
   if (typeof input !== "string" || !/^[A-Z0-9^][A-Z0-9.^-]{0,30}$/.test(input)) {
     throw new ApiError(400, "INVALID_TICKER", "Choose a valid stock, ETF, or index ticker.");
   }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-10-08T09:27:30.815Z",
+  "generatedAt": "2026-11-13T09:10:50.542Z",
   "provider": "SEC companyfacts + Yahoo Finance",
   "providerStatus": "available",
   "secProviderStatus": "unavailable",
@@ -16648,6 +16648,179 @@
         "verifiedAt": "2026-10-08T09:21:50Z",
         "sourceUrl": "https://www.sec.gov/files/company_tickers.json"
       }
+    },
+    "TTWO": {
+      "ticker": "TTWO",
+      "cik": null,
+      "companyName": "Take-Two Interactive Software, Inc.",
+      "available": true,
+      "status": "available",
+      "reason": "Yahoo Finance annual reported values; provider period dates may be nominal. SEC filing dates and missing concepts remain unavailable.",
+      "currency": "USD",
+      "periodEnd": "2026-03-31",
+      "fiscalYear": null,
+      "retrievedAt": "2026-11-13T09:10:50.542Z",
+      "metrics": {
+        "revenue": 6656400000,
+        "netIncome": -298200000,
+        "operatingCashFlow": 624300000,
+        "capitalExpenditures": 162800000,
+        "freeCashFlow": 461500000,
+        "totalDebt": 2958300000,
+        "revenueGrowth": 0.18155353592729329,
+        "netIncomeGrowth": null,
+        "operatingCashFlowGrowth": null,
+        "freeCashFlowGrowth": null,
+        "dilutedEPS": -1.62,
+        "basicEPS": -1.62
+      },
+      "metricSources": {
+        "revenue": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualTotalRevenue",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 6656400000,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          }
+        ],
+        "netIncome": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualNetIncome",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": -298200000,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          }
+        ],
+        "operatingCashFlow": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualOperatingCashFlow",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 624300000,
+            "url": "https://finance.yahoo.com/quote/TTWO/cash-flow/"
+          }
+        ],
+        "capitalExpenditures": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualCapitalExpenditure",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": -162800000,
+            "url": "https://finance.yahoo.com/quote/TTWO/cash-flow/",
+            "transformation": "Absolute value of the reported capital-expenditure cash outflow."
+          }
+        ],
+        "freeCashFlow": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualFreeCashFlow",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 461500000,
+            "url": "https://finance.yahoo.com/quote/TTWO/cash-flow/"
+          }
+        ],
+        "totalDebt": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualTotalDebt",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 2958300000,
+            "url": "https://finance.yahoo.com/quote/TTWO/balance-sheet/"
+          }
+        ],
+        "revenueGrowth": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualTotalRevenue",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 6656400000,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          },
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualTotalRevenue",
+            "unit": "USD",
+            "periodType": "12M",
+            "start": null,
+            "end": "2025-03-31",
+            "filed": null,
+            "accession": null,
+            "value": 5633600000,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          }
+        ],
+        "netIncomeGrowth": [],
+        "operatingCashFlowGrowth": [],
+        "freeCashFlowGrowth": [],
+        "dilutedEPS": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualDilutedEPS",
+            "unit": "USD/shares",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": -1.62,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          }
+        ],
+        "basicEPS": [
+          {
+            "provider": "Yahoo Finance",
+            "tag": "annualBasicEPS",
+            "unit": "USD/shares",
+            "periodType": "12M",
+            "start": null,
+            "end": "2026-03-31",
+            "filed": null,
+            "accession": null,
+            "value": -1.62,
+            "url": "https://finance.yahoo.com/quote/TTWO/financials/"
+          }
+        ]
+      },
+      "earnings": null,
+      "provider": "Yahoo Finance",
+      "periodType": "12M"
     }
   }
 }

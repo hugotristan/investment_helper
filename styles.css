@@ -834,3 +834,8 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
   .analyst-facts > div { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   #insightsPanel .panel-heading { align-items: flex-start; flex-wrap: wrap; gap: 14px; }
 }
+
+/* Coverage diagnostics remain readable on narrow screens. */
+#loadingTickerResults { overflow-x: auto; }
+.coverage-table { width:100%; border-collapse:collapse; text-align:left; font-size:.85rem; }
+.coverage-table th, .coverage-table td { padding:12px 10px; border-bottom:1px solid var(--border, #bbc2c8); vertical-align:top; min-width:120px; overflow-wrap:anywhere; }

@@ -122,6 +122,11 @@ jobs:
           path: data/prices.json
           key: prices-${{ github.run_id }}
 
+      - name: Refresh private tracked-stock coverage
+        # OIDC is scoped by the Worker to this repository, main branch and workflow.
+        # This updates only public market caches; never financial records.
+        run: node scripts/refresh-cloud-coverage.mjs
+
       - name: Restore latest exchange rate snapshot
         # Keep the last successful dated FX snapshot available during provider outages.
         # The publisher never refreshes its date unless it receives a real newer rate.

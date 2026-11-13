@@ -14,7 +14,7 @@ export async function renderFundamentals(item, snapshot, { now = Date.now() } = 
   if (item.isFund || broadFunds.has(item.ticker) || isEtfSeries(item)) {
     return panel("Company fundamentals", '<p class="fundamentals-note">Not applicable to an ETF or fund. Corporate revenue, profit, and earnings dates describe companies; fund holdings require separate analysis.</p>');
   }
-  const data = snapshot ?? await loadFundamentalsSnapshot();
+  const data = snapshot ?? await loadFundamentalsSnapshot(item.ticker);
   const record = data.byTicker?.[item.ticker];
   const verifier = earningsVerifier(item, record);
   const diagnostics = providerDiagnostics(data, item.ticker, record);

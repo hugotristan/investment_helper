@@ -47,7 +47,7 @@ export async function runStockDetail() {
       loadQuoteSnapshots([parsed.ticker]),
       loadNewsSources(contextTickers, { allowCache: false }),
       loadMarketContext(),
-      loadFundamentalsSnapshot()
+      loadFundamentalsSnapshot(parsed.ticker)
     ]);
     const scored = applyLearningSignal(scoreSeries(applyQuoteSnapshot(series, quotes.byTicker), news.byTicker[series.ticker] || news.byTicker[parsed.ticker] || []));
     await renderStockDetail(scored, news, marketContext, quotes, fundamentals);

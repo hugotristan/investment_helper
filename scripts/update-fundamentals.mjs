@@ -273,10 +273,13 @@ export async function main(args = process.argv.slice(2), { fetchSec = createSecF
   }
   const providerError = indexDiagnostics.indexStatus === "unavailable"
     ? indexDiagnostics.indexError || "No verified SEC issuer mappings are available." : null;
-  const snapshot = await generateFundamentalsSnapshot({ tickers: options.tickers, previous, companyTickers, calendar,
+  const tickers = args.includes("--tickers") ? options.tickers : [...new Set([...Object.keys(previous.byTicker || {}), ...options.tickers])]
+    .filter(ticker => !previous.byTicker?.[ticker]?.available || now()-Date.parse(previous.byTicker[ticker].retrievedAt) >= 7*86400000);
+  const snapshot = await generateFundamentalsSnapshot({ tickers, previous, companyTickers, calendar,
     providerError, indexDiagnostics, retrievedAt, now,
     fetchYahooFacts, maximumDurationMs: Math.max(0, maximumDurationMs - (now() - startedAt)),
     fetchFacts: (cik) => fetchSec(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik.padStart(10, "0")}.json`) });
+  if (!tickers.length && Object.values(snapshot.byTicker).some(record => record?.available)) snapshot.providerStatus = "available";
   await writeJsonAtomic(options.output, snapshot);
   process.stdout.write(`Fundamentals snapshot: ${snapshot.providerStatus}; ticker index ${snapshot.indexStatus}; ${snapshot.secSuccessfulRequests} SEC and ${snapshot.yahooSuccessfulRequests} Yahoo issuer requests succeeded, ${snapshot.failures.length} symbols retained or unavailable.\n`);
   return snapshot;

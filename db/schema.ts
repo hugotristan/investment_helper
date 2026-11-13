@@ -58,3 +58,14 @@ export const cashAudit = sqliteTable("cash_audit", {
   id: text("id").primaryKey(), userId: text("user_id").notNull(), operationId: text("operation_id").notNull(),
   event: text("event").notNull(), actor: text("actor").notNull(), occurredAt: text("occurred_at").notNull(),
 }, table => [index("cash_audit_operation").on(table.userId, table.operationId)]);
+
+// Public market observations only. No portfolio records or credentials are stored here.
+export const marketCache = sqliteTable("market_cache", {
+  key: text("key").primaryKey(), payload: text("payload"), succeededAt: integer("succeeded_at"),
+  expiresAt: integer("expires_at").notNull(), retryAt: integer("retry_at").notNull(),
+  leaseUntil: integer("lease_until").notNull(), error: text("error"),
+});
+export const coverageScans = sqliteTable("coverage_scans", {
+  userId: text("user_id").primaryKey(), cursor: integer("cursor").notNull(),
+  revision: text("revision").notNull(), nextAt: integer("next_at").notNull(),
+});

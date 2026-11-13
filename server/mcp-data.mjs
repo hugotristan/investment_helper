@@ -19,7 +19,7 @@ const oldest = (values) => values.filter(Boolean).sort()[0] ?? null;
 
 // This module has no storage write dependency. Portfolio quantities, notes and
 // balances never leave the Worker in requests to public market-data providers.
-export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url, init) => globalThis.fetch(url, init) }) {
+export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url, init) => globalThis.fetch(url, init), companyProvider }) {
   const clock = () => typeof now === "function" ? now() : now;
   const readAsset = createMarketAssetReader(assets);
   let fundamentalsRequest, fundamentalsUntil = 0;
@@ -98,13 +98,15 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
       try {
         const loaded = await market.loadHistory(ticker);
         const history = normalizeStockHistory(loaded, ticker, { now: clock() });
-        if (!history || clock() - Date.parse(history.historyAsOf) > 7 * DAY) throw new ApiError(503, "PRICES_UNAVAILABLE", "No recent validated daily history is available for this ticker.");
+        if (!history) throw new ApiError(503, "PRICES_UNAVAILABLE", "No recent validated daily history is available for this ticker.");
+        const stalePrice = loaded.stale || clock() - Date.parse(history.historyAsOf) > 7*DAY;
         const quote = history.quote && Date.parse(history.quote.quoteTime) >= Date.parse(history.historyAsOf) ? history.quote : null;
         const observed = quote ? date(quote.quoteTime, clock()) : history.historyAsOf;
-        return { ticker, status: loaded.stale ? "stale" : "available", stale: !!loaded.stale, quoteTimestamp: observed, price: quote?.price ?? history.prices.at(-1).close, currency: history.currency,
+        const identity = await companyProvider?.identity(ticker);
+        return { ticker, companyName:identity?.companyName || ticker, instrumentType:history.instrumentType, status: stalePrice ? "stale" : "available", stale: !!stalePrice, quoteTimestamp: observed, price: quote?.price ?? history.prices.at(-1).close, currency: history.currency,
           priceType: quote ? "dated_quote" : "completed_daily_close", source: quote?.source ?? history.source,
-          latestSuccessfulUpdateAt: observed, dataAsOf: observed, historyAsOf: history.historyAsOf,
-          delayMinutes: quote?.delayMinutes ?? null, realtime: false, errors: loaded.stale ? [failed("STALE_PRICE", loaded.refreshError,
+          latestSuccessfulUpdateAt: date(loaded.lastSuccessfulFetchAt,clock()) || observed, dataAsOf: observed, historyAsOf: history.historyAsOf,
+          delayMinutes: quote?.delayMinutes ?? null, realtime: false, errors: stalePrice ? [failed("STALE_PRICE", loaded.refreshError || "The last validated observation is more than seven days old.",
             { ticker, provider: quote?.source ?? history.source, retryable: true, lastSuccessfulQuoteAt: observed })] : [] };
       } catch (error) {
         return { ticker, status: "unavailable", price: null, currency: null, latestSuccessfulUpdateAt: null, dataAsOf: null,
@@ -118,7 +120,18 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
   }
 
   async function metrics(tickers) {
-    const { snapshots, refreshError } = await loadFundamentals();
+    const { snapshots:publishedSnapshots, refreshError } = await loadFundamentals();
+    const snapshots = [...publishedSnapshots];
+    const dynamic = { schemaVersion:1, generatedAt:new Date(clock()).toISOString(), byTicker:{} };
+    const identities = new Map(), failures = new Map();
+    if (companyProvider) await mapBatch([...new Set(tickers)], async ticker => {
+      const info = await companyProvider.identity(ticker); identities.set(ticker, info);
+      if (info.type === "ETF") return;
+      const fresh = snapshots.some(snapshot => snapshot.byTicker[ticker]?.available && clock()-Date.parse(snapshot.byTicker[ticker].retrievedAt) < 7*DAY);
+      if (!fresh) try { dynamic.byTicker[ticker] = await companyProvider.company(ticker); }
+      catch(error) { failures.set(ticker, failed("METRICS_UNAVAILABLE", error instanceof ApiError ? error.message : "Company financial retrieval failed.", {ticker,retryable:true})); }
+    }, {concurrency:2});
+    if (Object.keys(dynamic.byTicker).length) snapshots.push(dynamic);
     const rows = tickers.map(ticker => {
       const candidates = snapshots.flatMap(snapshot => {
         const record = Object.hasOwn(snapshot.byTicker, ticker) ? snapshot.byTicker[ticker] : null;
@@ -127,11 +140,12 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
           ? [{ snapshot, record, retrieved }] : [];
       }).sort((a, b) => b.retrieved.localeCompare(a.retrieved) || b.snapshot.generatedAt.localeCompare(a.snapshot.generatedAt));
       const selected = candidates[0];
+      if (identities.get(ticker)?.type === "ETF") return {ticker, assetType:"ETF", status:"unavailable", metrics:null, latestSuccessfulUpdateAt:null, errors:[failed("ETF_METRICS_UNSUPPORTED", "Annual company accounts do not apply to this ETF.", {ticker})]};
       if (!selected) return { ticker, status: "unavailable", metrics: null, latestSuccessfulUpdateAt: null,
-        errors: [broadFunds.has(ticker) || VWCE_TICKERS.includes(ticker) ? failed("ETF_METRICS_UNSUPPORTED", "Company financial metrics do not apply to this known fund.")
-          : failed("METRICS_UNAVAILABLE", "Company financial data has not been successfully published for this ticker. This is a coverage or provider failure, not an ETF classification.", { ticker, retryable: true })], ...(refreshError ? { warnings: [refreshError] } : {}) };
+        errors: [failures.get(ticker) || (broadFunds.has(ticker) || VWCE_TICKERS.includes(ticker) ? failed("ETF_METRICS_UNSUPPORTED", "Company financial metrics do not apply to this known fund.")
+          : failed("METRICS_UNAVAILABLE", "Company financial data has not been successfully published for this ticker. This is a coverage or provider failure, not an ETF classification.", { ticker, retryable: true }))], ...(refreshError ? { warnings: [refreshError] } : {}) };
       const { record, retrieved } = selected;
-      const stale = clock() - Date.parse(retrieved) >= 10 * DAY;
+      const stale = record.stale === true || clock() - Date.parse(retrieved) >= 10 * DAY;
       const values = Object.fromEntries(FUNDAMENTAL_METRICS.map(key => [key, Number.isFinite(record.metrics?.[key]) ? record.metrics[key] : null]));
       const missingMetrics = FUNDAMENTAL_METRICS.filter(key => values[key] === null);
       if (missingMetrics.length === FUNDAMENTAL_METRICS.length) return { ticker, status: "unavailable", metrics: null,
@@ -149,7 +163,7 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
           }))])),
         errors: [...(stale ? [failed("METRICS_STALE", "These retained financial figures were retrieved ten or more days ago; they have not been refreshed by this request.")] : []),
           ...(missingMetrics.length ? [failed("METRICS_INCOMPLETE", "Some financial metrics are unavailable; missing values are null, not zero.")] : [])],
-        warnings: [...(refreshError ? [refreshError] : []), ...(retained ? [failed("RETAINED_METRICS", "The latest refresh was unavailable or incomplete. Displayed figures retain the successful retrieval timestamp.")] : [])] };
+        warnings: [...(failures.has(ticker) ? [failures.get(ticker)] : []), ...(record.refreshError ? [failed("FINANCIAL_REFRESH_FAILED", record.refreshError, {ticker,retryable:true})] : []), ...(refreshError ? [refreshError] : []), ...(retained ? [failed("RETAINED_METRICS", "The latest refresh was unavailable or incomplete. Displayed figures retain the successful retrieval timestamp.")] : [])] };
     });
     return aggregate(rows, "companies", "Time each company's financial data was successfully retrieved. Reporting period dates and later update attempts are separate.");
   }
@@ -182,9 +196,29 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
         remainingTickerCount: Math.max(0, universe.length - offset - tickers.length) },
       inspectedTickers: tickers, uninspectedTickerCount: requestedTickers ? null : Math.max(0, known.length - tickers.length),
       checkedComponents: ["portfolio", "watchlist", ...(checkPrices ? ["prices"] : []), ...(checkMetrics ? ["financialMetrics"] : [])],
+      coverage: tickers.map(ticker => {
+        const price = priceData?.prices?.find(row => row.ticker === ticker), financial = financialData?.companies?.find(row => row.ticker === ticker);
+        const holding = p.holdings?.find(row => row.ticker === ticker);
+        const unsupported = financial?.errors?.some(error => error.code === "ETF_METRICS_UNSUPPORTED");
+        return {ticker, companyName:financial?.companyName || price?.companyName || holding?.name || ticker,
+          trackedBy:[...(holding ? ["portfolio"] : []), ...(w.watchlists?.some(list => list.tickers.includes(ticker)) ? ["watchlist"] : [])],
+          assetType:unsupported ? "ETF" : price?.instrumentType || "company_or_unknown", price:price?.price ?? null, currency:price?.currency ?? null,
+          priceObservationAt:price?.quoteTimestamp ?? price?.dataAsOf ?? null, priceType:price?.priceType ?? null,
+          financialMetricsStatus:unsupported ? "unsupported" : financial?.status ?? "not_checked",
+          lastSuccessfulDataUpdate:latest([price?.latestSuccessfulUpdateAt, financial?.latestSuccessfulUpdateAt]),
+          source:{price:price?.source ?? null, financialMetrics:financial?.source ?? null},
+          status:price?.status === "unavailable" ? "unavailable" : price?.status === "stale" || financial?.status === "stale" ? "stale" : price?.status === "available" && (unsupported || ["available","partial"].includes(financial?.status)) ? "available" : "unavailable",
+          errors:[...(price?.errors || []), ...(financial?.errors || []), ...(financial?.warnings || [])]};
+      }),
       prices: priceData, financialMetrics: financialData, errors: [...p.errors, ...w.errors, ...(priceData?.errors || []), ...(financialData?.errors || [])] };
   }
-  return { portfolio, watchlists, prices, metrics, status };
+  async function financialSnapshot(ticker) {
+    const {snapshots} = await loadFundamentals();
+    let record = snapshots.map(snapshot => snapshot.byTicker[ticker]).filter(record => record?.available).sort((a,b) => String(b.retrievedAt).localeCompare(String(a.retrievedAt)))[0];
+    if (companyProvider && (!record || clock()-Date.parse(record.retrievedAt) >= 7*DAY)) try { record = await companyProvider.company(ticker); } catch { /* Retain the validated published record. */ }
+    return {schemaVersion:1, generatedAt:new Date(clock()).toISOString(), byTicker:record ? {[ticker]:record} : {}, providerStatus:record?.available ? "available" : "unavailable"};
+  }
+  return { portfolio, watchlists, prices, metrics, status, financialSnapshot };
 }
 
 function aggregate(rows, field, timestampMeaning) {
