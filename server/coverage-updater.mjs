@@ -12,7 +12,7 @@ export async function coveragePlan(env,userId,data,companyProvider,{now=Date.now
   const tickers=[];
   for(const ticker of all.slice(offset,offset+2)){
     const info=await companyProvider.identity(ticker);
-    const fresh=async kind=>{const row=await env.DB.prepare('SELECT payload,expires_at FROM market_cache WHERE key = ?').bind(kind+':'+ticker).first();return !!row?.payload&&row.expires_at>now;};
+    const fresh=async kind=>{const row=await env.DB.prepare('SELECT payload,expires_at FROM market_cache WHERE key = ?').bind(kind+':'+ticker).first();if(!row?.payload||row.expires_at<=now)return false;try{return kind!=="financial"||JSON.parse(row.payload).historyVersion===1;}catch{return false;}};
     tickers.push({ticker,type:info.type,needsPrice:!await fresh('history'),needsFinancial:info.type!=='ETF'&&!await fresh('financial')});
   }
   return {revision,offset,nextOffset:offset+tickers.length<all.length?offset+tickers.length:null,tickers};
@@ -23,7 +23,7 @@ export async function acceptCoverageResults(env,userId,input,data,companyProvide
   let successes=0,failures=0;
   for(const entry of input.entries){
     const target=plan.tickers.find(row=>row.ticker===entry?.ticker);
-    if(!target||Object.keys(entry).some(key=>!['ticker','chart','yahooFinancials','priceFailure','financialFailure'].includes(key)))throw new ApiError(400,'INVALID_COVERAGE_RESULT','Only the requested market-data batch can be cached.');
+    if(!target||Object.keys(entry).some(key=>!['ticker','chart','yahooFinancials','priceFailure','financialFailure','issuerMetadata'].includes(key)))throw new ApiError(400,'INVALID_COVERAGE_RESULT','Only the requested market-data batch can be cached.');
     for(const [kind,raw,needed] of [['history',entry.chart,target.needsPrice],['financial',entry.yahooFinancials,target.needsFinancial]]){
       if(!needed)continue;
       let record=null;
@@ -31,7 +31,7 @@ export async function acceptCoverageResults(env,userId,input,data,companyProvide
         const parsed=parseYahooChart(raw,entry.ticker);
         if(parsed){parsed.quote=parseYahooQuote(raw,entry.ticker,{now});record=normalizeStockHistory(parsed,entry.ticker,{now});}
         if(record&&now-Date.parse(record.historyAsOf)>7*DAY)record=null;
-      }else if(raw){const normalized=normalizeYahooFinancials(raw,{ticker:entry.ticker,retrievedAt:new Date(now).toISOString(),companyName:(await companyProvider.identity(entry.ticker)).companyName});if(normalized.available)record=normalized;}
+      }else if(raw){const normalized=normalizeYahooFinancials(raw,{ticker:entry.ticker,retrievedAt:new Date(now).toISOString(),companyName:(await companyProvider.identity(entry.ticker)).companyName});if(normalized.available){record=normalized;const metadata=entry.issuerMetadata;if(metadata?.source==='SEC submissions'&&/^\d{4}$/.test(String(metadata.sic))&&metadata.tickers?.includes(entry.ticker))record.issuerMetadata={sic:String(metadata.sic),industry:String(metadata.sicDescription||'').slice(0,200),source:'SEC submissions',verifiedAt:new Date(now).toISOString()};}}
       const key=kind+':'+entry.ticker;
       if(record){
         await env.DB.prepare(`INSERT INTO market_cache(key,payload,succeeded_at,expires_at,retry_at,lease_until,error) VALUES(?,?,?,?,0,0,NULL) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload,succeeded_at=excluded.succeeded_at,expires_at=excluded.expires_at,retry_at=0,lease_until=0,error=NULL`)

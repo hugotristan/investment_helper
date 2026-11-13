@@ -212,11 +212,15 @@ export function createMcpData({ market, assets, now = Date.now, fetchImpl = (url
       }),
       prices: priceData, financialMetrics: financialData, errors: [...p.errors, ...w.errors, ...(priceData?.errors || []), ...(financialData?.errors || [])] };
   }
-  async function financialSnapshot(ticker) {
+  async function financialSnapshot(ticker,env) {
     const {snapshots} = await loadFundamentals();
     let record = snapshots.map(snapshot => snapshot.byTicker[ticker]).filter(record => record?.available).sort((a,b) => String(b.retrievedAt).localeCompare(String(a.retrievedAt)))[0];
-    if (companyProvider && (!record || clock()-Date.parse(record.retrievedAt) >= 7*DAY)) try { record = await companyProvider.company(ticker); } catch { /* Retain the validated published record. */ }
-    return {schemaVersion:1, generatedAt:new Date(clock()).toISOString(), byTicker:record ? {[ticker]:record} : {}, providerStatus:record?.available ? "available" : "unavailable"};
+    if (companyProvider && (!record || record.historyVersion !== 1 || clock()-Date.parse(record.retrievedAt) >= 7*DAY)) try { record = await companyProvider.company(ticker); } catch { /* Retain the validated published record. */ }
+    const peerMap = new Map(snapshots.flatMap(snapshot=>Object.values(snapshot.byTicker||{})).map(row=>[row.ticker,row]));
+    if (env?.DB) { const cached=await env.DB.prepare("SELECT payload FROM market_cache WHERE key LIKE ? AND payload IS NOT NULL LIMIT 250").bind("financial:%").all();
+      for(const row of cached.results)try{const company=JSON.parse(row.payload);if(company?.ticker&&company.available)peerMap.set(company.ticker,company);}catch{} }
+    return {schemaVersion:1, generatedAt:new Date(clock()).toISOString(), peers:await Promise.all([...peerMap.values()].filter(row=>row.ticker!==ticker&&record?.issuerMetadata?.sic&&String(row.issuerMetadata?.sic).slice(0,2)===String(record.issuerMetadata.sic).slice(0,2)).slice(0,40).map(async row=>{
+      let quote=null;if(env?.DB)try{const saved=await env.DB.prepare("SELECT payload FROM market_cache WHERE key = ?").bind("history:"+row.ticker).first();quote=JSON.parse(saved?.payload||"null")?.quote||null;}catch{}return {...row,analysisQuote:quote};})), byTicker:record ? {[ticker]:record} : {}, providerStatus:record?.available ? "available" : "unavailable"};
   }
   return { portfolio, watchlists, prices, metrics, status, financialSnapshot };
 }

@@ -1,3 +1,4 @@
+import {secFinancialHistory} from "./financial-history.js";
 const DAY_MS = 86400000;
 const ANNUAL_FORMS = /^(10-K|20-F|40-F)(\/A)?$/;
 const TAGS = {
@@ -68,6 +69,7 @@ export function normalizeSecCompanyFacts(companyFacts, { ticker = "", cik = comp
   // cannot prove an issuer's fiscal-year label (especially January year ends).
   record.fiscalYear = null;
   record.retrievedAt = new Date(acquisitionTime).toISOString();
+  record.historyVersion=1; record.annualHistory=secFinancialHistory(companyFacts,record);
   return record;
 }
 
@@ -118,7 +120,7 @@ function instantFacts(companyFacts, tag, acquisitionTime) {
     .filter((entry) => (!entry.start || entry.start === entry.end) && /^[A-Z]{3}$/.test(entry.unit));
 }
 
-function factsForTag(companyFacts, tag, acquisitionTime) {
+export function factsForTag(companyFacts, tag, acquisitionTime) {
   const concept = companyFacts?.facts?.["us-gaap"]?.[tag];
   const latest = new Map();
   for (const [unit, facts] of Object.entries(concept?.units || {})) {

@@ -843,3 +843,9 @@ label > span { display: block; margin-bottom: 7px; color: var(--muted-foreground
 .data-confidence { display:block; font-size:.75rem; font-weight:400; margin-top:5px; color:var(--muted, #52606b); }
 .data-confidence-panel { border-block:1px solid var(--border, #bbc2c8); padding:16px 0; margin:16px 0; }
 .data-confidence-panel h3 { font-size:1rem; }
+
+.fundamental-rating { padding:16px 0; border-bottom:1px solid var(--border,#bbc2c8); }
+.fundamental-rating details { margin:12px 0; }
+.fundamental-table-wrap { overflow:auto; }
+.fundamental-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+.fundamental-table th,.fundamental-table td { text-align:left; vertical-align:top; padding:12px; border-bottom:1px solid var(--border,#bbc2c8); min-width:140px; }

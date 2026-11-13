@@ -160,7 +160,7 @@ export function createApp(assets, options = {}) {
           if (url.pathname === "/api/analyst") {
             return userJson({ code: "ANALYST_RETIRED", error: "Paid AI requests have been removed. Open Portfolio insights and copy a summary for ChatGPT." }, 410);
           }
-          if (url.pathname === "/api/market/fundamentals") return userJson(await diagnostics.financialSnapshot(marketTicker(url.searchParams.get("ticker"))));
+          if (url.pathname === "/api/market/fundamentals") return userJson(await diagnostics.financialSnapshot(marketTicker(url.searchParams.get("ticker")),env));
           if (url.pathname === "/api/market/history") {
             if (url.searchParams.getAll("ticker").length !== 1 || [...url.searchParams.keys()].some((key) => key !== "ticker")) {
               throw new ApiError(400, "INVALID_TICKER", "Request one ticker without additional options.");

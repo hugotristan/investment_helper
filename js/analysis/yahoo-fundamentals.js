@@ -1,3 +1,4 @@
+import {yahooFinancialHistory,EXTRA_YAHOO_TYPES} from "./financial-history.js";
 import { emptyFundamentals } from "./fundamentals.js";
 
 const DAY_MS = 86400000;
@@ -6,7 +7,7 @@ const TYPES = {
   capitalExpenditures: "annualCapitalExpenditure", freeCashFlow: "annualFreeCashFlow", totalDebt: "annualTotalDebt",
   dilutedEPS: "annualDilutedEPS", basicEPS: "annualBasicEPS"
 };
-export const YAHOO_ANNUAL_TYPES = Object.freeze(Object.values(TYPES));
+export const YAHOO_ANNUAL_TYPES = Object.freeze([...new Set([...Object.values(TYPES),...Object.values(EXTRA_YAHOO_TYPES)])]);
 const CURRENCIES = new Set(typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("currency")
   : ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "CNY", "HKD", "TWD", "KRW", "INR", "SGD", "BRL", "MXN", "ZAR", "SEK", "NOK", "DKK"]);
 
@@ -57,6 +58,7 @@ export function normalizeYahooFinancials(json, { ticker = "", retrievedAt = new 
     record.periodType = "12M";
     record.reason = "Yahoo Finance annual reported values; provider period dates may be nominal. SEC filing dates and missing concepts remain unavailable.";
   }
+  record.historyVersion=1; record.annualHistory=yahooFinancialHistory(json,record);
   return record;
 }
 
@@ -69,6 +71,7 @@ function annualFacts(results, ticker, acquired) {
       || !Array.isArray(types) || types.length !== 1 || !YAHOO_ANNUAL_TYPES.includes(types[0])) continue;
     const type = types[0];
     const metric = Object.keys(TYPES).find((key) => TYPES[key] === type);
+    if (!metric) continue;
     if (!Array.isArray(result[type])) continue;
     for (const item of result[type]) {
       const value = item?.reportedValue?.raw;

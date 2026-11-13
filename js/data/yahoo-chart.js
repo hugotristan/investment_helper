@@ -65,7 +65,7 @@ export function parseYahooQuote(json, ticker, { now = Date.now() } = {}) {
     exchange: meta.fullExchangeName || meta.exchangeName || "", marketState, currency: meta.currency,
     price, previousClose, dayChange: previousClose ? price - previousClose : null,
     dayChangePercent: Number.isFinite(dayChangePercent) ? dayChangePercent : null,
-    volume: Math.max(0, Number(meta.regularMarketVolume) || 0), averageVolume: 0, marketCap: 0, bid: 0, ask: 0,
+    volume: Math.max(0, Number(meta.regularMarketVolume) || 0), averageVolume: 0, marketCap: positive(meta.marketCap), bid: 0, ask: 0,
     high52Week: positive(meta.fiftyTwoWeekHigh) || 0, low52Week: positive(meta.fiftyTwoWeekLow) || 0,
     dayHigh: positive(meta.regularMarketDayHigh) || 0, dayLow: positive(meta.regularMarketDayLow) || 0,
     quoteTime, epsTrailingTwelveMonths: 0, trailingPE: 0, dividendYield: 0,

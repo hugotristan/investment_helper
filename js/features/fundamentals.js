@@ -1,3 +1,4 @@
+import {renderFundamentalRating} from "./fundamental-rating.js";
 import { broadFunds } from "../config/settings.js";
 import { isEtfSeries } from "../analysis/data-quality.js";
 import { loadFundamentalsSnapshot } from "../data/fundamentals.js";
@@ -13,14 +14,15 @@ const metrics = [
 
 export async function renderFundamentals(item, snapshot, { now = Date.now() } = {}) {
   if (item.isFund || broadFunds.has(item.ticker) || isEtfSeries(item)) {
-    return panel("Company fundamentals", '<p class="fundamentals-note">Not applicable to an ETF or fund. Corporate revenue, profit, and earnings dates describe companies; fund holdings require separate analysis.</p>');
+    return renderFundamentalRating(item,snapshot,{now})+panel("Company fundamentals", '<p class="fundamentals-note">Not applicable to an ETF or fund. Corporate revenue, profit, and earnings dates describe companies; fund holdings require separate analysis.</p>');
   }
   const data = snapshot ?? await loadFundamentalsSnapshot(item.ticker);
   const record = data.byTicker?.[item.ticker];
   const verifier = earningsVerifier(item, record);
   const diagnostics = providerDiagnostics(data, item.ticker, record);
+  const ratingPanel=renderFundamentalRating(item,data,{now});
   if (record?.available !== true) {
-    return panel("Company fundamentals", `${diagnostics.html}<p class="fundamentals-note">${escapeHtml(record?.reason || data.reason || "No supported company filing data is available for this ticker.")}</p>
+    return panel("Company fundamentals", `${ratingPanel}${diagnostics.html}<p class="fundamentals-note">${escapeHtml(record?.reason || data.reason || "No supported company filing data is available for this ticker.")}</p>
       ${renderEarnings(record?.earnings, verifier, now)}`, '<span class="fundamentals-status is-unavailable">Unavailable</span>');
   }
   const retrieved = timestamp(record.retrievedAt);
@@ -30,7 +32,7 @@ export async function renderFundamentals(item, snapshot, { now = Date.now() } = 
   const grid = metrics.map(([key, label]) => renderMetric(record, key, label)).join("");
   const periodNote = yahoo ? "Source: Yahoo Finance. Its 12-month reporting periods are provider dates; SEC filing and fiscal-year dates are unavailable." : "Filed reporting periods are historical; retrieval time does not change them.";
   const note = `${stale ? "Refresh is needed. " : ""}Data retrieved ${dateLabel(record.retrievedAt)}. ${periodNote}`;
-  return panel("Company fundamentals", `<p class="fundamentals-note">${escapeHtml(note)}</p>
+  return panel("Company fundamentals", `${ratingPanel}<p class="fundamentals-note">${escapeHtml(note)}</p>
     ${record.reason ? `<p class="fundamentals-note">${escapeHtml(record.reason)}</p>` : ""}
     <p class="fundamentals-note">Company financials are separate from the Technical Score. Reported figures do not establish fair value.</p>
     <div class="fundamentals-grid">${grid}</div>

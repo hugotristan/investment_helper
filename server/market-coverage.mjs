@@ -125,7 +125,10 @@ export function createCompanyProvider({ cache, readAsset, fetchImpl = (url, init
           const facts = await providerJson('SEC', `https://data.sec.gov/api/xbrl/companyfacts/CIK${cik.padStart(10,'0')}.json`);
           if (String(facts.cik).replace(/^0+/, '') !== cik) throw new Error('Issuer mismatch');
           const record = normalizeSecCompanyFacts(facts, {ticker, cik, retrievedAt:new Date(now()).toISOString()});
-          if (record.available) return {...record, provider:'SEC companyfacts'};
+          if (record.available) {
+            try {const metadata=await providerJson('SEC',`https://data.sec.gov/submissions/CIK${cik.padStart(10,'0')}.json`);if(String(metadata.cik).replace(/^0+/,'')===cik&&metadata.tickers?.includes(ticker)&&/^\d{4}$/.test(String(metadata.sic)))record.issuerMetadata={sic:String(metadata.sic),industry:metadata.sicDescription,source:'SEC submissions',verifiedAt:new Date(now()).toISOString()};} catch {}
+            return {...record, provider:'SEC companyfacts'};
+          }
           failures.push('SEC: no supported annual company facts.');
         } catch(error) { failures.push(error instanceof ApiError ? error.message : 'SEC company facts failed validation.'); }
       } else failures.push('SEC issuer mapping is unavailable; no unverified CIK was requested.');
@@ -138,7 +141,7 @@ export function createCompanyProvider({ cache, readAsset, fetchImpl = (url, init
         failures.push('Yahoo financials: no supported annual financial statements.');
       } catch(error) { failures.push(error instanceof ApiError ? error.message : 'Yahoo financials failed.'); }
       throw new ApiError(503,'METRICS_UNAVAILABLE',failures.join(' '));
-    }, {ttl:7*DAY, background, validate:record => record?.ticker === ticker && record.available === true && Number.isFinite(Date.parse(record.retrievedAt)) && Date.parse(record.retrievedAt)<=now()});
+    }, {ttl:7*DAY, background, validate:record => record?.ticker === ticker && record.available === true && record.historyVersion === 1 && Number.isFinite(Date.parse(record.retrievedAt)) && Date.parse(record.retrievedAt)<=now()});
     return { ...info, ...result.value, stale:result.stale, refreshError:result.error };
   }
   return { company, identity };
